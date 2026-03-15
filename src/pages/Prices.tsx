@@ -1,86 +1,69 @@
-import { Check } from 'lucide-react';
+import { Zap, Sparkles, AlertCircle } from 'lucide-react';
 
 const PRICES_NORMAL = [
-  { iv: '4 IVs', price: '40.000' },
-  { iv: '5 IVs Castrado', price: '70.000' },
-  { iv: '5 IVs Reproduzível', price: '80.000' },
-  { iv: '6 IVs Castrado', price: '90.000' },
-  { iv: '6 IVs Reproduzível', price: '100.000' }
+  { iv: '4 IVs', price: '40k', label: 'Iniciante' },
+  { iv: '5 IVs Castrado', price: '70k', label: 'Eficaz' },
+  { iv: '5 IVs Reproduzível', price: '80k', label: 'Avançado' },
+  { iv: '6 IVs Castrado', price: '90k', label: 'Perfeito' },
+  { iv: '6 IVs Reproduzível', price: '100k', label: 'Elite' }
 ];
 
 const PRICES_GENDERLESS = [
-  { iv: '4 IVs', price: '80.000' },
-  { iv: '5 IVs Castrado', price: '140.000' },
-  { iv: '5 IVs Reproduzível', price: '160.000' },
-  { iv: '6 IVs Castrado', price: '180.000' },
-  { iv: '6 IVs Reproduzível', price: '200.000' }
+  { iv: '4 IVs', price: '80k', label: 'Iniciante' },
+  { iv: '5 IVs Castrado', price: '140k', label: 'Eficaz' },
+  { iv: '5 IVs Reproduzível', price: '160k', label: 'Avançado' },
+  { iv: '6 IVs Castrado', price: '180k', label: 'Perfeito' },
+  { iv: '6 IVs Reproduzível', price: '200k', label: 'Elite' }
 ];
 
 export const Prices = () => {
   return (
-    <div className="py-10 animate-fade">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
-          Nossa Tabela de Preços
-        </h2>
-        <p className="text-gray-400">Valores em Pokédollars (PD). Qualidade premium em cada breed.</p>
+    <div className="max-w-6xl mx-auto px-4 animate-fade">
+      <div className="mb-20 text-center">
+        <h2 className="pixel-title text-4xl mb-4">Tabela de <span className="text-primary">Valores</span></h2>
+        <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-xs">Precisão técnica com preço justo</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Normal Breeding */}
-        <div className="card border-purple-500/20">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-bold">Pokémon Com Gênero</h3>
-            <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-xs font-bold uppercase tracking-widest border border-purple-500/20">
-              Padrão
-            </span>
-          </div>
-          <div className="space-y-4">
-            {PRICES_NORMAL.map((p, i) => (
-              <div key={i} className="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-white/5 hover:border-purple-500/30 transition-all">
-                <span className="text-gray-300 font-medium">{p.iv}</span>
-                <span className="text-xl font-bold text-white">{p.price} <span className="text-xs text-purple-400">PD</span></span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Genderless Breeding */}
-        <div className="card border-blue-500/20">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-bold">Pokémon Sem Gênero</h3>
-            <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold uppercase tracking-widest border border-blue-500/20">
-              Ditto Breeding
-            </span>
-          </div>
-          <div className="space-y-4">
-            {PRICES_GENDERLESS.map((p, i) => (
-              <div key={i} className="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/30 transition-all">
-                <span className="text-gray-300 font-medium">{p.iv}</span>
-                <span className="text-xl font-bold text-white">{p.price} <span className="text-xs text-blue-400">PD</span></span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
+        <PriceTable title="Normal Breeding" data={PRICES_NORMAL} icon={<Zap size={24} className="text-primary" />} />
+        <PriceTable title="Genderless Breeding" data={PRICES_GENDERLESS} icon={<Sparkles size={24} className="text-secondary" />} />
       </div>
 
-      <div className="mt-12 glass p-8 rounded-2xl text-center border border-purple-500/20">
-        <h4 className="text-xl font-bold mb-4">Serviços Adicionais</h4>
-        <div className="flex flex-wrap justify-center gap-6">
-          <div className="flex items-center gap-2 text-gray-300">
-            <Check size={18} className="text-purple-400" />
-            <span>Habilidade Oculta: <strong>+15.000 PD</strong></span>
-          </div>
-          <div className="flex items-center gap-2 text-gray-300">
-            <Check size={18} className="text-purple-400" />
-            <span>Nature Personalizada: <strong>Grátis</strong></span>
-          </div>
-          <div className="flex items-center gap-2 text-gray-300">
-            <Check size={18} className="text-purple-400" />
-            <span>Gênero Específico: <strong>Grátis</strong></span>
+      <div className="glow-card p-10 flex flex-col md:flex-row items-center gap-10 bg-primary/5 border-primary/20">
+        <div className="p-5 bg-primary/20 rounded-full">
+          <AlertCircle size={48} className="text-primary" />
+        </div>
+        <div className="flex-1 text-center md:text-left">
+          <h3 className="pixel-title text-xl mb-2 text-white">Serviços Adicionais</h3>
+          <p className="text-gray-400 leading-relaxed mb-4">Habilidade Oculta (HA) possui um custo adicional fixo de <span className="text-secondary font-black">15k</span> por pedido, devido à raridade genética.</p>
+          <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+            <span className="px-4 py-2 bg-white/5 rounded-lg border border-white/10 text-xs font-bold text-gray-400">Natureza Custom: <span className="text-primary font-black">GRÁTIS</span></span>
+            <span className="px-4 py-2 bg-white/5 rounded-lg border border-white/10 text-xs font-bold text-gray-400">Gênero Escolhido: <span className="text-primary font-black">GRÁTIS</span></span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+const PriceTable = ({ title, data, icon }: any) => (
+  <div className="glow-card overflow-hidden">
+    <div className="p-8 border-b border-white/5 flex items-center justify-between">
+      <h3 className="pixel-title text-xl">{title}</h3>
+      {icon}
+    </div>
+    <div className="divide-y divide-white/5">
+      {data.map((item: any, i: number) => (
+        <div key={i} className="px-8 py-5 flex justify-between items-center hover:bg-white/[0.02] transition-colors">
+          <div>
+            <p className="text-[10px] font-black text-gray-600 uppercase mb-1">{item.label}</p>
+            <p className="font-bold">{item.iv}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-black text-primary">{item.price}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);

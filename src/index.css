@@ -1,16 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Silkscreen:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --bg-dark: #0a0a0c;
-  --bg-card: #151518;
-  --bg-card-hover: #1c1c21;
-  --primary: #8b5cf6; /* Purple */
-  --primary-glow: rgba(139, 92, 246, 0.3);
-  --secondary: #3b82f6; /* Blue */
-  --secondary-glow: rgba(59, 130, 246, 0.3);
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --accent-gradient: linear-gradient(135deg, var(--primary), var(--secondary));
-  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --primary: #FF1493; /* Deep Pink (Iron Valiant Blade) */
+  --primary-glow: rgba(255, 20, 147, 0.4);
+  --secondary: #4ADE80; /* Green (Iron Valiant Skin) */
+  --secondary-glow: rgba(74, 222, 128, 0.3);
+  --accent: #E5E7EB; /* Silver/White */
+  --bg-black: #000000;
+  --card-bg: rgba(0, 0, 0, 0.85);
+  --border-glow: 2px solid var(--primary);
+  --font-pixel: 'Silkscreen', cursive;
+  --font-sans: 'Inter', sans-serif;
+  --transition-fast: all 0.2s ease-out;
 }
 
 * {
@@ -20,100 +25,89 @@
 }
 
 body {
-  background-color: var(--bg-dark);
-  color: var(--text-main);
-  font-family: var(--font-family);
-  line-height: 1.6;
+  background-color: var(--bg-black);
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
   overflow-x: hidden;
 }
 
-h1, h2, h3, h4 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+/* Background Image Overlay */
+.bg-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  z-index: -1;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.pixel-title {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
-.glass {
-  background: rgba(21, 21, 24, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-}
-
-.card {
-  background: var(--bg-card);
-  border-radius: 16px;
-  border: 1px solid var(--border-color);
-  padding: 24px;
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  border-color: var(--primary);
-  transform: translateY(-4px);
-  box-shadow: 0 10px 30px -10px var(--primary-glow);
-}
-
-.btn-primary {
-  background: var(--accent-gradient);
-  color: white;
-  padding: 12px 24px;
+.glow-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  transition: var(--transition-fast);
+  position: relative;
+  overflow: hidden;
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
+.glow-card:hover {
+  border-color: var(--primary);
   box-shadow: 0 0 20px var(--primary-glow);
+  transform: translateY(-4px);
 }
 
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: 600;
+.btn-manda {
+  @apply px-8 py-3 rounded-lg font-bold uppercase tracking-wider transition-all duration-200;
+  background: var(--primary);
+  box-shadow: 0 0 15px var(--primary-glow);
 }
 
-.btn-outline:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+.btn-manda:hover {
+  filter: brightness(1.2);
+  transform: scale(1.02);
 }
 
-/* Scrollbar */
+.nav-link-manda {
+  @apply text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-white transition-all;
+}
+
+.nav-link-manda.active {
+  @apply text-primary;
+  text-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
-
 ::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: black;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #333;
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
 
-/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade {
-  animation: fadeIn 0.5s ease forwards;
+  animation: fadeIn 0.5s ease-out forwards;
 }
