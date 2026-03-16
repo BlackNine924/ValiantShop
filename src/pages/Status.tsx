@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Clock, Package, CheckCircle2, Coins } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
@@ -15,15 +15,18 @@ export const Status = () => {
 
     const q = query(
       collection(db, 'orders'),
-      where('playerNick', '==', user.displayName),
-      orderBy('createdAt', 'desc')
+      where('playerNick', '==', user.displayName)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeB - timeA;
+      });
       setOrders(ordersData);
       setLoading(false);
     });
@@ -91,6 +94,7 @@ export const Status = () => {
             <thead>
               <tr className="border-b border-white/5 bg-white/5">
                 <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
                 <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
@@ -99,9 +103,9 @@ export const Status = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
+                <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
               ) : filteredOrders.length === 0 ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
+                <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
               ) : filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-8 py-6">
@@ -109,6 +113,11 @@ export const Status = () => {
                       <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
                       <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
                     </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
+                      {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
+                    </span>
                   </td>
                   <td className="px-8 py-6">
                     <div className="flex flex-col gap-1">
