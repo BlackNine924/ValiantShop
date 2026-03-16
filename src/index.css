@@ -110,3 +110,540 @@ body {
 .animate-fade {
   animation: fadeIn 0.5s ease-out forwards;
 }
+
+/* =====================================================
+   POKEGRID STYLES
+   ===================================================== */
+
+.pokegrid-container {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* Scoreboard */
+.pokegrid-scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 12px 20px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.pokegrid-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pokegrid-stat svg {
+  color: var(--primary);
+}
+
+.pokegrid-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pokegrid-surrender-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pokegrid-surrender-btn:hover {
+  background: rgba(255, 100, 100, 0.15);
+  border-color: rgba(255, 100, 100, 0.3);
+  color: #ff6b6b;
+  transform: scale(1.05);
+}
+
+.pokegrid-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: black;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+.pokegrid-new-btn:hover {
+  filter: brightness(1.2);
+  transform: scale(1.05);
+}
+
+/* Wrong guess toast */
+.pokegrid-wrong-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff6b6b;
+  background: rgba(255, 50, 50, 0.12);
+  border: 1px solid rgba(255, 50, 50, 0.25);
+  border-radius: 10px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Grid Wrapper – CSS Grid 4 cols (1 header + 3 cells) */
+.pokegrid-grid-wrapper {
+  display: grid;
+  grid-template-columns: 100px repeat(3, 1fr);
+  gap: 6px;
+}
+
+/* Corner (empty top-left) */
+.pokegrid-corner {
+  border-radius: 10px;
+}
+
+/* Type Headers (row & col) */
+.pokegrid-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 2px solid color-mix(in srgb, var(--type-color) 40%, transparent);
+  transition: all 0.2s;
+}
+
+.pokegrid-type-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.pokegrid-type-label {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--type-color);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--type-color) 50%, transparent);
+}
+
+/* Grid Cells */
+.pokegrid-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  min-height: 100px;
+}
+
+.pokegrid-cell:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: rgba(74, 222, 128, 0.06);
+  box-shadow: 0 0 20px var(--primary-glow);
+  transform: scale(1.03);
+}
+
+.pokegrid-cell.correct {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(0,0,0,0.3));
+  cursor: default;
+  animation: correctPop 0.4s ease-out;
+}
+
+.pokegrid-cell.game-over {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pokegrid-cell.shake {
+  animation: gridShake 0.4s ease-out;
+  border-color: #ff4444 !important;
+  background: rgba(255, 50, 50, 0.1) !important;
+}
+
+/* Cell content – filled */
+.pokegrid-cell-filled {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+}
+
+.pokegrid-cell-sprite {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px var(--primary-glow));
+  animation: spriteAppear 0.3s ease-out;
+}
+
+.pokegrid-cell-name {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: white;
+  letter-spacing: 0.05em;
+  text-align: center;
+  line-height: 1.1;
+}
+
+/* Cell content – empty */
+.pokegrid-cell-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.pokegrid-cell-plus {
+  font-size: 28px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.15);
+  transition: color 0.2s;
+}
+.pokegrid-cell:hover .pokegrid-cell-plus {
+  color: var(--primary);
+}
+
+.pokegrid-cell-reveal {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  padding: 4px;
+}
+
+/* Game-over reveal with sprite */
+.pokegrid-cell-reveal-filled {
+  opacity: 0.45;
+}
+.pokegrid-cell-sprite-reveal {
+  filter: grayscale(0.5) drop-shadow(0 0 4px rgba(255,255,255,0.1)) !important;
+  animation: spriteAppear 0.5s ease-out !important;
+}
+.pokegrid-cell-name-reveal {
+  color: rgba(255,255,255,0.5) !important;
+}
+
+/* Game Over Bar */
+.pokegrid-game-over-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding: 16px 24px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.pokegrid-victory-text {
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  color: var(--primary);
+  text-shadow: 0 0 12px var(--primary-glow);
+}
+
+.pokegrid-over-text {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #aaa;
+  letter-spacing: 0.06em;
+}
+
+.pokegrid-play-again {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: black;
+  background: var(--secondary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 0 12px var(--secondary-glow);
+}
+.pokegrid-play-again:hover {
+  filter: brightness(1.2);
+  transform: scale(1.05);
+}
+
+/* =====================================================
+   SEARCH MODAL STYLES
+   ===================================================== */
+
+.pokegrid-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.pokegrid-modal {
+  width: 90%;
+  max-width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(15, 15, 15, 0.95);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  animation: modalSlide 0.25s ease-out;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.pokegrid-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.pokegrid-modal-header h3 {
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  color: white;
+  margin: 0 0 4px;
+}
+
+.pokegrid-modal-hint {
+  font-size: 11px;
+  color: #888;
+  margin: 0;
+}
+
+.type-badge-mini {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--primary);
+  background: rgba(74,222,128,0.1);
+  border: 1px solid rgba(74,222,128,0.2);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.pokegrid-close-btn {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.pokegrid-close-btn:hover {
+  color: white;
+}
+
+/* Search bar */
+.pokegrid-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.pokegrid-search-icon {
+  color: #555;
+  flex-shrink: 0;
+}
+
+.pokegrid-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: white;
+  font-family: var(--font-sans);
+}
+
+.pokegrid-search-input::placeholder {
+  color: #444;
+}
+
+/* Results list */
+.pokegrid-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  max-height: 50vh;
+}
+
+.pokegrid-no-results {
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: #555;
+}
+
+.pokegrid-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  color: white;
+}
+
+.pokegrid-result-item:hover {
+  background: rgba(74,222,128,0.06);
+  border-color: rgba(74,222,128,0.2);
+}
+
+.pokegrid-result-sprite {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.pokegrid-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pokegrid-result-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pokegrid-result-types {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pokegrid-result-id {
+  font-size: 11px;
+  font-weight: 600;
+  color: #444;
+  font-family: monospace;
+}
+
+/* =====================================================
+   POKEGRID ANIMATIONS
+   ===================================================== */
+
+@keyframes correctPop {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.06); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes gridShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes spriteAppear {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes modalSlide {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* =====================================================
+   POKEGRID RESPONSIVE
+   ===================================================== */
+
+@media (max-width: 480px) {
+  .pokegrid-grid-wrapper {
+    grid-template-columns: 70px repeat(3, 1fr);
+    gap: 4px;
+  }
+  .pokegrid-cell {
+    min-height: 70px;
+  }
+  .pokegrid-cell-sprite {
+    width: 44px;
+    height: 44px;
+  }
+  .pokegrid-type-icon {
+    font-size: 16px;
+  }
+  .pokegrid-type-label {
+    font-size: 8px;
+  }
+  .pokegrid-scoreboard {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .pokegrid-stat {
+    font-size: 11px;
+  }
+}

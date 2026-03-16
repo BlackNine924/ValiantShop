@@ -4,6 +4,7 @@ import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { PokeGridPage } from './pages/PokeGridPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
@@ -52,7 +53,13 @@ const HomePage = () => {
           desc="Acompanhe sua encomenda ao vivo."
           color="secondary"
         />
-
+        <CategoryCard 
+          to="/pokegrid" 
+          icon={<div className="font-black text-2xl px-2">PG</div>} 
+          title="POKEGRID" 
+          desc="Minigame diário de conhecimento Pokémon."
+          color="primary"
+        />
       </div>
     </div>
   );
@@ -91,6 +98,7 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
             <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
             <Link to="/order" className={`nav-link-manda ${isActive('/order') ? 'active' : ''}`}>Encomendas</Link>
             <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
+            <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokeGrid</Link>
             {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
           </div>
 
@@ -176,6 +184,7 @@ function App() {
                 <Route path="/prices" element={<Prices />} />
                 <Route path="/status" element={<Status />} />
                 <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/pokegrid" element={<PokeGridPage />} />
               </Routes>
             </main>
             <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
