@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X } from 'lucide-react';
+import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Package } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getEggGroups } from '../data/eggGroups';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'estoque'>('pedidos');
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -103,6 +104,9 @@ export const AdminDashboard = () => {
             <button onClick={() => setActiveTab('treinadores')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'treinadores' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
               <Users size={18} /> Treinadores ({uniqueTrainers})
             </button>
+            <button onClick={() => setActiveTab('estoque')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'estoque' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+              <Package size={18} /> Estoque Fixo
+            </button>
             <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
               <PieChart size={18} /> Caixa: {totalEconomy}k
             </button>
@@ -118,7 +122,7 @@ export const AdminDashboard = () => {
 
         <main className="lg:col-span-3 space-y-8">
           <div className="flex justify-between items-center bg-white/5 p-8 rounded-2xl border border-white/5">
-            <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : 'Treinadores'}</span></h2>
+            <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'treinadores' ? 'Treinadores' : 'Estoque'}</span></h2>
             <div className="flex gap-4">
                <div className="relative">
                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -190,28 +194,40 @@ export const AdminDashboard = () => {
                   <>
                     <thead>
                       <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
-                        <th className="px-8 py-5">Treinador Mestre</th>
-                        <th className="px-8 py-5">Volume de Pedidos</th>
-                        <th className="px-8 py-5">Total Investido</th>
+                        <th className="px-8 py-5">Pokémon (Espécie)</th>
+                        <th className="px-8 py-5 text-center">F4 (Em Caixa)</th>
+                        <th className="px-8 py-5 text-center">F5 (Em Caixa)</th>
+                        <th className="px-8 py-5 text-center">F6 (Em Caixa)</th>
+                        <th className="px-8 py-5">Egg Groups</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {Object.values(orders.reduce((acc, o) => {
-                        const nick = o.playerNick || 'Desconhecido';
-                        if (!acc[nick]) acc[nick] = { nick, count: 0, total: 0 };
-                        acc[nick].count++;
-                        acc[nick].total += o.totalPrice || 0;
-                        return acc;
-                      }, {} as Record<string, {nick: string, count: number, total: number}>))
-                      .filter((t: any) => t.nick.toLowerCase().includes(searchTerm.toLowerCase()))
-                      .sort((a: any, b: any) => b.total - a.total)
-                      .map((trainer: any) => (
-                        <tr key={trainer.nick} className="hover:bg-white/[0.01]">
-                          <td className="px-8 py-6 font-bold text-white">{trainer.nick}</td>
-                          <td className="px-8 py-6 text-gray-400 font-black">{trainer.count} Encomendas</td>
-                          <td className="px-8 py-6 font-black text-secondary">{trainer.total / 1000}k</td>
+                      {/* MOCK DATA PARA EXEMPLO DE COMO IMPLEMENTAR */}
+                      {[
+                        { pokemon: 'Gible', f4: 12, f5: 3, f6: 1 },
+                        { pokemon: 'Magikarp', f4: 5, f5: 8, f6: 0 },
+                        { pokemon: 'Beldum', f4: 2, f5: 1, f6: 0 }
+                      ].filter(p => p.pokemon.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                        <tr key={item.pokemon} className="hover:bg-white/[0.01]">
+                          <td className="px-8 py-6 font-bold text-white flex items-center gap-3">
+                            <span className="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_var(--secondary-glow)]"></span>
+                            {item.pokemon}
+                          </td>
+                          <td className="px-8 py-6 text-center text-gray-400 font-black">{item.f4}</td>
+                          <td className="px-8 py-6 text-center text-primary font-black">{item.f5}</td>
+                          <td className="px-8 py-6 text-center text-secondary font-black">{item.f6}</td>
+                          <td className="px-8 py-6">
+                            <div className="flex gap-2">
+                              {getEggGroups(item.pokemon).map(eg => (
+                                <span key={eg} className="px-2 py-1 bg-white/5 border border-white/10 rounded-md text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                  {eg}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
                         </tr>
                       ))}
+                      <tr><td colSpan={5} className="px-8 py-6 border-t-4 border-black text-[10px] uppercase text-gray-600 font-bold text-center tracking-widest">Estes dados são estruturais e devem ser consumidos de um Banco de Dados próprio que você criará Futuramente!</td></tr>
                     </tbody>
                   </>
                 )}
