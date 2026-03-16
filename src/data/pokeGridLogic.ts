@@ -4,6 +4,8 @@
  */
 import { POKEMON_TYPE_DATA, ALL_TYPES } from './pokemonTypes';
 import type { PokemonEntry, PokemonType } from './pokemonTypes';
+import * as Mappings from './categoryMappings';
+import { EGG_GROUPS_MAP } from './eggGroups';
 
 export interface GridCell {
   row: number;
@@ -279,10 +281,62 @@ function buildAllCriteria(): Criterion[] {
     });
   }
 
+  // 10. Evolution Stages
+  const evoColor = '#FAB005';
+  criteria.push(
+    { id: 'evo-3stages', label: '3 Estágios', emoji: '📈', color: evoColor, matches: (p) => Mappings.THREE_STAGE_EVOLUTION_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-none', label: 'Sem Evolução', emoji: '🛑', color: evoColor, matches: (p) => Mappings.NO_EVOLUTION_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-can', label: 'Pode Evoluir', emoji: '✨', color: evoColor, matches: (p) => Mappings.CAN_EVOLVE_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-final', label: 'Forma Final', emoji: '🏁', color: evoColor, matches: (p) => Mappings.FINAL_STAGE_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-middle', label: 'Forma do Meio', emoji: '⏳', color: evoColor, matches: (p) => Mappings.MIDDLE_STAGE_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-initial', label: 'Forma Inicial', emoji: '🥚', color: evoColor, matches: (p) => Mappings.FIRST_STAGE_IDS.has(getBaseId(p.id)) }
+  );
+
+  // 11. Evolution Methods
+  criteria.push(
+    { id: 'evo-stone', label: 'Evolui por Pedra', emoji: '💎', color: evoColor, matches: (p) => Mappings.STONE_EVOLUTION_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-trade', label: 'Evolui por Troca', emoji: '🔄', color: evoColor, matches: (p) => Mappings.TRADE_EVOLUTION_IDS.has(getBaseId(p.id)) },
+    { id: 'evo-friend', label: 'Evolui por Amizade', emoji: '🤝', color: evoColor, matches: (p) => Mappings.FRIENDSHIP_EVOLUTION_IDS.has(getBaseId(p.id)) }
+  );
+
+  // 12. Regional Forms
+  const regionalColor = '#228BE6';
+  criteria.push(
+    { id: 'region-alola', label: 'Alola', emoji: '🏝️', color: regionalColor, matches: (p) => Mappings.ALOLA_IDS.has(p.id) },
+    { id: 'region-galar', label: 'Galar', emoji: '⚔️', color: regionalColor, matches: (p) => Mappings.GALAR_IDS.has(p.id) },
+    { id: 'region-hisui', label: 'Hisui', emoji: '📜', color: regionalColor, matches: (p) => Mappings.HISUI_IDS.has(p.id) },
+    { id: 'region-paldea', label: 'Paldea', emoji: '🍷', color: regionalColor, matches: (p) => Mappings.PALDEA_IDS.has(p.id) }
+  );
+
+  // 13. Specials
+  criteria.push(
+    { id: 'dynamax', label: 'Dynamax', emoji: '🔴', color: '#E64980', matches: (p) => Mappings.DYNAMAX_IDS.has(getBaseId(p.id)) },
+    { id: 'babys', label: 'Babys', emoji: '👶', color: regionalColor, matches: (p) => Mappings.BABY_IDS.has(getBaseId(p.id)) },
+    { id: 'paradox', label: 'Paradoxo', emoji: '🌀', color: '#BE4BDB', matches: (p) => Mappings.PARADOX_IDS.has(getBaseId(p.id)) },
+    { id: 'ultrabeast', label: 'Ultrabeast', emoji: '👾', color: '#15AABF', matches: (p) => Mappings.ULTRABEAST_IDS.has(getBaseId(p.id)) },
+    { id: 'pseudo-legendary', label: 'Pseudo-Lendário', emoji: '🐉', color: '#82C91E', matches: (p) => Mappings.PSEUDO_LEGENDARY_IDS.has(getBaseId(p.id)) }
+  );
+
+  // 14. Egg Groups
+  const eggGroupColor = '#FD7E14';
+  const eggGroups = ['Monster', 'Bug', 'Flying', 'Plant', 'Mineral', 'Dragon', 'Fairy', 'Humanshape', 'Water 1', 'Water 2', 'Water 3', 'Indeterminate'];
+  for (const group of eggGroups) {
+    criteria.push({
+      id: `egg-${group.toLowerCase().replace(' ', '')}`,
+      label: `Grupo: ${group}`,
+      emoji: '🥚',
+      color: eggGroupColor,
+      matches: (p) => {
+        const pGroups = EGG_GROUPS_MAP[p.name.toLowerCase().replace('-', '').replace(' ', '')];
+        return pGroups ? pGroups.includes(group) : false;
+      }
+    });
+  }
+
   return criteria;
 }
 
-const ALL_CRITERIA = buildAllCriteria();
+export const ALL_CRITERIA = buildAllCriteria();
 
 // ─── Shuffle ──────────────────────────────────────────────────
 
@@ -361,11 +415,19 @@ export function searchPokemon(query: string): PokemonEntry[] {
 
 // ─── Grid generation ─────────────────────────────────────────
 
-export function generateGrid(): GameGrid {
+export function generateGrid(enabledCriteriaIds?: Set<string>): GameGrid {
   const MAX_ATTEMPTS = 500;
+  const pool = enabledCriteriaIds 
+    ? ALL_CRITERIA.filter(c => enabledCriteriaIds.has(c.id))
+    : ALL_CRITERIA;
+
+  if (pool.length < 6) {
+    // Not enough categories selected, fallback to all
+    return generateGrid();
+  }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const shuffled = shuffle(ALL_CRITERIA);
+    const shuffled = shuffle(pool);
     const picked: Criterion[] = [];
     const usedIds = new Set<string>();
 

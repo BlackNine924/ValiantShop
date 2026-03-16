@@ -1,14 +1,21 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  generateGrid, validateGuess, getUniqueGridAnswers, getBaseId
+  generateGrid, validateGuess, getUniqueGridAnswers, getBaseId, ALL_CRITERIA
 } from '../data/pokeGridLogic';
 import type { GameGrid, Criterion } from '../data/pokeGridLogic';
 import { getSpriteUrl } from '../data/pokemonTypes';
 import type { PokemonEntry } from '../data/pokemonTypes';
 import { PokemonSearchModal } from './PokemonSearchModal';
-import { RotateCcw, Trophy, Zap, XCircle } from 'lucide-react';
+import { SettingsModal } from './SettingsModal';
+import { RotateCcw, Trophy, Zap, XCircle, Settings, Timer as TimerIcon } from 'lucide-react';
 
 export const PokeGrid: React.FC = () => {
+  // Settings State
+  const [enabledCriteriaIds, setEnabledCriteriaIds] = useState<Set<string>>(new Set(ALL_CRITERIA.map(c => c.id)));
+  const [unlimitedMode, setUnlimitedMode] = useState(false);
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const [grid, setGrid] = useState<GameGrid>(() => generateGrid());
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,14 +28,34 @@ export const PokeGrid: React.FC = () => {
   const [isSurrendered, setIsSurrendered] = useState(false);
   const [shakeCell, setShakeCell] = useState<string | null>(null);
 
+  // Timer logic
+  const [time, setTime] = useState(0);
+  const [timerActive, setTimerActive] = useState(false);
+
+  useEffect(() => {
+    let interval: any;
+    if (timerActive && timerEnabled && !gameComplete && !isSurrendered) {
+      interval = setInterval(() => {
+        setTime(t => t + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerActive, timerEnabled, gameComplete, isSurrendered]);
+
   const correctCount = grid.cells.flat().filter(c => c.isCorrect).length;
-  const isGameOver = guesses >= maxGuesses || correctCount === 9 || isSurrendered;
+  const isGameOver = (!unlimitedMode && guesses >= maxGuesses) || correctCount === 9 || isSurrendered;
 
   // Calculate unique reveal answers once the game is over
   const revealGrid = useMemo(() => {
     if (!isGameOver) return null;
     return getUniqueGridAnswers(grid, usedPokemon);
   }, [isGameOver, grid, usedPokemon]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleCellClick = (row: number, col: number) => {
     if (isGameOver || grid.cells[row][col].isCorrect) return;
@@ -40,6 +67,9 @@ export const PokeGrid: React.FC = () => {
   const handleSelect = useCallback((pokemon: PokemonEntry) => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
+
+    // Start timer on first interaction
+    if (!timerActive) setTimerActive(true);
 
     const baseId = getBaseId(pokemon.id);
     const usedBaseIds = Array.from(usedPokemon).map(id => getBaseId(id));
@@ -66,7 +96,9 @@ export const PokeGrid: React.FC = () => {
       setScore(s => s + 1);
       setIsModalOpen(false);
     } else {
-      setGuesses(g => g + 1);
+      if (!unlimitedMode) {
+        setGuesses(g => g + 1);
+      }
       setShakeCell(`${row}-${col}`);
       setWrongGuess(`${pokemon.name} não atende aos requisitos!`);
       setTimeout(() => {
@@ -81,11 +113,12 @@ export const PokeGrid: React.FC = () => {
     const newCorrect = newCells.flat().filter(c => c.isCorrect).length;
     if (newCorrect === 9) {
       setGameComplete(true);
+      setTimerActive(false);
     }
-  }, [selectedCell, grid, usedPokemon]);
+  }, [selectedCell, grid, usedPokemon, unlimitedMode, timerActive]);
 
   const handleNewGame = () => {
-    setGrid(generateGrid());
+    setGrid(generateGrid(enabledCriteriaIds));
     setScore(0);
     setGuesses(0);
     setUsedPokemon(new Set());
@@ -93,12 +126,15 @@ export const PokeGrid: React.FC = () => {
     setIsSurrendered(false);
     setWrongGuess(null);
     setSelectedCell(null);
+    setTime(0);
+    setTimerActive(false);
   };
 
   const handleSurrender = () => {
     if (isGameOver) return;
     if (window.confirm('Tem certeza que deseja desistir e revelar as respostas?')) {
       setIsSurrendered(true);
+      setTimerActive(false);
     }
   };
 
@@ -106,15 +142,29 @@ export const PokeGrid: React.FC = () => {
     <div className="pokegrid-container">
       {/* Scoreboard */}
       <div className="pokegrid-scoreboard">
-        <div className="pokegrid-stat">
-          <Trophy size={16} />
-          <span>{score}/9</span>
+        <div className="flex gap-4">
+          <div className="pokegrid-stat">
+            <Trophy size={16} />
+            <span>{score}/9</span>
+          </div>
+          {!unlimitedMode && (
+            <div className="pokegrid-stat">
+              <Zap size={16} />
+              <span>{guesses}/{maxGuesses}</span>
+            </div>
+          )}
+          {timerEnabled && (
+            <div className="pokegrid-stat bg-primary/10 text-primary">
+              <TimerIcon size={16} />
+              <span>{formatTime(time)}</span>
+            </div>
+          )}
         </div>
-        <div className="pokegrid-stat">
-          <Zap size={16} />
-          <span>{guesses}/{maxGuesses} erros</span>
-        </div>
+        
         <div className="pokegrid-actions">
+          <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all" onClick={() => setIsSettingsOpen(true)}>
+            <Settings size={20} />
+          </button>
           {!isGameOver && (
             <button className="pokegrid-surrender-btn" onClick={handleSurrender}>
               <XCircle size={14} />
@@ -195,7 +245,10 @@ export const PokeGrid: React.FC = () => {
       {isGameOver && (
         <div className="pokegrid-game-over-bar">
           {gameComplete ? (
-            <span className="pokegrid-victory-text">🎉 PERFEITO! Você acertou todos os 9!</span>
+            <div className="flex flex-col items-center">
+              <span className="pokegrid-victory-text">🎉 PERFEITO! Você acertou todos os 9!</span>
+              {timerEnabled && <span className="text-xs font-bold text-primary mt-1">Tempo Final: {formatTime(time)}</span>}
+            </div>
           ) : isSurrendered ? (
             <span className="pokegrid-over-text">Você desistiu! Acertos: {score}/9</span>
           ) : (
@@ -219,6 +272,19 @@ export const PokeGrid: React.FC = () => {
           colLabel={grid.colLabels[selectedCell.col].label}
         />
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        enabledCriteriaIds={enabledCriteriaIds}
+        setEnabledCriteriaIds={setEnabledCriteriaIds}
+        unlimitedMode={unlimitedMode}
+        setUnlimitedMode={setUnlimitedMode}
+        timerEnabled={timerEnabled}
+        setTimerEnabled={setTimerEnabled}
+        onRestart={handleNewGame}
+      />
     </div>
   );
 };
