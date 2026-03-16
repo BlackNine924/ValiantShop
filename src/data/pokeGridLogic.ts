@@ -30,13 +30,25 @@ export interface Criterion {
 // ─── Pokémon with Mega Evolutions ──────────────────────────────
 // ─── Pokémon with Mega Evolutions ──────────────────────────────
 const MEGA_POKEMON_IDS = new Set([
-  3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150, 181,
-  208, 212, 214, 229, 248, 254, 257, 260, 282, 302, 303, 306,
-  308, 310, 318, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384,
-  428, 445, 448, 460, 475, 531, 719,
+  // Official (IDs assigned in pokemonTypes.ts)
+  20003, 20006, 21006, 20009, 20065, 20094, 20115, 20127, 20130, 20142,
+  20150, 21150, 20181, 20212, 20214, 20229, 20248, 20257, 20282, 20303,
+  20306, 20308, 20310, 20354, 20359, 20445, 20448, 20460, 20015, 20018,
+  20080, 20208, 20254, 20260, 20302, 20319, 20323, 20334, 20362, 20373,
+  20376, 20380, 20381, 20384, 20428, 20475, 20531, 20719,
+  // Custom/Rumored/User List
+  20154, 20500, 20160, 20689, 20121, 20668, 20036, 20545, 20071, 20609,
+  20652, 20655, 20658, 20691, 20149, 20780, 20604, 20530, 20870, 20478,
+  20701, 20687, 20560, 20227, 20718, 20026, 21026, 20358, 20998, 20623,
+  20740, 20768, 20952, 20970, 20398, 20678, 20978, 20485, 20491, 20807,
+  20801, 22359, 22448, 22445, 20670
 ]);
 
 // ─── Gen boundaries ────────────────────────────────────────────
+export function getBaseId(id: number): number {
+  return id >= 10000 ? id % 1000 : id;
+}
+
 function getGen(id: number): number {
   if (id <= 151) return 1;
   if (id <= 251) return 2;
@@ -197,7 +209,7 @@ function buildAllCriteria(): Criterion[] {
       label: `Gen ${gen}`,
       emoji: '📅',
       color: genColors[gen - 1] || '#CED4DA',
-      matches: (p) => getGen(p.id) === gen,
+      matches: (p) => getGen(getBaseId(p.id)) === gen,
     });
   }
 
@@ -216,7 +228,7 @@ function buildAllCriteria(): Criterion[] {
     label: 'Lendário',
     emoji: '👑',
     color: '#FFD43B',
-    matches: (p) => LEGENDARY_IDS.has(p.id),
+    matches: (p) => LEGENDARY_IDS.has(getBaseId(p.id)),
   });
 
   // 5. Mythical
@@ -225,7 +237,7 @@ function buildAllCriteria(): Criterion[] {
     label: 'Mítico',
     emoji: '🌟',
     color: '#DA77F2',
-    matches: (p) => MYTHICAL_IDS.has(p.id),
+    matches: (p) => MYTHICAL_IDS.has(getBaseId(p.id)),
   });
 
   // 6. Starters
@@ -234,7 +246,7 @@ function buildAllCriteria(): Criterion[] {
     label: 'Starter Base',
     emoji: '🎒',
     color: '#63E6BE',
-    matches: (p) => STARTER_IDS.has(p.id),
+    matches: (p) => STARTER_IDS.has(getBaseId(p.id)),
   });
 
   // 7. Single type
@@ -299,7 +311,7 @@ export function getPokemonForCell(c1: Criterion, c2: Criterion): PokemonEntry[] 
  */
 export function getUniqueGridAnswers(grid: GameGrid, guessedIds: Set<number>): (PokemonEntry | null)[][] {
   const result: (PokemonEntry | null)[][] = [[], [], []];
-  const usedIds = new Set(guessedIds);
+  const usedBaseIds = new Set(Array.from(guessedIds).map(id => getBaseId(id)));
 
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
@@ -308,11 +320,11 @@ export function getUniqueGridAnswers(grid: GameGrid, guessedIds: Set<number>): (
         result[r][c] = cell.guessedPokemon;
       } else {
         const potential = getPokemonForCell(grid.rowLabels[r], grid.colLabels[c]);
-        const available = potential.filter(p => !usedIds.has(p.id));
+        const available = potential.filter(p => !usedBaseIds.has(getBaseId(p.id)));
         if (available.length > 0) {
           const picked = available[Math.floor(Math.random() * available.length)];
           result[r][c] = picked;
-          usedIds.add(picked.id);
+          usedBaseIds.add(getBaseId(picked.id));
         } else {
           result[r][c] = potential[0] || null; // Fallback if no unique left
         }

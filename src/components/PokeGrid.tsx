@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  generateGrid, validateGuess, getUniqueGridAnswers
+  generateGrid, validateGuess, getUniqueGridAnswers, getBaseId
 } from '../data/pokeGridLogic';
 import type { GameGrid, Criterion } from '../data/pokeGridLogic';
 import { getSpriteUrl } from '../data/pokemonTypes';
@@ -41,8 +41,11 @@ export const PokeGrid: React.FC = () => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
 
-    if (usedPokemon.has(pokemon.id)) {
-      setWrongGuess(`${pokemon.name} já foi utilizado!`);
+    const baseId = getBaseId(pokemon.id);
+    const usedBaseIds = Array.from(usedPokemon).map(id => getBaseId(id));
+
+    if (usedBaseIds.includes(baseId)) {
+      setWrongGuess(`${pokemon.name} (ou sua outra forma) já foi utilizado!`);
       setTimeout(() => setWrongGuess(null), 2000);
       return;
     }
