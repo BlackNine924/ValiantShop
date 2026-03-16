@@ -37,7 +37,7 @@ export const OrderForm = () => {
   const [showPokemonList, setShowPokemonList] = useState(false);
   const selectedPokemon = useMemo(() => POKEMON_DATA.find(p => p.name === form.pokemon), [form.pokemon]);
   const filteredPokemon = useMemo(() => 
-    POKEMON_DATA.filter(p => BREEDING_RULES.isBreedable(p) && p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5)
+    POKEMON_DATA.filter(p => BREEDING_RULES.isBreedable() && p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5)
   , [search]);
 
   useEffect(() => {
