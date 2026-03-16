@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Activity, Clock, Package } from 'lucide-react';
+import { Search, Clock, Package, CheckCircle2, Coins } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
@@ -38,11 +38,16 @@ export const Status = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'Pendente': return 'text-orange-400 bg-orange-400/10 border-orange-400/30';
       case 'Breeding': return 'text-secondary bg-secondary/10 border-secondary/30';
       case 'Finalizado': return 'text-green-400 bg-green-400/10 border-green-400/30';
       default: return 'text-primary bg-primary/10 border-primary/30';
     }
   };
+
+  const totalSpent = filteredOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
+  const pendingCount = filteredOrders.filter(o => o.status === 'Pendente' || o.status === 'Breeding').length;
+  const completedCount = filteredOrders.filter(o => o.status === 'Finalizado').length;
 
   if (!user) {
     return (
@@ -93,17 +98,24 @@ export const Status = () => {
                 <tr key={order.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
+                      <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
                       <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className="font-black text-white uppercase tracking-wider">{order.pokemon}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-black text-white uppercase tracking-wider flex items-center gap-2">
+                        {order.pokemon} {order.gender && order.gender !== 'Aleatório' && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{order.gender}</span>}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-8 py-6">
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs} IVs • {order.nature}</span>
-                      <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability}</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs} • {order.nature || 'Aleatória'}</span>
+                      <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
+                      {order.ignoredIvs && order.ignoredIvs.length > 0 && (
+                        <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-8 py-6">
@@ -121,23 +133,26 @@ export const Status = () => {
         </div>
       </div>
 
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatusCard icon={<Clock className="text-primary" />} label="Tempo Médio" value="24-48h" />
-        <StatusCard icon={<Activity className="text-secondary" />} label="Breeders Ativos" value="04" />
-        <StatusCard icon={<Package className="text-primary" />} label="Pedidos Hoje" value="12" />
+      <div className="mt-12 mb-20 grid grid-cols-1 md:grid-cols-4 gap-6">
+        <StatusCard icon={<Package className="text-white" />} label="Total de Pedidos" value={filteredOrders.length} border="border-white/10" />
+        <StatusCard icon={<Clock className="text-orange-400" />} label="Pedidos Pendentes" value={pendingCount} border="border-orange-400/30" />
+        <StatusCard icon={<CheckCircle2 className="text-green-400" />} label="Entregues / Finalizados" value={completedCount} border="border-green-400/30" />
+        <StatusCard icon={<Coins className="text-secondary" />} label="Total Gasto" value={`${totalSpent / 1000}k`} border="border-secondary/30 bg-secondary/5" />
       </div>
     </div>
   );
 };
 
-const StatusCard = ({ icon, label, value }: any) => (
-  <div className="glow-card p-6 flex items-center gap-4 bg-black/40">
-    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center">
-      {icon}
-    </div>
-    <div>
-      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
-      <p className="text-xl font-black text-white">{value}</p>
+const StatusCard = ({ icon, label, value, border = "border-white/5" }: any) => (
+  <div className={`glow-card p-6 flex flex-col justify-center items-start gap-4 bg-black/40 border ${border}`}>
+    <div className="flex items-center gap-4 w-full">
+      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
+        <p className="text-3xl font-black text-white">{value}</p>
+      </div>
     </div>
   </div>
 );

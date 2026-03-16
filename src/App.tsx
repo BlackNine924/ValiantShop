@@ -145,10 +145,10 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen relative overflow-x-hidden">
+        <div className="min-h-screen relative overflow-x-hidden flex flex-col">
           <div className="bg-overlay"></div>
           <Navbar isLoginOpen={isLoginOpen} setIsLoginOpen={setIsLoginOpen} />
-          <main className="py-12 relative z-10">
+          <main className="py-12 relative z-10 flex-1">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route 
@@ -164,7 +164,7 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
           </main>
-          <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10">
+          <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
             <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
               <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-2">
                 <Shield size={12} className="text-gray-900" />
