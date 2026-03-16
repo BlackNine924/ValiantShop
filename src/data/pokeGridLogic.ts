@@ -345,11 +345,18 @@ export function validateGuess(
 // ─── Search ──────────────────────────────────────────────────
 
 export function searchPokemon(query: string): PokemonEntry[] {
-  const normalised = query.toLowerCase().trim();
-  if (normalised.length < 1) return [];
-  return POKEMON_TYPE_DATA.filter(p =>
-    p.name.toLowerCase().includes(normalised)
+  const normalized = query.toLowerCase().trim();
+  if (normalized.length < 1) return [];
+  const matches = POKEMON_TYPE_DATA.filter(p =>
+    p.name.toLowerCase().includes(normalized)
   );
+  // Ensure unique results by ID
+  const seen = new Set();
+  return matches.filter(p => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
 }
 
 // ─── Grid generation ─────────────────────────────────────────
