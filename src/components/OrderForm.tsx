@@ -8,13 +8,15 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 type IVOption = '4' | '5c' | '5b' | '6c' | '6b';
 
-const IV_DETAILS: Record<IVOption, { label: string, desc: string, price: number }> = {
-  '4': { label: '4 IVs', desc: 'Básico Competitivo', price: 40000 },
-  '5c': { label: '5 IVs Castrado', desc: 'Ideal para PVM', price: 70000 },
-  '5b': { label: '5 IVs Breedable', desc: 'Pronto para Cruzar', price: 80000 },
-  '6c': { label: '6 IVs Castrado', desc: 'Perfeição Pura', price: 90000 },
-  '6b': { label: '6 IVs Breedable', desc: 'Mestre Criador', price: 100000 }
+const IV_DETAILS: Record<IVOption, { label: string, price: number, numIgnored: number }> = {
+  '4': { label: '4 IVs (F4)', price: 40000, numIgnored: 2 },
+  '5c': { label: '5 IVs (Castrado | F5)', price: 70000, numIgnored: 1 },
+  '5b': { label: '5 IVs (Breedable | F5)', price: 80000, numIgnored: 1 },
+  '6c': { label: '6 IVs (Castrado | F6)', price: 90000, numIgnored: 0 },
+  '6b': { label: '6 IVs (Breedable | F6)', price: 100000, numIgnored: 0 }
 };
+
+const STATS = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
 
 const HA_FEE = 15000;
 
@@ -30,7 +32,8 @@ export const OrderForm = () => {
     nature: '',
     ability: '',
     ivs: '4' as IVOption,
-    hasHA: false
+    hasHA: false,
+    ignoredIvs: [] as string[]
   });
 
   const [search, setSearch] = useState('');
@@ -63,6 +66,13 @@ export const OrderForm = () => {
       alert('Você precisa estar logado com seu Nick para fazer uma encomenda!');
       return;
     }
+
+    const maxIgnored = IV_DETAILS[form.ivs].numIgnored;
+    if (form.ignoredIvs.length !== maxIgnored) {
+      setError(`Para a opção de ${IV_DETAILS[form.ivs].label}, você precisa selecionar exatamente ${maxIgnored} IV(s) para remover.`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'orders'), {
@@ -169,15 +179,54 @@ export const OrderForm = () => {
                 {(Object.keys(IV_DETAILS) as IVOption[]).map(key => (
                   <button 
                     key={key} 
-                    onClick={() => setForm({...form, ivs: key})}
+                    onClick={() => setForm({...form, ivs: key, ignoredIvs: []})}
                     className={`p-6 rounded-2xl border-2 transition-all text-left group ${form.ivs === key ? 'border-secondary bg-secondary/10 shadow-[0_0_20px_var(--secondary-glow)]' : 'border-white/5 hover:border-white/20'}`}
                   >
-                    <p className={`pixel-title text-sm mb-1 ${form.ivs === key ? 'text-secondary' : 'text-white'}`}>{IV_DETAILS[key].label}</p>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-70 mb-4">{IV_DETAILS[key].desc}</p>
+                    <p className={`pixel-title text-sm mb-4 ${form.ivs === key ? 'text-secondary' : 'text-white'}`}>{IV_DETAILS[key].label}</p>
                     <p className="font-black text-white text-xl">{formatPrice(IV_DETAILS[key].price)}</p>
                   </button>
                 ))}
               </div>
+
+              {IV_DETAILS[form.ivs].numIgnored > 0 && (
+                <div className="bg-black/40 border border-primary/20 rounded-2xl p-6 space-y-4">
+                  <div>
+                    <h4 className="pixel-title text-lg text-primary mb-2">QUAIS IVs REMOVER?</h4>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
+                      Selecione {IV_DETAILS[form.ivs].numIgnored} atributo(s) que você <span className="text-secondary underline underline-offset-4">NÃO FAZ QUESTÃO</span> de ter perfeitos (Ex: -Atk).
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    {STATS.map(stat => {
+                      const isSelected = form.ignoredIvs.includes(stat);
+                      return (
+                        <button
+                          key={stat}
+                          onClick={() => {
+                            if (isSelected) {
+                              setForm({ ...form, ignoredIvs: form.ignoredIvs.filter(i => i !== stat) });
+                            } else {
+                              if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
+                                setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });
+                              }
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-xl font-bold transition-all border-2 ${
+                            isSelected 
+                              ? 'bg-red-500/20 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                              : form.ignoredIvs.length >= IV_DETAILS[form.ivs].numIgnored
+                                ? 'bg-black/50 border-white/5 text-gray-700 cursor-not-allowed'
+                                : 'bg-black/50 border-white/10 text-gray-400 hover:border-primary/50 hover:text-primary'
+                          }`}
+                        >
+                          -{stat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-primary/5 border-2 border-primary/20 rounded-[2rem] p-10 flex flex-col md:flex-row justify-between items-center gap-10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl rounded-full"></div>

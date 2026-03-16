@@ -1,19 +1,19 @@
 import { Zap, Sparkles, AlertCircle } from 'lucide-react';
 
 const PRICES_NORMAL = [
-  { iv: '4 IVs', price: '40k', label: 'Iniciante' },
-  { iv: '5 IVs Castrado', price: '70k', label: 'Eficaz' },
-  { iv: '5 IVs Reproduzível', price: '80k', label: 'Avançado' },
-  { iv: '6 IVs Castrado', price: '90k', label: 'Perfeito' },
-  { iv: '6 IVs Reproduzível', price: '100k', label: 'Elite' }
+  { iv: '4 IVs', price: '40k', label: 'F4' },
+  { iv: '5 IVs Castrado', price: '70k', label: 'F5' },
+  { iv: '5 IVs Breedable', price: '80k', label: 'F5' },
+  { iv: '6 IVs Castrado', price: '90k', label: 'F6' },
+  { iv: '6 IVs Breedable', price: '100k', label: 'F6' }
 ];
 
 const PRICES_GENDERLESS = [
-  { iv: '4 IVs', price: '80k', label: 'Iniciante' },
-  { iv: '5 IVs Castrado', price: '140k', label: 'Eficaz' },
-  { iv: '5 IVs Reproduzível', price: '160k', label: 'Avançado' },
-  { iv: '6 IVs Castrado', price: '180k', label: 'Perfeito' },
-  { iv: '6 IVs Reproduzível', price: '200k', label: 'Elite' }
+  { iv: '4 IVs', price: '80k', label: 'F4' },
+  { iv: '5 IVs Castrado', price: '140k', label: 'F5' },
+  { iv: '5 IVs Breedable', price: '160k', label: 'F5' },
+  { iv: '6 IVs Castrado', price: '180k', label: 'F6' },
+  { iv: '6 IVs Breedable', price: '200k', label: 'F6' }
 ];
 
 export const Prices = () => {

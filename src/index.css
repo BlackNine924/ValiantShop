@@ -5,10 +5,10 @@
 @tailwind utilities;
 
 :root {
-  --primary: #FF1493; /* Deep Pink (Iron Valiant Blade) */
-  --primary-glow: rgba(255, 20, 147, 0.4);
-  --secondary: #4ADE80; /* Green (Iron Valiant Skin) */
-  --secondary-glow: rgba(74, 222, 128, 0.3);
+  --primary: #4ADE80; /* Green (Iron Valiant Skin) */
+  --primary-glow: rgba(74, 222, 128, 0.4);
+  --secondary: #FF1493; /* Deep Pink (Iron Valiant Blade) */
+  --secondary-glow: rgba(255, 20, 147, 0.3);
   --accent: #E5E7EB; /* Silver/White */
   --bg-black: #000000;
   --card-bg: rgba(0, 0, 0, 0.85);
