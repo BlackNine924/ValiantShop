@@ -61,9 +61,9 @@ export const AdminDashboard = () => {
   };
 
   const filteredOrders = orders.filter(o => 
-    o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.playerNick.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (o.pokemon?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (o.playerNick?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const getStatusStyle = (status: string) => {
@@ -74,7 +74,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  const uniqueTrainers = new Set(orders.map(o => o.playerNick)).size;
+  const uniqueTrainers = new Set(orders.map(o => o.playerNick || 'Desconhecido')).size;
   const totalEconomy = orders.reduce((acc, o) => acc + (o.totalPrice || 0), 0) / 1000;
 
   return (
@@ -130,7 +130,7 @@ export const AdminDashboard = () => {
                   {filteredOrders.map(o => (
                     <tr key={o.id} className="hover:bg-white/[0.01]">
                       <td className="px-8 py-6">
-                        <p className="font-bold text-white mb-0.5">{o.playerNick}</p>
+                        <p className="font-bold text-white mb-0.5">{o.playerNick || 'Veterano Anônimo'}</p>
                         <p className="text-[10px] text-gray-600 uppercase font-black">ID: {o.id.slice(0,8)} | {o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()).toLocaleDateString('pt-BR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Agora'}</p>
                       </td>
                       <td className="px-8 py-6">
