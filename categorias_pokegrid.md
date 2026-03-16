@@ -1,56 +1,33 @@
 # PokeGrid: Categorias (Critérios) Disponíveis
 
-Atualmente, o jogo PokeGrid pode gerar grades usando uma combinação das seguintes categorias:
+Atualmente, o jogo PokeGrid suporta as seguintes categorias para geração de grades:
 
-## Tipos de Pokémon
-Todos os 18 tipos elementais da franquia são suportados:
-- ⚪ Normal
-- 🔥 Fogo
-- 💧 Água
-- 🌿 Planta
-- ⚡ Elétrico
-- ❄️ Gelo
-- 🥊 Lutador
-- ☠️ Veneno
-- 🏔️ Terra
-- 🕊️ Voador
-- 🔮 Psíquico
-- 🐛 Inseto
-- 🪨 Pedra
-- 👻 Fantasma
-- 🐉 Dragão
-- 🌑 Noturno
-- ⚙️ Aço
-- ✨ Fada
+## ⚔️ Tipos de Pokémon
+Todos os 18 tipos elementais da franquia:
+Normal, Fogo, Água, Planta, Elétrico, Gelo, Lutador, Veneno, Terra, Voador, Psíquico, Inseto, Pedra, Fantasma, Dragão, Noturno, Aço, Fada.
 
-## Fraquezas (Defensivas)
-Pokémon que recebem dano super efetivo (x2 ou x4) de um ataque de determinado tipo:
-- ⚠️ Fraco vs Fogo
-- ⚠️ Fraco vs Água
-- ⚠️ Fraco vs Elétrico
-- ⚠️ Fraco vs Gelo
-- ⚠️ Fraco vs Terra
-- ⚠️ Fraco vs Fada
-- ⚠️ Fraco vs Lutador
-- ⚠️ Fraco vs Noturno
+## ⚠️ Fraquezas (Defensivas)
+Pokémon que recebem dano super efetivo (x2+) de:
+Fogo, Água, Elétrico, Gelo, Terra, Fada, Lutador, Noturno.
 
-## Gerações (Região de Origem)
-- 📅 Gen 1 (Kanto)
-- 📅 Gen 2 (Johto)
-- 📅 Gen 3 (Hoenn)
-- 📅 Gen 4 (Sinnoh)
-- 📅 Gen 5 (Unova)
-- 📅 Gen 6 (Kalos)
-- 📅 Gen 7 (Alola)
-- 📅 Gen 8 (Galar)
-- 📅 Gen 9 (Paldea)
+## 📅 Gerações (Região de Origem)
+- Gen 1 (Kanto) até Gen 9 (Paldea).
 
-## Classificações Especiais
-- 🧬 **Tem Mega**: O Pokémon possui uma Mega Evolução.
-- 👑 **Lendário**: Pertence ao grupo de Pokémon Lendários.
-- 🌟 **Mítico**: Pertence ao grupo de Pokémon Míticos (geralmente obtidos via eventos).
-- 🎒 **Starter Base**: Faz parte de uma linha evolutiva de Pokémon iniciais (forma final ou base).
+## 🧬 Evolução e Estados
+- **Estágios**: 3 Estágios, Sem Evolução, Pode Evoluir, Forma Final, Forma do Meio, Forma Inicial.
+- **Métodos**: Evolui por Pedra, Evolui por Troca, Evolui por Amizade.
+- **Tipagem**: Tipo Único, Tipo Duplo.
 
-## Aspectos de Tipagem
-- 1️⃣ **Tipo Único**: O Pokémon possui apenas um tipo.
-- 2️⃣ **Tipo Duplo**: O Pokémon possui dois tipos simultaneamente.
+## 🏝️ Formas Regionais
+- Alola, Galar, Hisui, Paldea.
+
+## 🌟 Classificações Especiais
+- **Status**: Tem Mega, Lendário, Mítico, Pseudo-Lendário.
+- **Grupos**: Iniciais (Starter Base), Babys, Paradoxo, Ultrabeast.
+- **Mecânicas**: Dynamax.
+
+## 🥚 Grupos de Ovos (Egg Groups)
+- Monster, Bug, Flying, Plant, Mineral, Dragon, Fairy, Humanshape, Water 1, Water 2, Water 3, Indeterminate.
+
+---
+*Nota: Você pode escolher quais categorias aparecem no grid através da engrenagem de configurações no jogo.*
