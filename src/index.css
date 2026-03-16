@@ -59,7 +59,6 @@ body {
   border-radius: 12px;
   transition: var(--transition-fast);
   position: relative;
-  overflow: hidden;
 }
 
 .glow-card:hover {

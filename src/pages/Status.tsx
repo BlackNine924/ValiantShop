@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 export const Status = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,6 +48,14 @@ export const Status = () => {
   const totalSpent = filteredOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
   const pendingCount = filteredOrders.filter(o => o.status === 'Pendente' || o.status === 'Breeding').length;
   const completedCount = filteredOrders.filter(o => o.status === 'Finalizado').length;
+
+  if (authLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 text-center py-20 flex flex-col items-center justify-center">
+        <h2 className="pixel-title text-2xl mb-4 text-secondary animate-pulse uppercase">Verificando Credenciais...</h2>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

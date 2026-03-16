@@ -5,6 +5,8 @@ import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CartProvider, useCart } from './context/CartContext';
+import { CartModal } from './components/CartModal';
 import { useState } from 'react';
 import logoUrl from './assets/hero.png';
 
@@ -74,6 +76,8 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const { cart, setIsCartOpen } = useCart();
+
   return (
     <>
       <nav className="sticky top-0 w-full z-50 bg-black/90 backdrop-blur-md border-b border-primary/20 px-6 py-4">
@@ -91,6 +95,14 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
           </div>
 
           <div className="flex items-center gap-6">
+            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-white hover:text-primary transition-colors">
+              <ShoppingBag size={24} />
+              {cart.length > 0 && (
+                <span className="absolute top-0 right-0 w-5 h-5 bg-primary text-black font-black text-[10px] rounded-full flex items-center justify-center border-2 border-black transform translate-x-1/4 -translate-y-1/4 shadow-[0_0_10px_var(--primary-glow)]">
+                  {cart.length}
+                </span>
+              )}
+            </button>
             {user ? (
               <div className="flex items-center gap-4">
                 <div className="hidden lg:flex flex-col items-end">
@@ -110,6 +122,7 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
         </div>
       </nav>
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <CartModal />
     </>
   );
 };
@@ -144,36 +157,38 @@ function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <div className="min-h-screen relative overflow-x-hidden flex flex-col">
-          <div className="bg-overlay"></div>
-          <Navbar isLoginOpen={isLoginOpen} setIsLoginOpen={setIsLoginOpen} />
-          <main className="py-12 relative z-10 flex-1">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route 
-                path="/order" 
-                element={
-                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                    <OrderForm />
-                  </ProtectedOrderRoute>
-                } 
-              />
-              <Route path="/prices" element={<Prices />} />
-              <Route path="/status" element={<Status />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-            </Routes>
-          </main>
-          <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
-            <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-              <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-2">
-                <Shield size={12} className="text-gray-900" />
+      <CartProvider>
+        <BrowserRouter>
+          <div className="min-h-screen relative overflow-x-hidden flex flex-col">
+            <div className="bg-overlay"></div>
+            <Navbar isLoginOpen={isLoginOpen} setIsLoginOpen={setIsLoginOpen} />
+            <main className="py-12 relative z-10 flex-1">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route 
+                  path="/order" 
+                  element={
+                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                      <OrderForm />
+                    </ProtectedOrderRoute>
+                  } 
+                />
+                <Route path="/prices" element={<Prices />} />
+                <Route path="/status" element={<Status />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+              </Routes>
+            </main>
+            <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
+              <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
+                <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-2">
+                  <Shield size={12} className="text-gray-900" />
+                </div>
+                <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
               </div>
-              <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
-            </div>
-          </footer>
-        </div>
-      </BrowserRouter>
+            </footer>
+          </div>
+        </BrowserRouter>
+      </CartProvider>
     </AuthProvider>
   );
 }
