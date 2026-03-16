@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
-  generateGrid, validateGuess, getUniqueGridAnswers, getBaseId, ALL_CRITERIA
+  generateDailyGrid, generateGrid, validateGuess, getUniqueGridAnswers, getBaseId, ALL_CRITERIA
 } from '../data/pokeGridLogic';
 import type { GameGrid, Criterion } from '../data/pokeGridLogic';
 import { getSpriteUrl } from '../data/pokemonTypes';
@@ -16,7 +16,7 @@ export const PokeGrid: React.FC = () => {
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const [grid, setGrid] = useState<GameGrid>(() => generateGrid());
+  const [grid, setGrid] = useState<GameGrid>(() => generateDailyGrid());
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [score, setScore] = useState(0);
@@ -118,6 +118,10 @@ export const PokeGrid: React.FC = () => {
   }, [selectedCell, grid, usedPokemon, unlimitedMode, timerActive]);
 
   const handleNewGame = () => {
+    // Only allow manual new grid if unlimited mode is on or game is complete and we want a fresh start
+    // But the user specifically said "ficando infinito apenas no modo ilimitado"
+    if (!unlimitedMode) return;
+    
     setGrid(generateGrid(enabledCriteriaIds));
     setScore(0);
     setGuesses(0);
@@ -171,10 +175,12 @@ export const PokeGrid: React.FC = () => {
               Desistir
             </button>
           )}
-          <button className="pokegrid-new-btn" onClick={handleNewGame}>
-            <RotateCcw size={14} />
-            Novo Grid
-          </button>
+          {unlimitedMode && (
+            <button className="pokegrid-new-btn" onClick={handleNewGame}>
+              <RotateCcw size={14} />
+              Novo Grid
+            </button>
+          )}
         </div>
       </div>
 
@@ -256,9 +262,11 @@ export const PokeGrid: React.FC = () => {
               Fim de jogo! Acertos: {score}/9
             </span>
           )}
-          <button className="pokegrid-play-again" onClick={handleNewGame}>
-            <RotateCcw size={14} /> Jogar Novamente
-          </button>
+          {unlimitedMode && (
+            <button className="pokegrid-play-again" onClick={handleNewGame}>
+              <RotateCcw size={14} /> Jogar Novamente
+            </button>
+          )}
         </div>
       )}
 

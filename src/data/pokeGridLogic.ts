@@ -206,9 +206,10 @@ function buildAllCriteria(): Criterion[] {
     '#63E6BE', '#FF922B', '#A9E34B', '#748FFC'
   ];
   for (let gen = 1; gen <= 9; gen++) {
+    const regionNames = ['', 'Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova', 'Kalos', 'Alola', 'Galar', 'Paldea'];
     criteria.push({
       id: `gen-${gen}`,
-      label: `Gen ${gen}`,
+      label: `Gen ${gen} (${regionNames[gen]})`,
       emoji: '📅',
       color: genColors[gen - 1] || '#CED4DA',
       matches: (p) => getGen(getBaseId(p.id)) === gen,
@@ -338,12 +339,35 @@ function buildAllCriteria(): Criterion[] {
 
 export const ALL_CRITERIA = buildAllCriteria();
 
-// ─── Shuffle ──────────────────────────────────────────────────
+// ─── Seeded Random ──────────────────────────────────────────
 
-function shuffle<T>(arr: T[]): T[] {
+// A simple seeded random generator (Mulberry32)
+function mulberry32(a: number) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let currentRandom = Math.random;
+
+function setSeed(seed: string) {
+  // Hash the string to a 32-bit integer
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  currentRandom = mulberry32(Math.abs(hash));
+}
+
+function seededShuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(currentRandom() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -415,19 +439,26 @@ export function searchPokemon(query: string): PokemonEntry[] {
 
 // ─── Grid generation ─────────────────────────────────────────
 
-export function generateGrid(enabledCriteriaIds?: Set<string>): GameGrid {
-  const MAX_ATTEMPTS = 500;
+export function generateGrid(enabledCriteriaIds?: Set<string>, seed?: string): GameGrid {
+  const MAX_ATTEMPTS = 1000;
+  
+  if (seed) {
+    setSeed(seed);
+  } else {
+    currentRandom = Math.random;
+  }
+
   const pool = enabledCriteriaIds 
     ? ALL_CRITERIA.filter(c => enabledCriteriaIds.has(c.id))
     : ALL_CRITERIA;
 
   if (pool.length < 6) {
-    // Not enough categories selected, fallback to all
-    return generateGrid();
+    // Not enough categories selected, fallback to all (recursive but limited)
+    return generateGrid(undefined, seed);
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const shuffled = shuffle(pool);
+    const shuffled = seededShuffle(pool);
     const picked: Criterion[] = [];
     const usedIds = new Set<string>();
 
@@ -467,7 +498,7 @@ export function generateGrid(enabledCriteriaIds?: Set<string>): GameGrid {
     }
   }
 
-  // Fallback
+  // Fallback (seeded if possible)
   const fallbackRows = ALL_CRITERIA.filter(c => ['type-Water', 'type-Fire', 'type-Grass'].includes(c.id));
   const fallbackCols = ALL_CRITERIA.filter(c => ['type-Poison', 'type-Flying', 'type-Ground'].includes(c.id));
   const cells: GridCell[][] = [];
@@ -478,5 +509,13 @@ export function generateGrid(enabledCriteriaIds?: Set<string>): GameGrid {
     }
     cells.push(row);
   }
-  return { rowLabels: fallbackRows, colLabels: fallbackCols, cells };
+  return { rowLabels: fallbackRows.slice(0,3), colLabels: fallbackCols.slice(0,3), cells };
+}
+
+/**
+ * Generates a deterministic grid based on the current date.
+ */
+export function generateDailyGrid(): GameGrid {
+  const dateStr = new Date().toISOString().split('T')[0];
+  return generateGrid(undefined, dateStr);
 }

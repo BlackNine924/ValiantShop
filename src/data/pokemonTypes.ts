@@ -27,7 +27,7 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "20009": "blastoise-mega",
   "20015": "beedrill-mega",
   "20018": "pidgeot-mega",
-  "20026": "raichu-megax",
+  "20026": "raichu-megax", // Speculative / Legends Z-A
   "20036": "clefable-mega",
   "20065": "alakazam-mega",
   "20071": "victreebel-mega",
@@ -117,7 +117,21 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "21448": "lucario-megaz"
 };
 
+// Map for high-quality external sprites from DeviantArt / sta.sh if needed
+const CUSTOM_SPRITE_URLS: Record<number, string> = {
+  21359: "https://sta.sh/01epazuybt42", // Mega Absol Z
+  21448: "https://sta.sh/01br85js0y27", // Mega Lucario Z
+  20154: "https://sta.sh/027t31j8bgpv", // Mega Meganium (Z)
+  20160: "https://sta.sh/06dpi8ane3f",  // Mega Feraligatr (Z)
+  20149: "https://sta.sh/07pz4tshy5m",  // Mega Dragonite
+};
+
 export function getSpriteUrl(id: number): string {
+  // Use custom high-quality sprites if available
+  if (CUSTOM_SPRITE_URLS[id]) {
+    return CUSTOM_SPRITE_URLS[id];
+  }
+
   // Use Showdown for Megas (more complete and consistent Gen 5 style)
   if (MEGA_NAME_MAP[id]) {
     return `https://play.pokemonshowdown.com/sprites/gen5/${MEGA_NAME_MAP[id]}.png`;
