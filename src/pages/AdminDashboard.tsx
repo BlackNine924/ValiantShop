@@ -9,6 +9,25 @@ export const AdminDashboard = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const q = query(collection(db, 'orders'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ordersData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeB - timeA;
+      });
+      setOrders(ordersData);
+    });
+
+    return unsubscribe;
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] px-4 animate-fade">
@@ -32,24 +51,8 @@ export const AdminDashboard = () => {
     );
   }
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    const q = query(collection(db, 'orders'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
-        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
-        return timeB - timeA;
-      });
-      setOrders(ordersData);
-    });
 
-    return unsubscribe;
-  }, [isAuthenticated]);
+
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
