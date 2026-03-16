@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, AlertCircle, CheckCircle2, X, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { POKEMON_DATA, BREEDING_RULES } from '../data/pokemonData';
+import { POKEMON_DATA, NATURES, BREEDING_RULES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -84,6 +84,14 @@ export const OrderForm = () => {
       setError(`Selecione exatamente ${maxIgnored} Atributo(s) para remover.`);
       return false;
     }
+    if (form.nature && form.nature.trim() !== '') {
+      const isValidNature = NATURES.some(n => n.toLowerCase() === form.nature.trim().toLowerCase());
+      if (!isValidNature && form.nature.toLowerCase() !== 'qualquer') {
+        setError('Natureza inválida! Digite uma Natureza existente ou deixe em branco.');
+        setStep(1);
+        return false;
+      }
+    }
     return true;
   }
 
@@ -107,7 +115,7 @@ export const OrderForm = () => {
     try {
       await addDoc(collection(db, 'orders'), {
         pokemon: form.pokemon,
-        nature: form.nature || 'Aleatória',
+        nature: (form.nature && form.nature.trim() !== '') ? form.nature.charAt(0).toUpperCase() + form.nature.slice(1).toLowerCase() : 'Aleatória',
         ability: form.ability,
         gender: form.gender,
         ivs: `${form.ivs} IVs ${form.isCastrated ? '(Castrado)' : '(Breedable)'}`,

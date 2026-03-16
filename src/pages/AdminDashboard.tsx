@@ -104,7 +104,7 @@ export const AdminDashboard = () => {
               <Users size={18} /> Treinadores ({uniqueTrainers})
             </button>
             <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-              <PieChart size={18} /> Caixa: {totalEconomy}k Px
+              <PieChart size={18} /> Caixa: {totalEconomy}k
             </button>
           </div>
           <div className="bg-white/5 rounded-xl p-6 border border-white/5">
