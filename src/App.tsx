@@ -81,10 +81,10 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
   return (
     <>
       <nav className="sticky top-0 w-full z-50 bg-black/90 backdrop-blur-md border-b border-primary/20 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <div className="w-full flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 group">
             <img src={logoUrl} alt="Logo" className="w-8 h-8 group-hover:rotate-12 transition-transform" />
-            <span className="pixel-title text-xl tracking-tighter text-white">VALIANT</span>
+            <span className="pixel-title text-xl tracking-tighter text-white">VALIANT SHOP</span>
           </Link>
           
           <div className="hidden md:flex gap-8 items-center">
@@ -180,8 +180,8 @@ function App() {
             </main>
             <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
               <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-                <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-2">
-                  <Shield size={12} className="text-gray-900" />
+                <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-20 hover:opacity-100 transition-opacity cursor-pointer mb-2">
+                  <Shield size={16} className="text-gray-500" />
                 </div>
                 <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
               </div>
