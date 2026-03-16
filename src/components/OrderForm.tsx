@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, AlertCircle, CheckCircle2, X, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { POKEMON_DATA, NATURES, BREEDING_RULES } from '../data/pokemonData';
+import { POKEMON_DATA, BREEDING_RULES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -201,16 +201,16 @@ export const OrderForm = () => {
                     ]}
                   />
 
-                  <CustomSelect 
-                    label="Natureza (Opcional)" 
-                    value={form.nature} 
-                    onChange={(v: string) => setForm({...form, nature: v})}
-                    placeholder="Qualquer Natureza..."
-                    options={[
-                      { label: 'Qualquer (Grátis)', value: 'Qualquer' },
-                      ...NATURES.map(n => ({ label: n, value: n }))
-                    ]}
-                  />
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Natureza (Opcional)</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-black/60 border-2 border-white/5 rounded-2xl px-6 py-5 text-white font-bold transition-all outline-none focus:border-secondary" 
+                      placeholder="Ex: Adamant..."
+                      value={form.nature}
+                      onChange={e => setForm({...form, nature: e.target.value})}
+                    />
+                  </div>
                   
                   <CustomSelect 
                     label="Habilidade" 
