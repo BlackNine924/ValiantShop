@@ -117,6 +117,26 @@ export const PokeGrid: React.FC = () => {
     }
   }, [selectedCell, grid, usedPokemon, unlimitedMode, timerActive]);
 
+  const handleRestartToDaily = useCallback(() => {
+    setGrid(generateDailyGrid());
+    setScore(0);
+    setGuesses(0);
+    setUsedPokemon(new Set());
+    setGameComplete(false);
+    setIsSurrendered(false);
+    setWrongGuess(null);
+    setSelectedCell(null);
+    setTime(0);
+    setTimerActive(false);
+  }, []);
+
+  useEffect(() => {
+    // Se o usuário desativar o modo ilimitado, forçamos o grid do dia
+    if (!unlimitedMode) {
+      handleRestartToDaily();
+    }
+  }, [unlimitedMode, handleRestartToDaily]);
+
   const handleNewGame = () => {
     // Only allow manual new grid if unlimited mode is on or game is complete and we want a fresh start
     // But the user specifically said "ficando infinito apenas no modo ilimitado"

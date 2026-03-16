@@ -119,11 +119,20 @@ const MEGA_NAME_MAP: Record<number, string> = {
 
 // Map for high-quality external sprites from DeviantArt / sta.sh if needed
 const CUSTOM_SPRITE_URLS: Record<number, string> = {
-  21359: "https://sta.sh/01epazuybt42", // Mega Absol Z
-  21448: "https://sta.sh/01br85js0y27", // Mega Lucario Z
-  20154: "https://sta.sh/027t31j8bgpv", // Mega Meganium (Z)
-  20160: "https://sta.sh/06dpi8ane3f",  // Mega Feraligatr (Z)
-  20149: "https://sta.sh/07pz4tshy5m",  // Mega Dragonite
+  20154: "https://pbs.twimg.com/media/G355BGUXkAA3XgI.png", // Mega Meganium
+  20160: "https://pbs.twimg.com/media/G3-5TwiWgAA6T4i.png", // Mega Feraligatr
+  20157: "https://pbs.twimg.com/media/G49oX9KXwAAAnM-.png", // Mega Typhlosion (Z-A)
+  20149: "https://pbs.twimg.com/media/G6Wv3h0XwAA34hW.png", // Mega Dragonite
+  20026: "https://pbs.twimg.com/media/G3e_D9oW4AArtGv.png", // Mega Raichu X
+  21026: "https://pbs.twimg.com/media/G0rXlqkXcAEgiN6.png", // Mega Raichu Y
+  20036: "https://pbs.twimg.com/media/G3TeyZqWUAAq7gW.png", // Mega Clefable
+  20121: "https://pbs.twimg.com/media/G5_puEDWcAAzWpo.png", // Mega Starmie
+  20227: "https://pbs.twimg.com/media/G3IdT9oXwAA1X4M.png", // Mega Skarmory
+  20071: "https://pbs.twimg.com/media/G2idT9oXwAA11rI.png", // Mega Victreebel
+  20970: "https://pbs.twimg.com/media/G6qKInPXoAA4U_-.png", // Mega Glimmora
+  20609: "https://pbs.twimg.com/media/G3Ie-UHW4AAu4_-.png", // Mega Chandelure
+  20687: "https://pbs.twimg.com/media/G1p7p-XawAEtS-M.png", // Mega Malamar
+  21359: "https://play.pokemonshowdown.com/sprites/gen5/absol-mega.png", // Absol Z placeholder if needed
 };
 
 export function getSpriteUrl(id: number): string {
