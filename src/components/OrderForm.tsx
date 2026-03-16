@@ -313,8 +313,15 @@ export const OrderForm = () => {
                             if (isSelected) {
                               setForm({ ...form, ignoredIvs: form.ignoredIvs.filter(i => i !== stat) });
                             } else {
-                              if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
-                                setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });
+                              if (stat === 'Qualquer') {
+                                const needed = IV_DETAILS[form.ivs].numIgnored - form.ignoredIvs.length;
+                                if (needed > 0) {
+                                  setForm({ ...form, ignoredIvs: [...form.ignoredIvs, ...Array(needed).fill('Qualquer')] });
+                                }
+                              } else {
+                                if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
+                                  setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });
+                                }
                               }
                             }
                           }}
