@@ -82,7 +82,7 @@ export const OrderForm = () => {
         status: 'Pendente',
         createdAt: serverTimestamp()
       });
-      setStep(3); // Success step
+      setStep(4); // Success step
     } catch (e) {
       console.error(e);
       alert('Erro ao enviar pedido. Tente novamente.');

@@ -44,13 +44,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user.displayName !== cleanNick) {
         await updateProfile(userCredential.user, { displayName: cleanNick });
-        setUser({ ...userCredential.user, displayName: cleanNick });
+        window.location.reload();
       }
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: cleanNick });
-        setUser({ ...userCredential.user, displayName: cleanNick });
+        window.location.reload();
       } else {
         throw err;
       }
