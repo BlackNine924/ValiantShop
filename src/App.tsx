@@ -107,7 +107,7 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
               <div className="flex items-center gap-4">
                 <div className="hidden lg:flex flex-col items-end">
                   <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Conectado</span>
-                  <span className="text-xs font-bold text-white truncate max-w-[120px]">{user.email}</span>
+                  <span className="text-xs font-bold text-white truncate max-w-[120px]">{user.displayName}</span>
                 </div>
                 <button onClick={logout} className="p-2 text-gray-500 hover:text-primary transition-colors">
                   <LogOut size={20} />

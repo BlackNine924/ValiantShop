@@ -141,9 +141,9 @@ export const OrderForm = () => {
       </div>
 
       <div className="glow-card p-8 md:p-12 border-primary/20 bg-black/40">
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {error && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-start justify-between gap-3 text-red-400 text-sm font-bold shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto', marginBottom: 24 }} exit={{ opacity: 0, height: 0, marginBottom: 0 }} className="p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-start justify-between gap-3 text-red-400 text-sm font-bold shadow-[0_0_20px_rgba(239,68,68,0.2)] overflow-hidden">
               <div className="flex items-center gap-3">
                 <AlertCircle size={18} className="shrink-0" /> <span className="pt-0.5">{error}</span>
               </div>
@@ -152,7 +152,9 @@ export const OrderForm = () => {
               </button>
             </motion.div>
           )}
+        </AnimatePresence>
 
+        <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
               <h3 className="pixel-title text-xl text-secondary">01. Configuração do Pokémon</h3>

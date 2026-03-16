@@ -1,14 +1,13 @@
-import { useState } from 'react';
-import { Users, PieChart, ShoppingBag, Search, Activity, ShieldCheck } from 'lucide-react';
-
-const MOCK_ORDERS = [
-  { id: '101', nickname: 'SteveMC', discord: 'steve#1234', pokemon: 'Garchomp', status: 'Breeding', price: 100000 },
-  { id: '102', nickname: 'AlexExplorer', discord: 'alex#0001', pokemon: 'Greninja', status: 'Ready', price: 85000 },
-];
+import { useState, useEffect } from 'react';
+import { Users, PieChart, ShoppingBag, Search, Activity, ShieldCheck, ChevronDown } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   if (!isAuthenticated) {
     return (
@@ -33,14 +32,59 @@ export const AdminDashboard = () => {
     );
   }
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const q = query(collection(db, 'orders'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ordersData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeB - timeA;
+      });
+      setOrders(ordersData);
+    });
+
+    return unsubscribe;
+  }, [isAuthenticated]);
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status: newStatus });
+    } catch (e) {
+      console.error('Erro ao atualizar status:', e);
+      alert('Falha ao atualizar status no banco de dados.');
+    }
+  };
+
+  const filteredOrders = orders.filter(o => 
+    o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    o.playerNick.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    o.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getStatusStyle = (status: string) => {
+    switch(status) {
+      case 'Finalizado': return 'bg-green-500/20 text-green-400 border-green-500/50';
+      case 'Breeding': return 'bg-secondary/20 text-secondary border-secondary/50';
+      default: return 'bg-orange-400/20 text-orange-400 border-orange-400/50';
+    }
+  };
+
+  const uniqueTrainers = new Set(orders.map(o => o.playerNick)).size;
+  const totalEconomy = orders.reduce((acc, o) => acc + (o.totalPrice || 0), 0) / 1000;
+
   return (
     <div className="max-w-7xl mx-auto px-4 animate-fade">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <aside className="space-y-4">
           <div className="glow-card p-6 space-y-2">
-            <AdminNav active label="Pedidos" icon={<ShoppingBag size={18} />} />
-            <AdminNav label="Treinadores" icon={<Users size={18} />} />
-            <AdminNav label="Estatísticas" icon={<PieChart size={18} />} />
+            <AdminNav active label={`Pedidos (${orders.length})`} icon={<ShoppingBag size={18} />} />
+            <AdminNav label={`Treinadores (${uniqueTrainers})`} icon={<Users size={18} />} />
+            <AdminNav label={`Caixa: ${totalEconomy}k Px`} icon={<PieChart size={18} />} />
           </div>
           <div className="bg-white/5 rounded-xl p-6 border border-white/5">
              <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-4">Server Status</p>
@@ -55,8 +99,16 @@ export const AdminDashboard = () => {
           <div className="flex justify-between items-center bg-white/5 p-8 rounded-2xl border border-white/5">
             <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">Encomendas</span></h2>
             <div className="flex gap-4">
-               <div className="p-2 bg-black border border-white/5 rounded-lg text-gray-500"><Search size={18} /></div>
-               <div className="p-2 bg-black border border-white/5 rounded-lg text-gray-500"><Activity size={18} /></div>
+               <div className="relative">
+                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                 <input 
+                   placeholder="Buscar Player ou Order ID..." 
+                   value={searchTerm}
+                   onChange={e => setSearchTerm(e.target.value)}
+                   className="bg-black/50 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs outline-none focus:border-primary transition-colors"
+                 />
+               </div>
+               <button className="p-2 bg-black border border-white/5 hover:border-white/20 transition-all rounded-lg text-gray-400"><Activity size={18} /></button>
             </div>
           </div>
 
@@ -71,19 +123,37 @@ export const AdminDashboard = () => {
                     <th className="px-8 py-5">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 italic">
-                  {MOCK_ORDERS.map(o => (
+                <tbody className="divide-y divide-white/5">
+                  {filteredOrders.length === 0 && (
+                    <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum registro encontrado no servidor...</td></tr>
+                  )}
+                  {filteredOrders.map(o => (
                     <tr key={o.id} className="hover:bg-white/[0.01]">
                       <td className="px-8 py-6">
-                        <p className="font-bold text-white mb-0.5">{o.nickname}</p>
-                        <p className="text-[10px] text-gray-600 uppercase font-black">{o.discord}</p>
+                        <p className="font-bold text-white mb-0.5">{o.playerNick}</p>
+                        <p className="text-[10px] text-gray-600 uppercase font-black">ID: {o.id.slice(0,8)} | {o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()).toLocaleDateString('pt-BR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Agora'}</p>
                       </td>
-                      <td className="px-8 py-6 text-gray-400 font-bold">{o.pokemon}</td>
-                      <td className="px-8 py-6 font-black text-primary">{o.price.toLocaleString()} PD</td>
                       <td className="px-8 py-6">
-                        <span className="px-3 py-1 bg-white/5 rounded text-[10px] font-black text-secondary border border-secondary/20">
-                          {o.status}
-                        </span>
+                        <p className="text-gray-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                          {o.pokemon}
+                          {o.gender && o.gender !== 'Aleatório' && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 rounded-full">{o.gender}</span>}
+                        </p>
+                        <p className="text-[10px] text-primary font-black uppercase tracking-tighter">{o.ivs} • {o.ability}</p>
+                      </td>
+                      <td className="px-8 py-6 font-black text-primary">{o.totalPrice / 1000}k <span className="text-gray-600 text-[10px]">Px</span></td>
+                      <td className="px-8 py-6">
+                        <div className="relative group/status">
+                          <select 
+                            value={o.status}
+                            onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                            className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusStyle(o.status)}`}
+                          >
+                            <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
+                            <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
+                            <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
+                          </select>
+                          <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                        </div>
                       </td>
                     </tr>
                   ))}
