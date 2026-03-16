@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { ShoppingBag, History, Table, Shield, ExternalLink, LogOut } from 'lucide-react';
+import { ShoppingBag, History, Table, Shield, LogOut } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
@@ -24,7 +24,7 @@ const HomePage = () => {
           VALIANT<span className="text-secondary font-black">SHOP</span>
         </h1>
         <p className="text-gray-400 font-bold uppercase tracking-[0.4em] text-[10px] opacity-80 italic">
-          Forge your dream team with Iron Precision
+          A melhor loja de Kanto!
         </p>
       </div>
 
@@ -50,14 +50,7 @@ const HomePage = () => {
           desc="Acompanhe sua encomenda ao vivo."
           color="secondary"
         />
-        <div className="glow-card p-8 flex flex-col items-center justify-center gap-4 border-dashed border-gray-800 lg:col-span-2">
-          <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest text-center">
-            Junte-se ao nosso Discord para sorteios e promoções semanais!
-          </p>
-          <a href="https://discord.gg/X6dSNGqJwH" target="_blank" rel="noreferrer" className="btn-manda flex items-center gap-2 !bg-secondary !shadow-secondary-glow">
-             Discord Oficial <ExternalLink size={16} />
-          </a>
-        </div>
+
       </div>
     </div>
   );
@@ -171,15 +164,12 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
           </main>
-          <footer className="py-16 border-t border-white/5 bg-black/80 text-center relative z-10">
+          <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10">
             <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-              <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-8">
+              <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-0 hover:opacity-10 transition-opacity cursor-pointer mb-2">
                 <Shield size={12} className="text-gray-900" />
               </div>
-              <p className="pixel-title text-[10px] text-gray-600 mb-2">VALIANT SHOP &copy; 2026</p>
-              <p className="text-[8px] text-gray-700 font-black uppercase tracking-[0.5em]">
-                Inspired by the paradox: Iron Valiant
-              </p>
+              <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
             </div>
           </footer>
         </div>
