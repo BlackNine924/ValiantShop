@@ -119,21 +119,52 @@ const MEGA_NAME_MAP: Record<number, string> = {
 
 // Map for high-quality external sprites from DeviantArt / sta.sh if needed
 const CUSTOM_SPRITE_URLS: Record<number, string> = {
-  20154: "/assets/sprites/mega/20154.png", // Mega Meganium
-  20160: "/assets/sprites/mega/20160.png", // Mega Feraligatr
-  20157: "/assets/sprites/mega/20157.png", // Mega Typhlosion (Z-A)
-  20149: "/assets/sprites/mega/20149.png", // Mega Dragonite
+  // Legends Z-A e Megas Especulativas (Locais)
   20026: "/assets/sprites/mega/20026.png", // Mega Raichu X
   21026: "/assets/sprites/mega/21026.png", // Mega Raichu Y
   20036: "/assets/sprites/mega/20036.png", // Mega Clefable
-  20121: "/assets/sprites/mega/20121.png", // Mega Starmie
-  20227: "/assets/sprites/mega/20227.png", // Mega Skarmory
   20071: "/assets/sprites/mega/20071.png", // Mega Victreebel
-  20970: "/assets/sprites/mega/20970.png", // Mega Glimmora
-  20609: "/assets/sprites/mega/20609.png", // Mega Chandelure
-  20687: "/assets/sprites/mega/20687.png", // Mega Malamar
-  21448: "/assets/sprites/mega/21448.png", // Mega Lucario Z
+  20121: "/assets/sprites/mega/20121.png", // Mega Starmie
+  20149: "/assets/sprites/mega/20149.png", // Mega Dragonite
+  20154: "/assets/sprites/mega/20154.png", // Mega Meganium
+  20160: "/assets/sprites/mega/20160.png", // Mega Feraligatr
+  20500: "/assets/sprites/mega/20500.png", // Mega Emboar
+  20227: "/assets/sprites/mega/20227.png", // Mega Skarmory
+  20358: "/assets/sprites/mega/20358.png", // Mega Chimecho
   21359: "/assets/sprites/mega/21359.png", // Mega Absol Z
+  20398: "/assets/sprites/mega/20398.png", // Mega Staraptor
+  21445: "/assets/sprites/mega/21445.png", // Mega Garchomp Z
+  21448: "/assets/sprites/mega/21448.png", // Mega Lucario Z
+  20478: "/assets/sprites/mega/20478.png", // Mega Froslass
+  20485: "/assets/sprites/mega/20485.png", // Mega Heatran
+  20491: "/assets/sprites/mega/20491.png", // Mega Darkrai
+  20530: "/assets/sprites/mega/20530.png", // Mega Excadrill
+  20545: "/assets/sprites/mega/20545.png", // Mega Scolipede
+  20560: "/assets/sprites/mega/20560.png", // Mega Scrafty
+  20604: "/assets/sprites/mega/20604.png", // Mega Eelektross
+  20609: "/assets/sprites/mega/20609.png", // Mega Chandelure
+  20623: "/assets/sprites/mega/20623.png", // Mega Golurk
+  20652: "/assets/sprites/mega/20652.png", // Mega Chesnaught
+  20655: "/assets/sprites/mega/20655.png", // Mega Delphox
+  20658: "/assets/sprites/mega/20658.png", // Mega Greninja
+  20668: "/assets/sprites/mega/20668.png", // Mega Pyroar
+  20670: "/assets/sprites/mega/20670.png", // Mega Floette (Eternal)
+  20678: "/assets/sprites/mega/20678.png", // Mega Meowstic
+  20687: "/assets/sprites/mega/20687.png", // Mega Malamar
+  20689: "/assets/sprites/mega/20689.png", // Mega Barbaracle
+  20691: "/assets/sprites/mega/20691.png", // Mega Dragalge
+  20701: "/assets/sprites/mega/20701.png", // Mega Hawlucha
+  20718: "/assets/sprites/mega/20718.png", // Mega Zygarde
+  20740: "/assets/sprites/mega/20740.png", // Mega Crabominable
+  20768: "/assets/sprites/mega/20768.png", // Mega Golisopod
+  20780: "/assets/sprites/mega/20780.png", // Mega Drampa
+  20801: "/assets/sprites/mega/20801.png", // Mega Magearna
+  20807: "/assets/sprites/mega/20807.png", // Mega Zeraora
+  20870: "/assets/sprites/mega/20870.png", // Mega Falinks
+  20952: "/assets/sprites/mega/20952.png", // Mega Scovillain
+  20970: "/assets/sprites/mega/20970.png", // Mega Glimmora
+  20978: "/assets/sprites/mega/20978.png", // Mega Tatsugiri
+  20998: "/assets/sprites/mega/20998.png", // Mega Baxcalibur
 };
 
 export function getSpriteUrl(id: number): string {

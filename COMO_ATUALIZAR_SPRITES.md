@@ -1,36 +1,62 @@
-# Como Atualizar Sprites Manualmente
+# Guia de Atualização de Sprites (IDs Completos)
 
-Se você encontrar um sprite (imagem) que eu não consegui localizar ou que quebrou, você pode atualizar manualmente seguindo estes passos:
-
-### 1. Preparar a Imagem
-- A imagem deve estar no formato **.png** (preferencialmente com fundo transparente).
-- O nome do arquivo **deve ser exatamente o ID do Pokémon**.
-  - Exemplo: O ID do **Mega Lucario Z** é `21448`. O arquivo deve se chamar `21448.png`.
-
-### 2. Onde colocar o arquivo
-Abra o Explorer do VS Code e arraste a imagem para a seguinte pasta:
+Para que os sprites apareçam no jogo, você deve renomear os arquivos `.png` com os IDs abaixo e colocá-los na pasta:
 `public/assets/sprites/mega/`
 
-### 3. IDs Úteis (Pokémon Legends Z-A e Especiais)
-Aqui estão os IDs que já configurei no código para ler desta pasta:
-- `20154`: Mega Meganium
-- `20160`: Mega Feraligatr
-- `20157`: Mega Typhlosion (Z-A)
-- `20149`: Mega Dragonite
-- `21448`: Mega Lucario Z
-- `21359`: Mega Absol Z
-- `20026`: Mega Raichu X
-- `21026`: Mega Raichu Y
-- `20036`: Mega Clefable
-- `20121`: Mega Starmie
-- `20227`: Mega Skarmory
-- `20071`: Mega Victreebel
-- `20970`: Mega Glimmora
-- `20609`: Mega Chandelure
-- `20687`: Mega Malamar
+### 📋 Lista de IDs para Mega Evoluções (Legends Z-A e Speculativos)
 
-### 4. Por que fazer isso?
-Ao colocar as imagens nesta pasta, o jogo para de depender da internet para carregar esses sprites específicos. Eles ficarão salvos dentro do seu projeto e funcionarão sempre, mesmo se o site original sair do ar.
+| Pokémon | ID do Arquivo |
+| :--- | :--- |
+| **Mega Raichu X** | `20026.png` |
+| **Mega Raichu Y** | `21026.png` |
+| **Mega Clefable** | `20036.png` |
+| **Mega Victreebel** | `20071.png` |
+| **Mega Starmie** | `20121.png` |
+| **Mega Dragonite** | `20149.png` |
+| **Mega Meganium** | `20154.png` |
+| **Mega Feraligatr** | `20160.png` |
+| **Mega Emboar** | `20500.png` |
+| **Mega Skarmory** | `20227.png` |
+| **Mega Chimecho** | `20358.png` |
+| **Mega Absol Z** | `21359.png` |
+| **Mega Staraptor** | `20398.png` |
+| **Mega Garchomp Z** | `21445.png` |
+| **Mega Lucario Z** | `21448.png` |
+| **Mega Froslass** | `20478.png` |
+| **Mega Heatran** | `20485.png` |
+| **Mega Darkrai** | `20491.png` |
+| **Mega Excadrill** | `20530.png` |
+| **Mega Scolipede** | `20545.png` |
+| **Mega Scrafty** | `20560.png` |
+| **Mega Eelektross** | `20604.png` |
+| **Mega Chandelure** | `20609.png` |
+| **Mega Golurk** | `20623.png` |
+| **Mega Chesnaught** | `20652.png` |
+| **Mega Delphox** | `20655.png` |
+| **Mega Greninja** | `20658.png` |
+| **Mega Pyroar** | `20668.png` |
+| **Mega Floette** | `20670.png` |
+| **Mega Meowstic** | `20678.png` |
+| **Mega Malamar** | `20687.png` |
+| **Mega Barbaracle** | `20689.png` |
+| **Mega Dragalge** | `20691.png` |
+| **Mega Hawlucha** | `20701.png` |
+| **Mega Zygarde** | `20718.png` |
+| **Mega Crabominable** | `20740.png` |
+| **Mega Golisopod** | `20768.png` |
+| **Mega Drampa** | `20780.png` |
+| **Mega Magearna** | `20801.png` |
+| **Mega Zeraora** | `20807.png` |
+| **Mega Falinks** | `20870.png` |
+| **Mega Scovillain** | `20952.png` |
+| **Mega Glimmora** | `20970.png` |
+| **Mega Tatsugiri** | `20978.png` |
+| **Mega Baxcalibur** | `20998.png` |
 
 ---
-*Dica: Se você adicionar um novo ID que não está nesta lista, me avise para que eu registre ele no código!*
+
+### 💡 Como fazer agora:
+1. Pegue o sprite que você tem.
+2. Renomeie para o ID correspondente da lista acima.
+3. Copie o arquivo para: `public/assets/sprites/mega/`
+4. O jogo atualizará automaticamente e usará sua imagem!
