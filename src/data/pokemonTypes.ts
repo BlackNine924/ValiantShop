@@ -90,6 +90,8 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "20376": "metagross-mega",
   "20380": "latias-mega",
   "20381": "latios-mega",
+  "20382": "kyogre-primal",
+  "20383": "groudon-primal",
   "20384": "rayquaza-mega",
   "20398": "staraptor-mega",
   "20428": "lopunny-mega",
@@ -137,7 +139,8 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "21150": "mewtwo-megay",
   "21359": "absol-megaz",
   "21445": "garchomp-megaz",
-  "21448": "lucario-megaz"
+  "21448": "lucario-megaz",
+  "20670": "floette-eternal"
 };
 
 const DYNAMAX_NAME_MAP: Record<number, string> = {
@@ -1379,7 +1382,9 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 21448, name: "Mega Lucario Z", types: ["Fighting", "Steel"] },
   { id: 21445, name: "Mega Garchomp Z", types: ["Dragon", "Ground"] },
   { id: 20670, name: "Mega Eternal Floette", types: ["Fairy"] },
-  // Gigantamax (G-Max) Forms (34 entries)
+  { id: 20382, name: "Primal Kyogre", types: ["Water"] },
+  { id: 20383, name: "Primal Groudon", types: ["Ground", "Fire"] },
+  // Gigantamax (G-Max) Forms (35 entries)
   { id: 30003, name: "G-Max Venusaur", types: ["Grass", "Poison"] },
   { id: 30006, name: "G-Max Charizard", types: ["Fire", "Flying"] },
   { id: 30009, name: "G-Max Blastoise", types: ["Water"] },
@@ -1413,4 +1418,5 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 30884, name: "G-Max Duraludon", types: ["Steel", "Dragon"] },
   { id: 30890, name: "Eternamax Eternatus", types: ["Poison", "Dragon"] },
   { id: 30892, name: "G-Max Urshifu", types: ["Fighting", "Dark"] },
+  { id: 30091, name: "G-Max Cloyster", types: ["Water", "Ice"] },
 ];
