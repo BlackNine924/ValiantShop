@@ -3,8 +3,8 @@ import {
   generateDailyGrid, generateGrid, validateGuess, getUniqueGridAnswers, getBaseId, ALL_CRITERIA
 } from '../data/pokeGridLogic';
 import type { GameGrid, Criterion } from '../data/pokeGridLogic';
-import { getSpriteUrl } from '../data/pokemonTypes';
 import type { PokemonEntry } from '../data/pokemonTypes';
+import { getSpriteUrl } from '../data/pokemonTypes';
 import { PokemonSearchModal } from './PokemonSearchModal';
 import { SettingsModal } from './SettingsModal';
 import { RotateCcw, Trophy, Zap, XCircle, Settings, Timer as TimerIcon } from 'lucide-react';
@@ -12,13 +12,19 @@ import { useAuth } from '../context/AuthContext';
 import { savePokeGridState, loadPokeGridState } from '../services/persistenceService';
 
 export const PokeGrid: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   // Settings State
   const [enabledCriteriaIds, setEnabledCriteriaIds] = useState<Set<string>>(new Set(ALL_CRITERIA.map(c => c.id)));
   const [unlimitedMode, setUnlimitedMode] = useState(false);
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const gridId = useMemo(() => {
+    const dateStr = new Date().toLocaleDateString('en-CA');
+    return unlimitedMode ? 'infinite_current' : dateStr;
+  }, [unlimitedMode]);
 
   const [grid, setGrid] = useState<GameGrid>(() => generateDailyGrid());
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
@@ -38,10 +44,15 @@ export const PokeGrid: React.FC = () => {
   // Load from Firebase/LocalStorage
   useEffect(() => {
     const loadState = async () => {
+      // Don't start loading until Auth is resolved
+      if (authLoading) return;
+
       let savedState = null;
       
       if (user?.displayName) {
-        savedState = await loadPokeGridState(user.displayName);
+        console.log(`📡 [Pokégrid] Carregando ${unlimitedMode ? 'Infinito' : 'Diário'} (${gridId}) para:`, user.displayName);
+        savedState = await loadPokeGridState(user.displayName, gridId);
+        if (savedState) console.log('✅ [Pokégrid] Progresso carregado do Firebase!');
       }
       
       if (!savedState) {
@@ -49,14 +60,13 @@ export const PokeGrid: React.FC = () => {
         if (local) {
           try {
             savedState = JSON.parse(local);
+            if (savedState) console.log('📁 [Pokégrid] Progresso carregado do cache local.');
           } catch (e) {}
         }
       }
 
       if (savedState) {
-        const dateStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
-        // Restore if it's currently the same day OR if we are in unlimited mode
-        // But respect the saved 'unlimitedMode' setting
+        const dateStr = new Date().toLocaleDateString('en-CA');
         const isCurrentlyDaily = !savedState.unlimitedMode;
         
         if (savedState.unlimitedMode || savedState.date === dateStr) {
@@ -69,20 +79,21 @@ export const PokeGrid: React.FC = () => {
           setTime(savedState.time || 0);
           setUnlimitedMode(savedState.unlimitedMode || false);
         } else if (isCurrentlyDaily) {
-          // New day, reset to daily grid
+          console.log('🌅 [Pokégrid] Novo dia detectado. Resetando grid diário.');
           handleRestartToDaily();
         }
       } else {
-        // No saved state, if not unlimited, ensure daily grid is fresh
         if (!unlimitedMode) {
           handleRestartToDaily();
         }
       }
-      setHasLoaded(true);
+      
+      // Delay setting hasLoaded to ensure states are settled
+      setTimeout(() => setHasLoaded(true), 100);
     };
 
     loadState();
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     let interval: any;
@@ -114,9 +125,15 @@ export const PokeGrid: React.FC = () => {
     localStorage.setItem('pokegrid_state', JSON.stringify(state));
 
     if (user?.displayName) {
-      const timeoutId = setTimeout(() => {
-        savePokeGridState(user.displayName!, state);
-      }, 1000); // Debounce saves
+      setIsSaving(true);
+      const timeoutId = setTimeout(async () => {
+        try {
+          await savePokeGridState(user.displayName!, gridId, state);
+          console.log(`💾 [Pokégrid] ${gridId} Sincronizado!`);
+        } finally {
+          setIsSaving(false);
+        }
+      }, 1500);
       return () => clearTimeout(timeoutId);
     }
   }, [grid, score, guesses, usedPokemon, gameComplete, isSurrendered, time, unlimitedMode, user, hasLoaded]);
@@ -193,8 +210,33 @@ export const PokeGrid: React.FC = () => {
 
       newCells[row][col].guessedPokemon = pokemon;
       newCells[row][col].isCorrect = true;
-      setScore(s => s + 1);
+      const newScore = score + 1;
+      setScore(newScore);
       setIsModalOpen(false);
+
+      // Force immediate sync to Firebase
+      const dateStr = new Date().toLocaleDateString('en-CA');
+      const stateToSave = {
+        grid: { ...grid, cells: newCells },
+        score: newScore,
+        guesses,
+        usedPokemon: Array.from(newUsed),
+        gameComplete: newScore === 9,
+        isSurrendered,
+        time,
+        date: dateStr,
+        unlimitedMode
+      };
+      
+      if (user?.displayName) {
+        savePokeGridState(user.displayName, gridId, stateToSave);
+      }
+      localStorage.setItem('pokegrid_state', JSON.stringify(stateToSave));
+
+      if (newScore === 9) {
+        setGameComplete(true);
+        setTimerActive(false);
+      }
     } else {
       if (!unlimitedMode) {
         setGuesses(g => g + 1);
@@ -293,6 +335,12 @@ export const PokeGrid: React.FC = () => {
             </div>
           )}
         </div>
+        
+        {isSaving && (
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 text-[8px] text-primary animate-pulse font-black uppercase tracking-widest whitespace-nowrap">
+            <RotateCcw size={8} className="animate-spin" /> Sincronizando com a Nuvem...
+          </div>
+        )}
         
         <div className="pokegrid-actions">
           <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all" onClick={() => setIsSettingsOpen(true)}>

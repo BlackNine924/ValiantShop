@@ -3,6 +3,9 @@ import { X, Heart, Shield, Zap, Swords, Sword, Ruler, Weight, Globe, Calendar, B
 import type { DetailedPokemon, Variation } from '../services/pokedexService';
 import { getDetailedPokemon, TYPE_TRADUCOES } from '../services/pokedexService';
 import { TYPE_COLORS, getPokemonArtwork, getCustomArtworkByName } from '../data/pokemonTypes';
+import type { PokemonType } from '../data/pokemonTypes';
+import { calculateEffectiveness } from '../data/typeEffectiveness';
+import type { EffectivenessCategory } from '../data/typeEffectiveness';
 
 interface PokedexDetailProps {
   pokemonId: number;
@@ -232,14 +235,6 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           <p className="text-gray-300 text-sm leading-relaxed italic pl-2">
                             "{basePokemon?.species?.flavor_text}"
                           </p>
-                          {basePokemon?.species?.flavor_text.includes('(Trad.') && (
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-lg border border-white/10 group-hover:border-primary/30 transition-colors">
-                              <Globe size={10} className="text-gray-500" />
-                              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
-                                Tradução Automática ou Alternativa
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -251,30 +246,47 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                       </div>
 
                       <div className="space-y-6 pt-6 border-t border-white/5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                          <div>
-                            <h4 className="text-[10px] font-black text-red-500 uppercase mb-4 tracking-widest flex items-center gap-2">
-                              <Swords size={12} /> Fraquezas
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {basePokemon?.typeRelations?.weaknesses.map(t => (
-                                <TypeBadge key={t.name} type={t.label} colorName={t.name} />
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <h4 className="text-[10px] font-black text-green-500 uppercase mb-4 tracking-widest flex items-center gap-2">
-                              <Shield size={12} /> Resistências
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {basePokemon?.typeRelations?.resistances.map(t => (
-                                <TypeBadge key={t.name} type={t.label} colorName={t.name} />
-                              ))}
-                              {basePokemon?.typeRelations?.immunities.map(t => (
-                                <TypeBadge key={t.name} type={t.label} colorName={t.name} isImmunity />
-                              ))}
-                            </div>
-                          </div>
+                        <h4 className="text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest flex items-center gap-2">
+                          <Shield size={12} /> Efetividade de Tipos (Dano Recebido)
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {(Object.entries(calculateEffectiveness(displayData.types as PokemonType[])) as [EffectivenessCategory, PokemonType[]][]).map(([category, types]) => {
+                            if (types.length === 0 || category === 'DANO NORMAL (1x)') return null;
+                            
+                            let colorClass = "text-gray-400";
+                            let icon = <CheckCircle2 size={12} />;
+                            
+                            if (category.includes('4x')) {
+                              colorClass = "text-red-600 font-black";
+                              icon = <Zap size={12} className="animate-pulse" />;
+                            } else if (category.includes('2x')) {
+                              colorClass = "text-red-400";
+                              icon = <Swords size={12} />;
+                            } else if (category.includes('0x')) {
+                              colorClass = "text-primary font-black";
+                              icon = <Shield size={12} />;
+                            } else if (category.includes('0.25x')) {
+                              colorClass = "text-green-600";
+                              icon = <Shield size={12} />;
+                            } else if (category.includes('0.5x')) {
+                              colorClass = "text-green-400";
+                              icon = <Shield size={12} />;
+                            }
+
+                            return (
+                              <div key={category} className="p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                                <p className={`text-[8px] uppercase tracking-tighter mb-2 flex items-center gap-1.5 ${colorClass}`}>
+                                  {icon} {category}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {types.map(t => (
+                                    <TypeBadge key={t} type={TYPE_TRADUCOES[t.toLowerCase()] || t} colorName={t} />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
                         <div>
@@ -282,12 +294,16 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           <div className="flex flex-wrap gap-2">
                             {basePokemon?.abilities.map((a, idx) => (
                               <div key={idx} className="flex items-center gap-2">
-                                <span className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-tight group-hover:border-primary/20 transition-colors flex items-center gap-2">
+                                <span className={`px-4 py-2 bg-white/5 border rounded-xl text-[10px] font-bold uppercase tracking-tight transition-all duration-500 flex items-center gap-2 group/ability ${a.isHidden ? 'border-secondary/50 bg-secondary/5 shadow-[0_0_15px_rgba(var(--secondary-rgb),0.2)]' : 'border-white/10 hover:border-primary/20'}`}>
                                   {a.name.replace(/-/g, ' ')}
                                   {a.isHidden && (
-                                    <span className="bg-secondary/20 text-secondary border border-secondary/30 px-1.5 py-0.5 rounded-md text-[8px] font-black">
-                                      HA
-                                    </span>
+                                    <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-secondary/20 rounded-lg border border-secondary/40 relative overflow-hidden group/ha">
+                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/ha:animate-shimmer"></div>
+                                      <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse shadow-[0_0_8px_var(--secondary-glow)]"></div>
+                                      <span className="bg-gradient-to-r from-secondary to-indigo-300 bg-clip-text text-transparent text-[8px] font-black tracking-tighter">
+                                        HABILIDADE OCULTA
+                                      </span>
+                                    </div>
                                   )}
                                 </span>
                               </div>

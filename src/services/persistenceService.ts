@@ -8,18 +8,25 @@ export interface UserProgress {
   };
 }
 
-export const savePokeGridState = async (nick: string, state: any) => {
+export const savePokeGridState = async (nick: string, gridId: string, state: any) => {
   if (!nick) return;
-  const userRef = doc(db, 'users', nick.toLowerCase());
-  await setDoc(userRef, { pokegrid: state }, { merge: true });
+  const gridKey = `${nick.toLowerCase()}_${gridId}`;
+  const gridRef = doc(db, 'grids', gridKey);
+  await setDoc(gridRef, { 
+    state, 
+    userId: nick.toLowerCase(), 
+    gridId,
+    lastUpdated: new Date().toISOString() 
+  }, { merge: true });
 };
 
-export const loadPokeGridState = async (nick: string) => {
+export const loadPokeGridState = async (nick: string, gridId: string) => {
   if (!nick) return null;
-  const userRef = doc(db, 'users', nick.toLowerCase());
-  const snap = await getDoc(userRef);
+  const gridKey = `${nick.toLowerCase()}_${gridId}`;
+  const gridRef = doc(db, 'grids', gridKey);
+  const snap = await getDoc(gridRef);
   if (snap.exists()) {
-    return snap.data().pokegrid || null;
+    return snap.data().state || null;
   }
   return null;
 };
