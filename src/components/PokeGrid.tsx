@@ -8,8 +8,12 @@ import type { PokemonEntry } from '../data/pokemonTypes';
 import { PokemonSearchModal } from './PokemonSearchModal';
 import { SettingsModal } from './SettingsModal';
 import { RotateCcw, Trophy, Zap, XCircle, Settings, Timer as TimerIcon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { savePokeGridState, loadPokeGridState } from '../services/persistenceService';
 
 export const PokeGrid: React.FC = () => {
+  const { user } = useAuth();
+  
   // Settings State
   const [enabledCriteriaIds, setEnabledCriteriaIds] = useState<Set<string>>(new Set(ALL_CRITERIA.map(c => c.id)));
   const [unlimitedMode, setUnlimitedMode] = useState(false);
@@ -27,10 +31,30 @@ export const PokeGrid: React.FC = () => {
   const [gameComplete, setGameComplete] = useState(false);
   const [isSurrendered, setIsSurrendered] = useState(false);
   const [shakeCell, setShakeCell] = useState<string | null>(null);
-
-  // Timer logic
   const [time, setTime] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
+
+  // Load from Firebase
+  useEffect(() => {
+    if (user?.displayName) {
+      loadPokeGridState(user.displayName).then(state => {
+        if (state) {
+          const dateStr = new Date().toISOString().split('T')[0];
+          // Only restore if it's the same day or unlimited mode
+          if (state.date === dateStr || state.unlimitedMode) {
+            setGrid(state.grid);
+            setScore(state.score || 0);
+            setGuesses(state.guesses || 0);
+            setUsedPokemon(new Set(state.usedPokemon || []));
+            setGameComplete(state.gameComplete || false);
+            setIsSurrendered(state.isSurrendered || false);
+            setTime(state.time || 0);
+            setUnlimitedMode(state.unlimitedMode || false);
+          }
+        }
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     let interval: any;
@@ -41,6 +65,31 @@ export const PokeGrid: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [timerActive, timerEnabled, gameComplete, isSurrendered]);
+
+  // Persist State Effect (Firebase + LocalStorage fallback)
+  useEffect(() => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const state = {
+      grid,
+      score,
+      guesses,
+      usedPokemon: Array.from(usedPokemon),
+      gameComplete,
+      isSurrendered,
+      time,
+      date: dateStr,
+      unlimitedMode
+    };
+    
+    localStorage.setItem('pokegrid_state', JSON.stringify(state));
+
+    if (user?.displayName) {
+      const timeoutId = setTimeout(() => {
+        savePokeGridState(user.displayName!, state);
+      }, 1000); // Debounce saves
+      return () => clearTimeout(timeoutId);
+    }
+  }, [grid, score, guesses, usedPokemon, gameComplete, isSurrendered, time, unlimitedMode, user]);
 
   const correctCount = grid.cells.flat().filter(c => c.isCorrect).length;
   const isGameOver = (!unlimitedMode && guesses >= maxGuesses) || correctCount === 9 || isSurrendered;
@@ -128,18 +177,33 @@ export const PokeGrid: React.FC = () => {
     setSelectedCell(null);
     setTime(0);
     setTimerActive(false);
+    
+    // Clear only state, status is handled by combined state now
+    localStorage.removeItem('pokegrid_state');
   }, []);
 
   useEffect(() => {
     // Se o usuário desativar o modo ilimitado, forçamos o grid do dia
-    if (!unlimitedMode) {
+    // Mas apenas se o estado atual não for do dia correto
+    const saved = localStorage.getItem('pokegrid_state');
+    const dateStr = new Date().toISOString().split('T')[0];
+    let alreadyCorrect = false;
+    if (saved) {
+      try {
+        const state = JSON.parse(saved);
+        if (!unlimitedMode && state.date === dateStr && !state.unlimitedMode) {
+          alreadyCorrect = true;
+        }
+      } catch (e) {}
+    }
+
+    if (!unlimitedMode && !alreadyCorrect) {
       handleRestartToDaily();
     }
   }, [unlimitedMode, handleRestartToDaily]);
 
   const handleNewGame = () => {
     // Only allow manual new grid if unlimited mode is on or game is complete and we want a fresh start
-    // But the user specifically said "ficando infinito apenas no modo ilimitado"
     if (!unlimitedMode) return;
     
     setGrid(generateGrid(enabledCriteriaIds));
@@ -152,6 +216,8 @@ export const PokeGrid: React.FC = () => {
     setSelectedCell(null);
     setTime(0);
     setTimerActive(false);
+
+    localStorage.removeItem('pokegrid_state');
   };
 
   const handleSurrender = () => {
@@ -161,6 +227,8 @@ export const PokeGrid: React.FC = () => {
       setTimerActive(false);
     }
   };
+
+  // Removed legacy individual persistence effects
 
   return (
     <div className="pokegrid-container">
@@ -281,6 +349,11 @@ export const PokeGrid: React.FC = () => {
             <span className="pokegrid-over-text">
               Fim de jogo! Acertos: {score}/9
             </span>
+          )}
+          {!unlimitedMode && (
+            <div className="text-[10px] text-gray-500 mt-1 italic">
+              Grid diário concluído. Volte amanhã para um novo desafio!
+            </div>
           )}
           {unlimitedMode && (
             <button className="pokegrid-play-again" onClick={handleNewGame}>

@@ -48,6 +48,7 @@ const MEGA_POKEMON_IDS = new Set([
 
 // ─── Gen boundaries ────────────────────────────────────────────
 export function getBaseId(id: number): number {
+  if (id >= 30000) return id % 30000;
   return id >= 10000 ? id % 1000 : id;
 }
 
@@ -311,7 +312,7 @@ function buildAllCriteria(): Criterion[] {
 
   // 13. Specials
   criteria.push(
-    { id: 'dynamax', label: 'Dynamax', emoji: '🔴', color: '#E64980', matches: (p) => Mappings.DYNAMAX_IDS.has(getBaseId(p.id)) },
+    { id: 'dynamax', label: 'Dynamax', emoji: '🔴', color: '#E64980', matches: (p) => Mappings.HAS_GMAX_IDS.has(getBaseId(p.id)) },
     { id: 'babys', label: 'Babys', emoji: '👶', color: regionalColor, matches: (p) => Mappings.BABY_IDS.has(getBaseId(p.id)) },
     { id: 'paradox', label: 'Paradoxo', emoji: '🌀', color: '#BE4BDB', matches: (p) => Mappings.PARADOX_IDS.has(getBaseId(p.id)) },
     { id: 'ultrabeast', label: 'Ultrabeast', emoji: '👾', color: '#15AABF', matches: (p) => Mappings.ULTRABEAST_IDS.has(getBaseId(p.id)) },
@@ -376,7 +377,9 @@ function seededShuffle<T>(arr: T[]): T[] {
 // ─── Intersection checks ─────────────────────────────────────
 
 function hasIntersection(c1: Criterion, c2: Criterion): boolean {
-  return POKEMON_TYPE_DATA.some(p => c1.matches(p) && c2.matches(p));
+  // We require at least 3 candidates to ensure the grid is solvable and interesting
+  const matches = POKEMON_TYPE_DATA.filter(p => c1.matches(p) && c2.matches(p));
+  return matches.length >= 3;
 }
 
 export function getPokemonForCell(c1: Criterion, c2: Criterion): PokemonEntry[] {

@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { ShoppingBag, History, Table, Shield, LogOut } from 'lucide-react';
+import { ShoppingBag, History, Table, Shield, LogOut, Grid3X3, Smartphone } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PokeGridPage } from './pages/PokeGridPage';
+import { PokedexPage } from './pages/PokedexPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
@@ -55,10 +56,17 @@ const HomePage = () => {
         />
         <CategoryCard 
           to="/pokegrid" 
-          icon={<div className="font-black text-2xl px-2">PG</div>} 
-          title="POKEGRID" 
+          icon={<Grid3X3 size={32} />} 
+          title="POKÉGRID" 
           desc="Minigame diário de conhecimento Pokémon."
           color="primary"
+        />
+        <CategoryCard 
+          to="/pokedex" 
+          icon={<Smartphone size={32} className="rotate-0" />} 
+          title="POKÉDEX" 
+          desc="Enciclopédia completa de Pokémon."
+          color="secondary"
         />
       </div>
     </div>
@@ -98,7 +106,8 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen }: any) => {
             <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
             <Link to="/order" className={`nav-link-manda ${isActive('/order') ? 'active' : ''}`}>Encomendas</Link>
             <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
-            <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokeGrid</Link>
+            <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>Pokégrid</Link>
+            <Link to="/pokedex" className={`nav-link-manda ${isActive('/pokedex') ? 'active' : ''}`}>Pokédex</Link>
             {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
           </div>
 
@@ -184,7 +193,22 @@ function App() {
                 <Route path="/prices" element={<Prices />} />
                 <Route path="/status" element={<Status />} />
                 <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/pokegrid" element={<PokeGridPage />} />
+                <Route 
+                  path="/pokegrid" 
+                  element={
+                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                      <PokeGridPage />
+                    </ProtectedOrderRoute>
+                  } 
+                />
+                <Route 
+                  path="/pokedex" 
+                  element={
+                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                      <PokedexPage />
+                    </ProtectedOrderRoute>
+                  } 
+                />
               </Routes>
             </main>
             <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">

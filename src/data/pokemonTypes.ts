@@ -21,6 +21,27 @@ export const ALL_TYPES: PokemonType[] = [
   'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon',
   'Dark', 'Steel', 'Fairy'
 ];
+
+export const TYPE_COLORS: Record<string, string> = {
+  Normal: '#A8A878',
+  Fire: '#F08030',
+  Water: '#6890F0',
+  Grass: '#78C850',
+  Electric: '#F8D030',
+  Ice: '#98D8D8',
+  Fighting: '#C03028',
+  Poison: '#A040A0',
+  Ground: '#E0C068',
+  Flying: '#A890F0',
+  Psychic: '#F85888',
+  Bug: '#A8B820',
+  Rock: '#B8A038',
+  Ghost: '#705898',
+  Dragon: '#7038F8',
+  Dark: '#705848',
+  Steel: '#B8B8D0',
+  Fairy: '#EE99AC'
+};
 const MEGA_NAME_MAP: Record<number, string> = {
   "20003": "venusaur-mega",
   "20006": "charizard-megax",
@@ -107,7 +128,9 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "20870": "falinks-mega",
   "20952": "scovillain-mega",
   "20970": "glimmora-mega",
-  "20978": "tatsugiri-mega",
+  "20978": "tatsugiri-curly-mega",
+  "20239": "tatsugiri-droopy-mega",
+  "210147": "magearna-original-mega",
   "20998": "baxcalibur-mega",
   "21006": "charizard-megay",
   "21026": "raichu-megay",
@@ -117,69 +140,120 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "21448": "lucario-megaz"
 };
 
-// Map for high-quality external sprites from DeviantArt / sta.sh if needed
-const CUSTOM_SPRITE_URLS: Record<number, string> = {
-  // Legends Z-A e Megas Especulativas (Locais)
-  20026: "/assets/sprites/mega/20026.png", // Mega Raichu X
-  21026: "/assets/sprites/mega/21026.png", // Mega Raichu Y
-  20036: "/assets/sprites/mega/20036.png", // Mega Clefable
-  20071: "/assets/sprites/mega/20071.png", // Mega Victreebel
-  20121: "/assets/sprites/mega/20121.png", // Mega Starmie
-  20149: "/assets/sprites/mega/20149.png", // Mega Dragonite
-  20154: "/assets/sprites/mega/20154.png", // Mega Meganium
-  20160: "/assets/sprites/mega/20160.png", // Mega Feraligatr
-  20500: "/assets/sprites/mega/20500.png", // Mega Emboar
-  20227: "/assets/sprites/mega/20227.png", // Mega Skarmory
-  20358: "/assets/sprites/mega/20358.png", // Mega Chimecho
-  21359: "/assets/sprites/mega/21359.png", // Mega Absol Z
-  20398: "/assets/sprites/mega/20398.png", // Mega Staraptor
-  21445: "/assets/sprites/mega/21445.png", // Mega Garchomp Z
-  21448: "/assets/sprites/mega/21448.png", // Mega Lucario Z
-  20478: "/assets/sprites/mega/20478.png", // Mega Froslass
-  20485: "/assets/sprites/mega/20485.png", // Mega Heatran
-  20491: "/assets/sprites/mega/20491.png", // Mega Darkrai
-  20530: "/assets/sprites/mega/20530.png", // Mega Excadrill
-  20545: "/assets/sprites/mega/20545.png", // Mega Scolipede
-  20560: "/assets/sprites/mega/20560.png", // Mega Scrafty
-  20604: "/assets/sprites/mega/20604.png", // Mega Eelektross
-  20609: "/assets/sprites/mega/20609.png", // Mega Chandelure
-  20623: "/assets/sprites/mega/20623.png", // Mega Golurk
-  20652: "/assets/sprites/mega/20652.png", // Mega Chesnaught
-  20655: "/assets/sprites/mega/20655.png", // Mega Delphox
-  20658: "/assets/sprites/mega/20658.png", // Mega Greninja
-  20668: "/assets/sprites/mega/20668.png", // Mega Pyroar
-  20670: "/assets/sprites/mega/20670.png", // Mega Floette (Eternal)
-  20678: "/assets/sprites/mega/20678.png", // Mega Meowstic
-  20687: "/assets/sprites/mega/20687.png", // Mega Malamar
-  20689: "/assets/sprites/mega/20689.png", // Mega Barbaracle
-  20691: "/assets/sprites/mega/20691.png", // Mega Dragalge
-  20701: "/assets/sprites/mega/20701.png", // Mega Hawlucha
-  20718: "/assets/sprites/mega/20718.png", // Mega Zygarde
-  20740: "/assets/sprites/mega/20740.png", // Mega Crabominable
-  20768: "/assets/sprites/mega/20768.png", // Mega Golisopod
-  20780: "/assets/sprites/mega/20780.png", // Mega Drampa
-  20801: "/assets/sprites/mega/20801.png", // Mega Magearna
-  20807: "/assets/sprites/mega/20807.png", // Mega Zeraora
-  20870: "/assets/sprites/mega/20870.png", // Mega Falinks
-  20952: "/assets/sprites/mega/20952.png", // Mega Scovillain
-  20970: "/assets/sprites/mega/20970.png", // Mega Glimmora
-  20978: "/assets/sprites/mega/20978.png", // Mega Tatsugiri
-  20998: "/assets/sprites/mega/20998.png", // Mega Baxcalibur
+const DYNAMAX_NAME_MAP: Record<number, string> = {
+  30003: "venusaur-gmax",
+  30006: "charizard-gmax",
+  30009: "blastoise-gmax",
+  30012: "butterfree-gmax",
+  30025: "pikachu-gmax",
+  30052: "meowth-gmax",
+  30068: "machamp-gmax",
+  30091: "cloyster-gmax", // Note: Some are speculative/custom like Cloyster in some mods
+  30094: "gengar-gmax",
+  30099: "kingler-gmax",
+  30131: "lapras-gmax",
+  30133: "eevee-gmax",
+  30143: "snorlax-gmax",
+  30569: "garbodor-gmax",
+  30809: "melmetal-gmax",
+  30812: "rillaboom-gmax",
+  30815: "cinderace-gmax",
+  30818: "inteleon-gmax",
+  30823: "corviknight-gmax",
+  30826: "orbeetle-gmax",
+  30834: "drednaw-gmax",
+  30839: "coalossal-gmax",
+  30841: "flapple-gmax",
+  30842: "appletun-gmax",
+  30844: "sandaconda-gmax",
+  30849: "toxtricity-gmax",
+  30851: "centiskorch-gmax",
+  30858: "hatterene-gmax",
+  30861: "grimmsnarl-gmax",
+  30869: "alcremie-gmax",
+  30879: "copperajah-gmax",
+  30884: "duraludon-gmax",
+  30890: "eternatus-eternamax",
+  30892: "urshifu-gmax"
 };
 
-export function getSpriteUrl(id: number): string {
-  // Use custom high-quality sprites if available
-  if (CUSTOM_SPRITE_URLS[id]) {
-    return CUSTOM_SPRITE_URLS[id];
+export function getSpriteUrl(id: number, shiny: boolean = false): string {
+  // 1. Check for custom local sprites (Predictable paths)
+  if (id >= 20000 && id < 30000) {
+    // Mega
+    const path = `/assets/sprites/mega/${id}${shiny ? '-shiny' : ''}.png`;
+    return path;
+  }
+  if (id >= 30000 && id < 40000) {
+    // Dynamax
+    const path = `/assets/sprites/dynamax/${id}${shiny ? '-shiny' : ''}.png`;
+    return path;
   }
 
-  // Use Showdown for Megas (more complete and consistent Gen 5 style)
+  // 2. Use Showdown for Megas (more complete and consistent Gen 5 style)
   if (MEGA_NAME_MAP[id]) {
-    return `https://play.pokemonshowdown.com/sprites/gen5/${MEGA_NAME_MAP[id]}.png`;
+    const shinyPrefix = shiny ? 'ani-shiny' : 'gen5';
+    const extension = shiny ? 'gif' : 'png';
+    return `https://play.pokemonshowdown.com/sprites/${shinyPrefix}/${MEGA_NAME_MAP[id]}.${extension}`;
+  }
+
+  // 3. Use Showdown for G-Max (Gen 8 style sprites)
+  if (DYNAMAX_NAME_MAP[id]) {
+    const shinyPrefix = shiny ? 'ani-shiny' : 'ani';
+    return `https://play.pokemonshowdown.com/sprites/${shinyPrefix}/${DYNAMAX_NAME_MAP[id]}.gif`;
   }
   
   // Official PokeAPI for standard Pokemon
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  const shinyPath = shiny ? 'shiny/' : '';
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyPath}${id}.png`;
+}
+
+/**
+ * Finds a custom local artwork by variation display name.
+ */
+export function getCustomArtworkByName(displayName: string, shiny: boolean = false): string | null {
+  const normalized = displayName.toLowerCase().replace(/[\s\-_]/g, '');
+
+  for (const [idStr, slug] of Object.entries(MEGA_NAME_MAP)) {
+    if (slug.replace(/[\s\-_]/g, '') === normalized) {
+      return getPokemonArtwork(Number(idStr), shiny);
+    }
+  }
+
+  for (const [idStr, slug] of Object.entries(DYNAMAX_NAME_MAP)) {
+    if (slug.replace(/[\s\-_]/g, '') === normalized) {
+      return getPokemonArtwork(Number(idStr), shiny);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns high-quality Official Artwork for the Pokedex.
+ * Prioritizes custom local artwork, then falls back to PokeAPI Official Artwork.
+ */
+export function getPokemonArtwork(id: number, shiny: boolean = false): string {
+  // 1. Custom local artwork (Anime style - predictable paths)
+  if (id >= 20000) {
+    // Custom Megas or Dynamax artworks
+    return `/assets/sprites/artwork/${id}${shiny ? '-shiny' : ''}.png`;
+  }
+
+  // 2. Fallback for varieties
+  let apiId = id;
+  if (id >= 10000 && id < 20000) {
+    // We let PokeAPI handle varieties if we don't have custom artwork
+    apiId = id;
+  }
+
+  // 3. Official PokeAPI Artwork
+  const baseUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
+  
+  if (shiny) {
+    return `${baseUrl}/shiny/${apiId}.png`;
+  }
+  return `${baseUrl}/${apiId}.png`;
 }
 
 export const POKEMON_TYPE_DATA: PokemonEntry[] = [
@@ -1293,13 +1367,49 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 20970, name: "Mega Glimmora", types: ["Rock", "Poison"] },
   { id: 20398, name: "Mega Staraptor", types: ["Normal", "Flying"] },
   { id: 20678, name: "Mega Meowstic", types: ["Psychic"] },
-  { id: 20978, name: "Mega Tatsugiri", types: ["Dragon", "Water"] },
+  { id: 20978, name: "Mega Tatsugiri Curly", types: ["Dragon", "Water"] },
+  { id: 20239, name: "Mega Tatsugiri Droopy", types: ["Dragon", "Water"] },
   { id: 20485, name: "Mega Heatran", types: ["Fire", "Steel"] },
   { id: 20491, name: "Mega Darkrai", types: ["Dark"] },
   { id: 20807, name: "Mega Zeraora", types: ["Electric"] },
   { id: 20801, name: "Mega Magearna", types: ["Steel", "Fairy"] },
+  { id: 210147, name: "Mega Magearna Original", types: ["Steel", "Fairy"] },
   { id: 21359, name: "Mega Absol Z", types: ["Dark"] },
   { id: 21448, name: "Mega Lucario Z", types: ["Fighting", "Steel"] },
   { id: 21445, name: "Mega Garchomp Z", types: ["Dragon", "Ground"] },
   { id: 20670, name: "Mega Eternal Floette", types: ["Fairy"] },
+  // Gigantamax (G-Max) Forms (34 entries)
+  { id: 30003, name: "G-Max Venusaur", types: ["Grass", "Poison"] },
+  { id: 30006, name: "G-Max Charizard", types: ["Fire", "Flying"] },
+  { id: 30009, name: "G-Max Blastoise", types: ["Water"] },
+  { id: 30012, name: "G-Max Butterfree", types: ["Bug", "Flying"] },
+  { id: 30025, name: "G-Max Pikachu", types: ["Electric"] },
+  { id: 30052, name: "G-Max Meowth", types: ["Normal"] },
+  { id: 30068, name: "G-Max Machamp", types: ["Fighting"] },
+  { id: 30094, name: "G-Max Gengar", types: ["Ghost", "Poison"] },
+  { id: 30099, name: "G-Max Kingler", types: ["Water"] },
+  { id: 30131, name: "G-Max Lapras", types: ["Water", "Ice"] },
+  { id: 30133, name: "G-Max Eevee", types: ["Normal"] },
+  { id: 30143, name: "G-Max Snorlax", types: ["Normal"] },
+  { id: 30569, name: "G-Max Garbodor", types: ["Poison"] },
+  { id: 30809, name: "G-Max Melmetal", types: ["Steel"] },
+  { id: 30812, name: "G-Max Rillaboom", types: ["Grass"] },
+  { id: 30815, name: "G-Max Cinderace", types: ["Fire"] },
+  { id: 30818, name: "G-Max Inteleon", types: ["Water"] },
+  { id: 30823, name: "G-Max Corviknight", types: ["Flying", "Steel"] },
+  { id: 30826, name: "G-Max Orbeetle", types: ["Bug", "Psychic"] },
+  { id: 30834, name: "G-Max Drednaw", types: ["Water", "Rock"] },
+  { id: 30839, name: "G-Max Coalossal", types: ["Rock", "Fire"] },
+  { id: 30841, name: "G-Max Flapple", types: ["Grass", "Dragon"] },
+  { id: 30842, name: "G-Max Appletun", types: ["Grass", "Dragon"] },
+  { id: 30844, name: "G-Max Sandaconda", types: ["Ground"] },
+  { id: 30849, name: "G-Max Toxtricity", types: ["Electric", "Poison"] },
+  { id: 30851, name: "G-Max Centiskorch", types: ["Fire", "Bug"] },
+  { id: 30858, name: "G-Max Hatterene", types: ["Psychic", "Fairy"] },
+  { id: 30861, name: "G-Max Grimmsnarl", types: ["Dark", "Fairy"] },
+  { id: 30869, name: "G-Max Alcremie", types: ["Fairy"] },
+  { id: 30879, name: "G-Max Copperajah", types: ["Steel"] },
+  { id: 30884, name: "G-Max Duraludon", types: ["Steel", "Dragon"] },
+  { id: 30890, name: "Eternamax Eternatus", types: ["Poison", "Dragon"] },
+  { id: 30892, name: "G-Max Urshifu", types: ["Fighting", "Dark"] },
 ];

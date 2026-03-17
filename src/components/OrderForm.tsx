@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, AlertCircle, CheckCircle2, X, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { POKEMON_DATA, NATURES, BREEDING_RULES } from '../data/pokemonData';
+import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -15,6 +15,20 @@ const IV_DETAILS: Record<IVOption, { label: string, price: number, numIgnored: n
   '5': { label: '5 IVs (F5)', price: 80000, numIgnored: 1 },
   '6': { label: '6 IVs (F6)', price: 100000, numIgnored: 0 }
 };
+
+const GENDERLESS_POKEMON = [
+  'Magnemite', 'Magneton', 'Magnezone', 'Voltorb', 'Electrode', 'Staryu', 'Starmie', 'Porygon', 'Porygon2', 'Porygon-Z',
+  'Shedinja', 'Lunatone', 'Solrock', 'Baltoy', 'Claydol', 'Beldum', 'Metang', 'Metagross', 'Bronzor', 'Bronzong',
+  'Rotom', 'Phione', 'Manaphy', 'Darkrai', 'Shaymin', 'Arceus', 'Victini', 'Klink', 'Klang', 'Klinklang', 'Cryogonal',
+  'Golett', 'Golurk', 'Staryu', 'Starmie', 'Ditto', 'Mew', 'Celebi', 'Jirachi', 'Deoxys', 'Regirock', 'Regice', 'Registeel',
+  'Latias', 'Latios', 'Kyogre', 'Groudon', 'Rayquaza', 'Azelf', 'Mesprit', 'Uxie', 'Dialga', 'Palkia', 'Heatran', 'Regigigas',
+  'Giratina', 'Cresselia', 'Cobalion', 'Terrakion', 'Virizion', 'Tornadus', 'Thundurus', 'Reshiram', 'Zekrom', 'Landorus',
+  'Kyurem', 'Keldeo', 'Meloetta', 'Genesect', 'Xerneas', 'Yveltal', 'Zygarde', 'Diancie', 'Hoopa', 'Volcanion', 'Type: Null',
+  'Silvally', 'Minior', 'Dhelmise', 'Tapu Koko', 'Tapu Lele', 'Tapu Bulu', 'Tapu Fini', 'Cosmog', 'Cosmoem', 'Solgaleo',
+  'Lunala', 'Nihilego', 'Buzzwole', 'Pheromosa', 'Xurkitree', 'Celesteela', 'Kartana', 'Guzzlord', 'Necrozma', 'Magearna',
+  'Marshadow', 'Poipole', 'Naganadel', 'Stakataka', 'Blacephalon', 'Zeraora', 'Meltan', 'Melmetal', 'Sinistea', 'Polteageist',
+  'Falinks', 'Calyrex', 'Regieleki', 'Regidrago', 'Glastrier', 'Spectrier', 'Meloetta', 'Pecharunt', 'Terapagos'
+];
 
 const CASTRATED_DISCOUNT = 10000;
 
@@ -46,9 +60,19 @@ export const OrderForm = () => {
   const [search, setSearch] = useState('');
   const [showPokemonList, setShowPokemonList] = useState(false);
   const selectedPokemon = useMemo(() => POKEMON_DATA.find(p => p.name === form.pokemon), [form.pokemon]);
+  const isGenderless = useMemo(() => {
+    return GENDERLESS_POKEMON.includes(form.pokemon);
+  }, [form.pokemon]);
+
+  useEffect(() => {
+    if (isGenderless) {
+      setForm(prev => ({ ...prev, gender: 'Genderless' }));
+    }
+  }, [isGenderless]);
+
   const filteredPokemon = useMemo(() => {
     if (!search || search.trim() === '') return [];
-    return POKEMON_DATA.filter(p => BREEDING_RULES.isBreedable() && p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
+    return POKEMON_DATA.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
   }, [search]);
 
   useEffect(() => {
@@ -72,6 +96,7 @@ export const OrderForm = () => {
 
   const calculateItemPrice = (item: any) => {
     let base = IV_DETAILS[item.ivs as IVOption].price;
+    if (GENDERLESS_POKEMON.includes(item.pokemon)) base *= 2; // Preço Genderless é o dobro
     if (item.isCastrated && item.ivs !== '4') base -= CASTRATED_DISCOUNT;
     if (item.hasHA) base += HA_FEE;
     return base;
@@ -201,9 +226,12 @@ export const OrderForm = () => {
                   <CustomSelect 
                     label="Gênero (Obrigatório)" 
                     value={form.gender} 
-                    onChange={(v: string) => setForm({...form, gender: v})}
+                    onChange={(v: string) => !isGenderless && setForm({...form, gender: v})}
                     placeholder="Selecione..."
-                    options={[
+                    disabled={isGenderless}
+                    options={isGenderless ? [
+                      { label: 'Genderless', value: 'Genderless' }
+                    ] : [
                       { label: 'Qualquer', value: 'Qualquer' },
                       { label: 'Macho', value: 'Macho' },
                       { label: 'Fêmea', value: 'Fêmea' }
@@ -399,7 +427,7 @@ export const OrderForm = () => {
 
 
 
-const CustomSelect = ({ label, value, onChange, options, placeholder }: any) => {
+const CustomSelect = ({ label, value, onChange, options, placeholder, disabled }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -412,12 +440,13 @@ const CustomSelect = ({ label, value, onChange, options, placeholder }: any) => 
   }, []);
 
   return (
-    <div className="space-y-3 relative" ref={ref}>
+    <div className={`space-y-3 relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`} ref={ref}>
       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">{label}</label>
       <button 
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-black/60 border-2 rounded-2xl px-6 py-5 text-left font-bold transition-all flex justify-between items-center ${isOpen ? 'border-secondary' : 'border-white/5'}`}
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full bg-black/60 border-2 rounded-2xl px-6 py-5 text-left font-bold transition-all flex justify-between items-center ${isOpen ? 'border-secondary' : 'border-white/5'} ${disabled ? 'cursor-not-allowed' : ''}`}
       >
         <span className={value ? 'text-white' : 'text-gray-500'}>{value || placeholder}</span>
         <span className="text-secondary text-xs">▼</span>
