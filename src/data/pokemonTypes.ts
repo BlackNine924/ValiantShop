@@ -176,7 +176,8 @@ const DYNAMAX_NAME_MAP: Record<number, string> = {
   30879: "copperajah-gmax",
   30884: "duraludon-gmax",
   30890: "eternatus-eternamax",
-  30892: "urshifu-gmax"
+  30892: "urshifu-single-strike-gmax",
+  30893: "urshifu-rapid-strike-gmax"
 };
 
 export function getSpriteUrl(id: number, shiny: boolean = false): string {
@@ -204,6 +205,12 @@ export function getSpriteUrl(id: number, shiny: boolean = false): string {
   if (DYNAMAX_NAME_MAP[id]) {
     const shinyPrefix = shiny ? 'ani-shiny' : 'ani';
     return `https://play.pokemonshowdown.com/sprites/${shinyPrefix}/${DYNAMAX_NAME_MAP[id]}.gif`;
+  }
+  
+  if (id >= 10000 && id < 20000) {
+    // Variations/Forms
+    const path = `/assets/sprites/variations/${id}${shiny ? '-shiny' : ''}.png`;
+    return path;
   }
   
   // Official PokeAPI for standard Pokemon
@@ -751,7 +758,8 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 489, name: "Phione", types: ["Water"] },
   { id: 490, name: "Manaphy", types: ["Water"] },
   { id: 491, name: "Darkrai", types: ["Dark"] },
-  { id: 492, name: "Shaymin", types: ["Grass"] },
+  { id: 492, name: "Shaymin Land Forme", types: ["Grass"] },
+  { id: 10492, name: "Shaymin Sky Forme", types: ["Grass", "Flying"] },
   { id: 493, name: "Arceus", types: ["Normal"] },
   { id: 494, name: "Victini", types: ["Psychic", "Fire"] },
   { id: 495, name: "Snivy", types: ["Grass"] },
@@ -1151,7 +1159,8 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 889, name: "Zamazenta", types: ["Fighting"] },
   { id: 890, name: "Eternatus", types: ["Poison", "Dragon"] },
   { id: 891, name: "Kubfu", types: ["Fighting"] },
-  { id: 892, name: "Urshifu", types: ["Fighting", "Dark"] },
+  { id: 892, name: "Urshifu Single Strike Style", types: ["Fighting", "Dark"] },
+  { id: 10892, name: "Urshifu Rapid Strike Style", types: ["Fighting", "Water"] },
   { id: 893, name: "Zarude", types: ["Dark", "Grass"] },
   { id: 894, name: "Regieleki", types: ["Electric"] },
   { id: 895, name: "Regidrago", types: ["Dragon"] },
@@ -1416,6 +1425,7 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 30879, name: "G-Max Copperajah", types: ["Steel"] },
   { id: 30884, name: "G-Max Duraludon", types: ["Steel", "Dragon"] },
   { id: 30890, name: "Eternamax Eternatus", types: ["Poison", "Dragon"] },
-  { id: 30892, name: "G-Max Urshifu", types: ["Fighting", "Dark"] },
+  { id: 30892, name: "G-Max Urshifu (Single)", types: ["Fighting", "Dark"] },
+  { id: 30893, name: "G-Max Urshifu (Rapid)", types: ["Fighting", "Water"] },
   { id: 30091, name: "G-Max Cloyster", types: ["Water", "Ice"] },
 ];

@@ -61,7 +61,7 @@ export interface DetailedPokemon {
     animated?: string;
   };
   species?: PokemonSpecies;
-  abilities: string[];
+  abilities: { name: string; isHidden: boolean }[];
   evolutionChain?: EvolutionStage[];
   typeRelations?: TypeRelations;
   variations?: Variation[];
@@ -69,6 +69,7 @@ export interface DetailedPokemon {
 }
 
 const POKE_API_BASE = 'https://pokeapi.co/api/v2';
+import { translateDescription } from '../utils/translationHelper';
 const pokemonCache: Record<string, DetailedPokemon> = {};
 
 export const TYPE_TRADUCOES: Record<string, string> = {
@@ -100,14 +101,28 @@ export async function getDetailedPokemon(idOrName: number | string): Promise<Det
 
   const base_total = Object.values(stats).reduce((a, b) => a + b, 0);
 
-  const abilities = data.abilities.map((a: any) => a.ability.name);
+  const abilities = data.abilities.map((a: any) => ({
+    name: a.ability.name,
+    isHidden: a.is_hidden
+  }));
 
   const speciesResponse = await fetch(data.species.url);
   const speciesData = await speciesResponse.json();
 
-  const flavorText = speciesData.flavor_text_entries
-    .find((entry: any) => entry.language.name === 'pt-BR' || entry.language.name === 'pt')?.flavor_text.replace(/\f/g, ' ') || 
-    speciesData.flavor_text_entries.find((entry: any) => entry.language.name === 'en')?.flavor_text.replace(/\f/g, ' ') || '';
+  const ptEntries = speciesData.flavor_text_entries.filter((entry: any) => 
+    entry.language.name === 'pt' || entry.language.name === 'pt-BR'
+  );
+
+  let flavorText = ptEntries.length > 0 
+    ? ptEntries[ptEntries.length - 1].flavor_text.replace(/\f/g, ' ')
+    : translateDescription(speciesData.flavor_text_entries.find((entry: any) => entry.language.name === 'en')?.flavor_text.replace(/\f/g, ' ') || '', data.id);
+      
+  if (!ptEntries.length && flavorText && !flavorText.includes('é um Pokémon')) {
+    // If it's still probably English (no manual translation found), prefix it
+    if (/[a-zA-Z]/.test(flavorText) && !flavorText.startsWith('(')) {
+       flavorText = `(Trad. Automática) ${flavorText}`;
+    }
+  }
 
   const species: PokemonSpecies = {
     flavor_text: flavorText,

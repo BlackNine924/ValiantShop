@@ -56,3 +56,20 @@ Agora todo o progresso (Pokégrid e Pokédex) é salvo automaticamente no **Fire
 - O acesso ao Pokégrid e Pokédex é **exclusivo para quem estiver logado**.
 - O progresso é sincronizado em tempo real.
 - **Pokédex:** Você pode marcar Pokémons como "Capturados" clicando no botão dentro do detalhe do Pokémon.
+
+---
+
+## 5. Tabela de IDs Especiais (Formas Separadas)
+
+Para o Pokégrid, separamos algumas formas que mudam de tipo. Use os IDs abaixo para adicionar os sprites nas pastas correspondentes:
+
+### Formas Regional/Estilo (Pasta `variations`)
+- **892**: Urshifu (Single Strike) - Fighting/Dark
+- **10892**: Urshifu (Rapid Strike) - Fighting/Water
+- **492**: Shaymin (Land) - Grass
+- **10492**: Shaymin (Sky) - Grass/Flying
+
+### Gigantamax (Pasta `dynamax`)
+- **30892**: G-Max Urshifu (Single Strike)
+- **30893**: G-Max Urshifu (Rapid Strike)
+- **30091**: G-Max Cloyster

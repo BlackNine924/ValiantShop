@@ -228,9 +228,19 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                     <div className="space-y-8 animate-fade">
                       <div className="relative group">
                         <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full opacity-40 group-hover:opacity-100 transition-opacity"></div>
-                        <p className="text-gray-300 text-sm leading-relaxed italic pl-2">
-                          "{basePokemon?.species?.flavor_text}"
-                        </p>
+                        <div className="space-y-3">
+                          <p className="text-gray-300 text-sm leading-relaxed italic pl-2">
+                            "{basePokemon?.species?.flavor_text}"
+                          </p>
+                          {basePokemon?.species?.flavor_text.includes('(Trad.') && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-lg border border-white/10 group-hover:border-primary/30 transition-colors">
+                              <Globe size={10} className="text-gray-500" />
+                              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                Tradução Automática ou Alternativa
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -270,10 +280,17 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                         <div>
                           <h4 className="text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest">Habilidades</h4>
                           <div className="flex flex-wrap gap-2">
-                            {basePokemon?.abilities.map(a => (
-                              <span key={a} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-tight group-hover:border-primary/20 transition-colors">
-                                {a.replace(/-/g, ' ')}
-                              </span>
+                            {basePokemon?.abilities.map((a, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <span className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-tight group-hover:border-primary/20 transition-colors flex items-center gap-2">
+                                  {a.name.replace(/-/g, ' ')}
+                                  {a.isHidden && (
+                                    <span className="bg-secondary/20 text-secondary border border-secondary/30 px-1.5 py-0.5 rounded-md text-[8px] font-black">
+                                      HA
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
                             ))}
                           </div>
                         </div>

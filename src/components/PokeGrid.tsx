@@ -40,12 +40,10 @@ export const PokeGrid: React.FC = () => {
     const loadState = async () => {
       let savedState = null;
       
-      // 1. Try Firebase first
       if (user?.displayName) {
         savedState = await loadPokeGridState(user.displayName);
       }
       
-      // 2. Fallback to LocalStorage if Firebase fails or is empty
       if (!savedState) {
         const local = localStorage.getItem('pokegrid_state');
         if (local) {
@@ -56,9 +54,12 @@ export const PokeGrid: React.FC = () => {
       }
 
       if (savedState) {
-        const dateStr = new Date().toISOString().split('T')[0];
-        // Only restore if it's the same day or unlimited mode
-        if (savedState.date === dateStr || savedState.unlimitedMode) {
+        const dateStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+        // Restore if it's currently the same day OR if we are in unlimited mode
+        // But respect the saved 'unlimitedMode' setting
+        const isCurrentlyDaily = !savedState.unlimitedMode;
+        
+        if (savedState.unlimitedMode || savedState.date === dateStr) {
           setGrid(savedState.grid);
           setScore(savedState.score || 0);
           setGuesses(savedState.guesses || 0);
@@ -67,6 +68,14 @@ export const PokeGrid: React.FC = () => {
           setIsSurrendered(savedState.isSurrendered || false);
           setTime(savedState.time || 0);
           setUnlimitedMode(savedState.unlimitedMode || false);
+        } else if (isCurrentlyDaily) {
+          // New day, reset to daily grid
+          handleRestartToDaily();
+        }
+      } else {
+        // No saved state, if not unlimited, ensure daily grid is fresh
+        if (!unlimitedMode) {
+          handleRestartToDaily();
         }
       }
       setHasLoaded(true);
@@ -89,7 +98,7 @@ export const PokeGrid: React.FC = () => {
   useEffect(() => {
     if (!hasLoaded) return; // CRITICAL: Don't save until we've tried to load!
 
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = new Date().toLocaleDateString('en-CA');
     const state = {
       grid,
       score,
@@ -115,6 +124,20 @@ export const PokeGrid: React.FC = () => {
   const correctCount = grid.cells.flat().filter(c => c.isCorrect).length;
   const isGameOver = (!unlimitedMode && guesses >= maxGuesses) || correctCount === 9 || isSurrendered;
 
+  useEffect(() => {
+    if (hasLoaded) {
+      console.log('PokeGrid State:', {
+        unlimitedMode,
+        guesses,
+        maxGuesses,
+        correctCount,
+        isSurrendered,
+        isGameOver,
+        gridLoaded: grid.rowLabels.length > 0
+      });
+    }
+  }, [hasLoaded, unlimitedMode, guesses, maxGuesses, correctCount, isSurrendered, isGameOver, grid.rowLabels.length]);
+
   // Calculate unique reveal answers once the game is over
   const revealGrid = useMemo(() => {
     if (!isGameOver) return null;
@@ -128,7 +151,14 @@ export const PokeGrid: React.FC = () => {
   };
 
   const handleCellClick = (row: number, col: number) => {
-    if (isGameOver || grid.cells[row][col].isCorrect) return;
+    if (grid.cells[row][col].isCorrect) return;
+    
+    if (isGameOver && !unlimitedMode) {
+      setWrongGuess('O desafio diário já foi concluído! Volte amanhã ou jogue no Modo Ilimitado.');
+      setTimeout(() => setWrongGuess(null), 3000);
+      return;
+    }
+
     setSelectedCell({ row, col });
     setWrongGuess(null);
     setIsModalOpen(true);
@@ -137,9 +167,6 @@ export const PokeGrid: React.FC = () => {
   const handleSelect = useCallback((pokemon: PokemonEntry) => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
-
-    // Start timer on first interaction
-    if (!timerActive) setTimerActive(true);
 
     const baseId = getBaseId(pokemon.id);
     const usedBaseIds = Array.from(usedPokemon).map(id => getBaseId(id));
@@ -153,6 +180,9 @@ export const PokeGrid: React.FC = () => {
     const rowCriterion = grid.rowLabels[row];
     const colCriterion = grid.colLabels[col];
     const isCorrect = validateGuess(pokemon, rowCriterion, colCriterion);
+
+    // Start timer on first interaction (computed answer)
+    if (!timerActive) setTimerActive(true);
 
     const newCells = grid.cells.map(r => r.map(c => ({ ...c })));
     
@@ -198,30 +228,20 @@ export const PokeGrid: React.FC = () => {
     setSelectedCell(null);
     setTime(0);
     setTimerActive(false);
-    
-    // Clear only state, status is handled by combined state now
-    localStorage.removeItem('pokegrid_state');
   }, []);
 
   useEffect(() => {
+    if (!hasLoaded) return;
+    
     // Se o usuário desativar o modo ilimitado, forçamos o grid do dia
-    // Mas apenas se o estado atual não for do dia correto
-    const saved = localStorage.getItem('pokegrid_state');
-    const dateStr = new Date().toISOString().split('T')[0];
-    let alreadyCorrect = false;
-    if (saved) {
-      try {
-        const state = JSON.parse(saved);
-        if (!unlimitedMode && state.date === dateStr && !state.unlimitedMode) {
-          alreadyCorrect = true;
-        }
-      } catch (e) {}
-    }
+    // Mas NÃO resetamos se já tivermos um estado do dia carregado
+    const today = new Date().toISOString().split('T')[0];
+    const isStateFromToday = grid.rowLabels.length > 0 && localStorage.getItem('pokegrid_state_date') === today;
 
-    if (!unlimitedMode && !alreadyCorrect) {
+    if (!unlimitedMode && !isStateFromToday) {
       handleRestartToDaily();
     }
-  }, [unlimitedMode, handleRestartToDaily]);
+  }, [unlimitedMode, hasLoaded, handleRestartToDaily, grid.rowLabels.length]);
 
   const handleNewGame = () => {
     // Only allow manual new grid if unlimited mode is on or game is complete and we want a fresh start
@@ -324,7 +344,7 @@ export const PokeGrid: React.FC = () => {
                     shakeCell === `${ri}-${ci}` ? 'shake' : ''
                   } ${isGameOver && !cell.isCorrect ? 'game-over' : ''}`}
                   onClick={() => handleCellClick(ri, ci)}
-                  disabled={isGameOver || cell.isCorrect}
+                  disabled={cell.isCorrect}
                 >
                   {cell.isCorrect && cell.guessedPokemon ? (
                     <div className="pokegrid-cell-filled">
