@@ -178,7 +178,8 @@ const DYNAMAX_NAME_MAP: Record<number, string> = {
 };
 
 export function getSpriteUrl(id: number, shiny: boolean = false): string {
-  // 1. Check for custom local sprites (Predictable paths)
+  // 1. Check for custom local sprites (Predictable paths - STICKLY SEPARATED from Pokedex)
+  // This uses /assets/sprites/mega or /assets/sprites/dynamax
   if (id >= 20000 && id < 30000) {
     // Mega
     const path = `/assets/sprites/mega/${id}${shiny ? '-shiny' : ''}.png`;

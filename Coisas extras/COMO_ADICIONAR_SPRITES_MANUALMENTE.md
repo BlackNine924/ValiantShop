@@ -15,6 +15,9 @@ Use estas pastas para as sprites que aparecem no minigame Pokégrid.
 Use esta pasta para as imagens de alta qualidade que aparecem no detalhe da Pokédex.
 - **Artworks (Megas/Dynamax/Outros):** `public/assets/sprites/artwork/`
 
+> [!IMPORTANT]
+> **Separação Estrita:** As pastas acima são **independentes**. Você pode ter um arquivo `20006.png` na pasta `mega/` e outro arquivo `20006.png` na pasta `artwork/`. O Pokégrid usará o da pasta `mega/` e a Pokédex usará o da pasta `artwork/`. Não há conflito.
+
 ---
 
 ## 2. Como nomear os arquivos?

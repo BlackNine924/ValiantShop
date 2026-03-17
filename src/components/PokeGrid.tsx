@@ -33,27 +33,46 @@ export const PokeGrid: React.FC = () => {
   const [shakeCell, setShakeCell] = useState<string | null>(null);
   const [time, setTime] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Load from Firebase
+  // Load from Firebase/LocalStorage
   useEffect(() => {
-    if (user?.displayName) {
-      loadPokeGridState(user.displayName).then(state => {
-        if (state) {
-          const dateStr = new Date().toISOString().split('T')[0];
-          // Only restore if it's the same day or unlimited mode
-          if (state.date === dateStr || state.unlimitedMode) {
-            setGrid(state.grid);
-            setScore(state.score || 0);
-            setGuesses(state.guesses || 0);
-            setUsedPokemon(new Set(state.usedPokemon || []));
-            setGameComplete(state.gameComplete || false);
-            setIsSurrendered(state.isSurrendered || false);
-            setTime(state.time || 0);
-            setUnlimitedMode(state.unlimitedMode || false);
-          }
+    const loadState = async () => {
+      let savedState = null;
+      
+      // 1. Try Firebase first
+      if (user?.displayName) {
+        savedState = await loadPokeGridState(user.displayName);
+      }
+      
+      // 2. Fallback to LocalStorage if Firebase fails or is empty
+      if (!savedState) {
+        const local = localStorage.getItem('pokegrid_state');
+        if (local) {
+          try {
+            savedState = JSON.parse(local);
+          } catch (e) {}
         }
-      });
-    }
+      }
+
+      if (savedState) {
+        const dateStr = new Date().toISOString().split('T')[0];
+        // Only restore if it's the same day or unlimited mode
+        if (savedState.date === dateStr || savedState.unlimitedMode) {
+          setGrid(savedState.grid);
+          setScore(savedState.score || 0);
+          setGuesses(savedState.guesses || 0);
+          setUsedPokemon(new Set(savedState.usedPokemon || []));
+          setGameComplete(savedState.gameComplete || false);
+          setIsSurrendered(savedState.isSurrendered || false);
+          setTime(savedState.time || 0);
+          setUnlimitedMode(savedState.unlimitedMode || false);
+        }
+      }
+      setHasLoaded(true);
+    };
+
+    loadState();
   }, [user]);
 
   useEffect(() => {
@@ -68,6 +87,8 @@ export const PokeGrid: React.FC = () => {
 
   // Persist State Effect (Firebase + LocalStorage fallback)
   useEffect(() => {
+    if (!hasLoaded) return; // CRITICAL: Don't save until we've tried to load!
+
     const dateStr = new Date().toISOString().split('T')[0];
     const state = {
       grid,
@@ -89,7 +110,7 @@ export const PokeGrid: React.FC = () => {
       }, 1000); // Debounce saves
       return () => clearTimeout(timeoutId);
     }
-  }, [grid, score, guesses, usedPokemon, gameComplete, isSurrendered, time, unlimitedMode, user]);
+  }, [grid, score, guesses, usedPokemon, gameComplete, isSurrendered, time, unlimitedMode, user, hasLoaded]);
 
   const correctCount = grid.cells.flat().filter(c => c.isCorrect).length;
   const isGameOver = (!unlimitedMode && guesses >= maxGuesses) || correctCount === 9 || isSurrendered;
