@@ -139,8 +139,7 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "21150": "mewtwo-megay",
   "21359": "absol-megaz",
   "21445": "garchomp-megaz",
-  "21448": "lucario-megaz",
-  "20670": "floette-eternal"
+  "21448": "lucario-megaz"
 };
 
 const DYNAMAX_NAME_MAP: Record<number, string> = {
