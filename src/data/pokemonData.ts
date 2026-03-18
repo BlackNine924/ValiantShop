@@ -7720,6 +7720,14 @@ export const POKEMON_DATA = [
       "Regenerator"
     ],
     "hiddenAbility": "Sticky Hold"
+  },
+  {
+    "id": 132,
+    "name": "Ditto",
+    "abilities": [
+      "Limber"
+    ],
+    "hiddenAbility": "Imposter"
   }
 ];
 

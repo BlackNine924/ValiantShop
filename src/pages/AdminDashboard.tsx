@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
 import { POKEMON_DATA } from '../data/pokemonData';
-import { ADMIN_CONFIG } from '../../Coisas extras/CONFIG_ADMIN';
+import { ADMIN_CONFIG } from '../config/adminConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminDashboard = () => {
