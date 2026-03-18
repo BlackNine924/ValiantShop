@@ -181,6 +181,12 @@ const DYNAMAX_NAME_MAP: Record<number, string> = {
 };
 
 export function getSpriteUrl(id: number, shiny: boolean = false): string {
+  // 0. Shiny-locked forms (Pikachu Cosplay, Libre, Starter, Eevee Starter, etc)
+  const SHINY_LOCKED_IDS = [10080, 10081, 10082, 10083, 10084, 10158];
+  if (shiny && SHINY_LOCKED_IDS.includes(id)) {
+      shiny = false;
+  }
+
   // 1. Check for custom local sprites (Predictable paths - STICKLY SEPARATED from Pokedex)
   // This uses /assets/sprites/mega or /assets/sprites/dynamax
   if (id >= 20000 && id < 30000) {
@@ -245,9 +251,14 @@ export function getCustomArtworkByName(displayName: string, shiny: boolean = fal
  */
 export function getPokemonArtwork(id: number, shiny: boolean = false): string {
   // 1. Custom local artwork (Anime style - predictable paths)
-  if (id >= 20000) {
-    // Custom Megas or Dynamax artworks
-    return `/assets/sprites/artwork/${id}${shiny ? '-shiny' : ''}.png`;
+  if (id >= 20000 && id < 30000) {
+    return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
+  }
+  if (id >= 30000 && id < 40000) {
+    return `/assets/artwork/dynamax/${id}${shiny ? '-shiny' : ''}.png`;
+  }
+  if (id >= 10000 && id < 20000) {
+      return `/assets/artwork/variations/${id}${shiny ? '-shiny' : ''}.png`;
   }
 
   // 2. Fallback for varieties
@@ -260,6 +271,12 @@ export function getPokemonArtwork(id: number, shiny: boolean = false): string {
   // 3. Official PokeAPI Artwork
   const baseUrl = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
   
+  // Shiny-locked forms check
+  const SHINY_LOCKED_IDS = [10080, 10081, 10082, 10083, 10084, 10158];
+  if (shiny && SHINY_LOCKED_IDS.includes(apiId)) {
+      shiny = false;
+  }
+
   if (shiny) {
     return `${baseUrl}/shiny/${apiId}.png`;
   }

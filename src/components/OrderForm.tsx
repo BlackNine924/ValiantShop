@@ -30,6 +30,14 @@ const GENDERLESS_POKEMON = [
   'Falinks', 'Calyrex', 'Regieleki', 'Regidrago', 'Glastrier', 'Spectrier', 'Meloetta', 'Pecharunt', 'Terapagos'
 ];
 
+const MALE_ONLY_POKEMON = [
+  'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
+  'Volbeat', 'Latios', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
+  'Tornadus', 'Thundurus', 'Landorus', 'Impidimp', 'Morgrem', 'Grimmsnarl', 
+  'Indeedee', 'Indeedee Male', 'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
+];
+
+
 const CASTRATED_DISCOUNT = 10000;
 
 const STATS = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
@@ -64,11 +72,19 @@ export const OrderForm = () => {
     return GENDERLESS_POKEMON.includes(form.pokemon);
   }, [form.pokemon]);
 
+  const isMaleOnly = useMemo(() => {
+    return MALE_ONLY_POKEMON.includes(form.pokemon);
+  }, [form.pokemon]);
+
+
   useEffect(() => {
     if (isGenderless) {
       setForm(prev => ({ ...prev, gender: 'Genderless' }));
+    } else if (isMaleOnly) {
+      setForm(prev => ({ ...prev, gender: 'Macho' }));
     }
-  }, [isGenderless]);
+  }, [isGenderless, isMaleOnly]);
+
 
   const filteredPokemon = useMemo(() => {
     if (!search || search.trim() === '') return [];
@@ -96,7 +112,8 @@ export const OrderForm = () => {
 
   const calculateItemPrice = (item: any) => {
     let base = IV_DETAILS[item.ivs as IVOption].price;
-    if (GENDERLESS_POKEMON.includes(item.pokemon)) base *= 2; // Preço Genderless é o dobro
+    if (GENDERLESS_POKEMON.includes(item.pokemon) || MALE_ONLY_POKEMON.includes(item.pokemon)) base *= 2; // Preço Genderless / Male-Only é o dobro
+
     if (item.isCastrated && item.ivs !== '4') base -= CASTRATED_DISCOUNT;
     if (item.hasHA) base += HA_FEE;
     return base;
@@ -224,19 +241,22 @@ export const OrderForm = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <CustomSelect 
-                    label="Gênero (Obrigatório)" 
+                    label={`Gênero (Obrigatório) ${isMaleOnly ? '[Apenas Macho]' : ''}`} 
                     value={form.gender} 
-                    onChange={(v: string) => !isGenderless && setForm({...form, gender: v})}
+                    onChange={(v: string) => (!isGenderless && !isMaleOnly) && setForm({...form, gender: v})}
                     placeholder="Selecione..."
-                    disabled={isGenderless}
+                    disabled={isGenderless || isMaleOnly}
                     options={isGenderless ? [
                       { label: 'Genderless', value: 'Genderless' }
+                    ] : isMaleOnly ? [
+                      { label: 'Macho (100% Tax)', value: 'Macho' }
                     ] : [
                       { label: 'Qualquer', value: 'Qualquer' },
                       { label: 'Macho', value: 'Macho' },
                       { label: 'Fêmea', value: 'Fêmea' }
                     ]}
                   />
+
 
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Natureza (Opcional)</label>
@@ -259,6 +279,7 @@ export const OrderForm = () => {
                     })}
                     placeholder="Escolher Habilidade..."
                     options={[
+                      { label: 'Qualquer Habilidade', value: 'Qualquer' },
                       ...(selectedPokemon?.abilities.map((ab: string) => ({ label: ab, value: ab })) || []),
                       ...(selectedPokemon?.hiddenAbility ? [{ label: `${selectedPokemon.hiddenAbility} (HA +15k)`, value: selectedPokemon.hiddenAbility }] : [])
                     ]}
@@ -289,7 +310,7 @@ export const OrderForm = () => {
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12">
               <h3 className="pixel-title text-xl text-secondary">03. Seleção de Potencial (IVs)</h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
                 {(Object.keys(IV_DETAILS) as IVOption[]).map(key => (
                   <button 
                     key={key} 
@@ -333,7 +354,7 @@ export const OrderForm = () => {
                   </div>
                   
                   <div className="flex flex-wrap gap-3">
-                    {[...STATS, 'Qualquer'].map(stat => {
+                    {STATS.map(stat => {
                       const isSelected = form.ignoredIvs.includes(stat);
                       return (
                         <button
@@ -342,27 +363,20 @@ export const OrderForm = () => {
                             if (isSelected) {
                               setForm({ ...form, ignoredIvs: form.ignoredIvs.filter(i => i !== stat) });
                             } else {
-                              if (stat === 'Qualquer') {
-                                const needed = IV_DETAILS[form.ivs].numIgnored - form.ignoredIvs.length;
-                                if (needed > 0) {
-                                  setForm({ ...form, ignoredIvs: [...form.ignoredIvs, ...Array(needed).fill('Qualquer')] });
-                                }
-                              } else {
-                                if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
-                                  setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });
-                                }
+                              if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
+                                setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });
                               }
                             }
                           }}
                           className={`px-4 py-2 rounded-xl font-bold transition-all border-2 ${
                             isSelected 
-                              ? stat === 'Qualquer' ? 'bg-secondary/20 border-secondary text-secondary shadow-[0_0_15px_rgba(139,92,246,0.4)]' : 'bg-red-500/20 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                              ? 'bg-red-500/20 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
                               : form.ignoredIvs.length >= IV_DETAILS[form.ivs].numIgnored
                                 ? 'bg-black/50 border-white/5 text-gray-700 cursor-not-allowed'
                                 : 'bg-black/50 border-white/10 text-gray-400 hover:border-primary/50 hover:text-primary'
                           }`}
                         >
-                          {stat === 'Qualquer' ? 'Qualquer um' : `-${stat}`}
+                          -{stat}
                         </button>
                       );
                     })}

@@ -231,12 +231,13 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                     <div className="space-y-8 animate-fade">
                       <div className="relative group">
                         <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full opacity-40 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="space-y-3">
+                        <div className="space-y-3 max-h-40 overflow-y-auto custom-scrollbar pr-3">
                           <p className="text-gray-300 text-sm leading-relaxed italic pl-2">
                             "{basePokemon?.species?.flavor_text}"
                           </p>
                         </div>
                       </div>
+
 
                       <div className="grid grid-cols-2 gap-4">
                         <DataBox title="Altura" value={`${basePokemon?.height}m`} icon={<Ruler size={14} />} />
@@ -250,9 +251,9 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           <Shield size={12} /> Efetividade de Tipos (Dano Recebido)
                         </h4>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                           {(Object.entries(calculateEffectiveness(displayData.types as PokemonType[])) as [EffectivenessCategory, PokemonType[]][]).map(([category, types]) => {
-                            if (types.length === 0 || category === 'DANO NORMAL (1x)') return null;
+                            if (types.length === 0) return null;
                             
                             let colorClass = "text-gray-400";
                             let icon = <CheckCircle2 size={12} />;
@@ -294,13 +295,13 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           <div className="flex flex-wrap gap-2">
                             {basePokemon?.abilities.map((a, idx) => (
                               <div key={idx} className="flex items-center gap-2">
-                                <span className={`px-4 py-2 bg-white/5 border rounded-xl text-[10px] font-bold uppercase tracking-tight transition-all duration-500 flex items-center gap-2 group/ability ${a.isHidden ? 'border-secondary/50 bg-secondary/5 shadow-[0_0_15px_rgba(var(--secondary-rgb),0.2)]' : 'border-white/10 hover:border-primary/20'}`}>
+                                <span className={`px-4 py-2 bg-white/5 border rounded-xl text-[10px] font-bold uppercase tracking-tight transition-all duration-500 flex items-center gap-2 group/ability ${a.isHidden ? 'border-secondary bg-secondary/10 shadow-[0_0_20px_rgba(var(--secondary-rgb),0.3)]' : 'border-white/10 hover:border-primary/20'}`}>
                                   {a.name.replace(/-/g, ' ')}
                                   {a.isHidden && (
-                                    <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-secondary/20 rounded-lg border border-secondary/40 relative overflow-hidden group/ha">
-                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/ha:animate-shimmer"></div>
-                                      <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse shadow-[0_0_8px_var(--secondary-glow)]"></div>
-                                      <span className="bg-gradient-to-r from-secondary to-indigo-300 bg-clip-text text-transparent text-[8px] font-black tracking-tighter">
+                                    <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 bg-secondary/30 rounded-lg border border-secondary/60 relative overflow-hidden group/ha shadow-[0_0_10px_var(--secondary-glow)]">
+                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover/ha:animate-shimmer"></div>
+                                      <div className="w-2 h-2 rounded-full bg-secondary animate-pulse shadow-[0_0_12px_var(--secondary-glow)]"></div>
+                                      <span className="bg-gradient-to-r from-secondary to-pink-300 bg-clip-text text-transparent text-[8px] font-black tracking-tighter">
                                         HABILIDADE OCULTA
                                       </span>
                                     </div>
@@ -343,32 +344,33 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                       <div className="flex flex-col items-center gap-12 pb-8">
                         {basePokemon?.evolutionChain?.map((stage, idx) => (
                           <React.Fragment key={stage.id}>
-                            <div 
-                              className={`flex flex-col items-center group relative cursor-pointer p-4 rounded-3xl transition-all ${basePokemon?.id === stage.id ? 'bg-primary/5 ring-1 ring-primary/20 scale-110' : 'hover:bg-white/5'}`}
-                              onClick={() => {
+                            <EvolutionStageCard 
+                              stage={stage}
+                              formSuffix={currentVariation?.name.toLowerCase().match(/(alola|galar|hisui|paldea)/)?.[0]}
+                              isActive={basePokemon?.id === stage.id}
+                              onClick={async (targetVariationName: string) => {
                                 if (basePokemon?.id !== stage.id) {
                                   setCurrentVariation(null);
                                   setBasePokemon(null);
-                                  getDetailedPokemon(stage.id).then(setBasePokemon);
+                                  const base = await getDetailedPokemon(stage.id);
+                                  // Attempt to pre-select the variation if it was a regional form stage
+                                  if (targetVariationName && base.variations) {
+                                    const targetSuffix = targetVariationName.toLowerCase().match(/(alola|galar|hisui|paldea)/)?.[0];
+                                    if (targetSuffix) {
+                                      const matchedVar = base.variations.find(v => v.name.toLowerCase().includes(targetSuffix));
+                                      if (matchedVar) {
+                                        setBasePokemon(base);
+                                        setCurrentVariation(matchedVar);
+                                        return;
+                                      }
+                                    }
+                                  }
+                                  setBasePokemon(base);
                                 }
                               }}
-                            >
-                              <div className="w-28 h-28 bg-black/40 border border-white/5 rounded-2xl p-4 group-hover:border-primary/40 transition-all shadow-inner relative overflow-hidden">
-                                <img 
-                                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${stage.id}.png`}
-                                  alt={stage.species_name}
-                                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                                  loading="lazy"
-                                />
-                                {basePokemon?.id === stage.id && (
-                                  <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full animate-ping"></div>
-                                )}
-                              </div>
-                              <span className={`mt-4 text-[11px] font-black uppercase tracking-tighter ${basePokemon?.id === stage.id ? 'text-primary' : 'text-gray-400 group-hover:text-white'}`}>
-                                {stage.species_name}
-                              </span>
-                              <span className="text-[9px] text-gray-600 font-bold tracking-widest">#{stage.id.toString().padStart(3, '0')}</span>
-                            </div>
+                            />
+
+
                             
                             {idx < (basePokemon?.evolutionChain?.length || 0) - 1 && (
                               <div className="flex flex-col items-center gap-3 -my-6 py-2">
@@ -485,3 +487,56 @@ const TypeBadge = ({ type, colorName, isImmunity }: { type: string; colorName: s
     </span>
   );
 };
+
+const EvolutionStageCard = ({ stage, formSuffix, isActive, onClick }: any) => {
+  const [spriteUrl, setSpriteUrl] = useState(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${stage.id}.png`);
+  const [displayName, setDisplayName] = useState(stage.species_name);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (formSuffix) {
+      fetch(`https://pokeapi.co/api/v2/pokemon/${stage.species_name}-${formSuffix}`)
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          if (isMounted) {
+            setSpriteUrl(data.sprites.other['official-artwork'].front_default || data.sprites.front_default);
+            setDisplayName(`${stage.species_name} ${formSuffix}`);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setSpriteUrl(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${stage.id}.png`);
+            setDisplayName(stage.species_name);
+          }
+        });
+    } else {
+      setSpriteUrl(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${stage.id}.png`);
+      setDisplayName(stage.species_name);
+    }
+    return () => { isMounted = false; };
+  }, [stage.id, formSuffix, stage.species_name]);
+
+  return (
+    <div 
+      className={`flex flex-col items-center group relative cursor-pointer p-4 rounded-3xl transition-all ${isActive ? 'bg-primary/5 ring-1 ring-primary/20 scale-110' : 'hover:bg-white/5'}`}
+      onClick={() => onClick(displayName)}
+    >
+      <div className="w-28 h-28 bg-black/40 border border-white/5 rounded-2xl p-4 group-hover:border-primary/40 transition-all shadow-inner relative overflow-hidden flex items-center justify-center">
+        <img 
+          src={spriteUrl}
+          alt={displayName}
+          className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+          loading="lazy"
+        />
+        {isActive && (
+          <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full animate-ping"></div>
+        )}
+      </div>
+      <span className={`mt-4 text-[11px] font-black uppercase tracking-tighter text-center ${isActive ? 'text-primary' : 'text-gray-400 group-hover:text-white'}`}>
+        {displayName.replace(/-/g, ' ')}
+      </span>
+      <span className="text-[9px] text-gray-600 font-bold tracking-widest">#{stage.id.toString().padStart(3, '0')}</span>
+    </div>
+  );
+};
+

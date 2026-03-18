@@ -5,7 +5,7 @@ import { PokedexDetail } from '../components/PokedexDetail';
 import { PokedexFilterModal } from '../components/PokedexFilterModal';
 import { Search, ArrowLeft, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { LEGENDARY_IDS, MYTHICAL_IDS, HAS_MEGA_IDS, HAS_GMAX_IDS, PARADOX_IDS, ULTRABEAST_IDS } from '../data/categoryMappings';
+import { LEGENDARY_IDS, MYTHICAL_IDS, HAS_MEGA_IDS, HAS_GMAX_IDS, PARADOX_IDS, ULTRABEAST_IDS, HAS_ALOLA_IDS, HAS_GALAR_IDS, HAS_HISUI_IDS, HAS_PALDEA_IDS } from '../data/categoryMappings';
 
 import { useAuth } from '../context/AuthContext';
 import { loadPokedexState, savePokedexState } from '../services/persistenceService';
@@ -87,6 +87,10 @@ export const PokedexPage: React.FC = () => {
             case 'gmax': return HAS_GMAX_IDS.has(p.id);
             case 'ub': return ULTRABEAST_IDS.has(p.id);
             case 'paradox': return PARADOX_IDS.has(p.id);
+            case 'alola': return HAS_ALOLA_IDS.has(p.id);
+            case 'galar': return HAS_GALAR_IDS.has(p.id);
+            case 'hisui': return HAS_HISUI_IDS.has(p.id);
+            case 'paldea': return HAS_PALDEA_IDS.has(p.id);
             default: return false;
           }
         });

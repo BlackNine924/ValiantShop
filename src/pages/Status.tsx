@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Search, Clock, Package, CheckCircle2, Coins } from 'lucide-react';
+import { Search, Clock, Package, CheckCircle2, Coins, Star, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showReviewModal, setShowReviewModal] = useState<any>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
 
   useEffect(() => {
     if (!user || !user.displayName) return;
@@ -33,6 +36,28 @@ export const Status = () => {
 
     return unsubscribe;
   }, [user]);
+
+  const handleReview = async () => {
+    if (!showReviewModal) return;
+    try {
+      await addDoc(collection(db, 'reviews'), {
+        orderId: showReviewModal.id,
+        pokemon: showReviewModal.pokemon,
+        playerNick: user?.displayName,
+        rating,
+        comment,
+        createdAt: serverTimestamp()
+      });
+      await updateDoc(doc(db, 'orders', showReviewModal.id), { isReviewed: true });
+      setShowReviewModal(null);
+      setRating(5);
+      setComment('');
+      alert('Review enviada com sucesso! ⭐');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao enviar review.');
+    }
+  };
 
   const filteredOrders = orders.filter(o => 
     o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,9 +164,19 @@ export const Status = () => {
                     <span className="font-black text-secondary">{order.totalPrice / 1000}k</span>
                   </td>
                   <td className="px-8 py-6">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </span>
+                    <div className="flex flex-col items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </span>
+                      {order.status === 'Finalizado' && !order.isReviewed && (
+                        <button 
+                          onClick={() => setShowReviewModal(order)}
+                          className="flex items-center gap-1 text-[10px] font-black text-secondary hover:text-white transition-colors uppercase tracking-tighter"
+                        >
+                          <Star size={10} fill="currentColor" /> Deixar Review
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -149,6 +184,39 @@ export const Status = () => {
           </table>
         </div>
       </div>
+
+      {showReviewModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade">
+          <div className="glow-card max-w-md w-full p-8 space-y-6 relative overflow-visible">
+            <button onClick={() => setShowReviewModal(null)} className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"><X size={20} /></button>
+            <div className="text-center">
+              <h3 className="pixel-title text-xl mb-2">Avaliar <span className="text-secondary">{showReviewModal.pokemon}</span></h3>
+              <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest">Como foi sua experiência com este pedido?</p>
+            </div>
+            
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button 
+                  key={star} 
+                  onClick={() => setRating(star)}
+                  className={`transition-all transform hover:scale-110 ${rating >= star ? 'text-secondary' : 'text-gray-700'}`}
+                >
+                  <Star size={32} fill={rating >= star ? "currentColor" : "none"} strokeWidth={2} />
+                </button>
+              ))}
+            </div>
+
+            <textarea 
+              className="w-full bg-black/60 border-2 border-white/5 rounded-2xl p-4 text-white text-sm font-bold min-h-[120px] focus:border-secondary transition-all outline-none"
+              placeholder="Escreva seu depoimento aqui (Opcional)..."
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+            />
+
+            <button onClick={handleReview} className="btn-manda w-full !bg-secondary !shadow-secondary-glow">Enviar Avaliação ⭐</button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-12 mb-20 grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatusCard icon={<Package className="text-white" />} label="Total de Pedidos" value={filteredOrders.length} border="border-white/10" />

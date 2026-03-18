@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 type CartItem = any; // Tipagem genérica mantida do original
 
@@ -14,8 +14,15 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem('valiant_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('valiant_cart', JSON.stringify(cart));
+  }, [cart]);
 
   const addToCart = (item: CartItem) => {
     setCart(prev => [...prev, item]);

@@ -1,0 +1,312 @@
+# Audit: 3D Artworks
+Aqui estão todos os arquivos de Artwork 3D que estão faltando ou precisam de atenção. Como nenhuma artwork customizada foi adicionada ainda, todos estão listados abaixo.
+
+## Artworks (Megas, Dynamax e Variantes Especiais)
+- [ ] ID 492 (shaymin-land) [Shiny] - Arquivo ausente
+- [ ] ID 892 (urshifu-single-strike) [Normal] - Arquivo ausente
+- [ ] ID 892 (urshifu-single-strike) [Shiny] - Arquivo ausente
+- [ ] ID 10892 (urshifu-rapid-strike) [Normal] - Arquivo ausente
+- [ ] ID 10892 (urshifu-rapid-strike) [Shiny] - Arquivo ausente
+- [ ] ID 20026 (raichu-megax) [Normal] - Arquivo ausente
+- [ ] ID 20026 (raichu-megax) [Shiny] - Arquivo ausente
+- [ ] ID 20036 (clefable-mega) [Normal] - Arquivo ausente
+- [ ] ID 20036 (clefable-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20071 (victreebel-mega) [Normal] - Arquivo ausente
+- [ ] ID 20071 (victreebel-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20121 (starmie-mega) [Normal] - Arquivo ausente
+- [ ] ID 20121 (starmie-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20149 (dragonite-mega) [Normal] - Arquivo ausente
+- [ ] ID 20149 (dragonite-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20154 (meganium-mega) [Normal] - Arquivo ausente
+- [ ] ID 20154 (meganium-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20160 (feraligatr-mega) [Normal] - Arquivo ausente
+- [ ] ID 20160 (feraligatr-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20227 (skarmory-mega) [Normal] - Arquivo ausente
+- [ ] ID 20227 (skarmory-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20239 (tatsugiri-droopy-mega) [Normal] - Arquivo ausente
+- [ ] ID 20239 (tatsugiri-droopy-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20358 (chimecho-mega) [Normal] - Arquivo ausente
+- [ ] ID 20358 (chimecho-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20398 (staraptor-mega) [Normal] - Arquivo ausente
+- [ ] ID 20398 (staraptor-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20478 (froslass-mega) [Normal] - Arquivo ausente
+- [ ] ID 20478 (froslass-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20485 (heatran-mega) [Normal] - Arquivo ausente
+- [ ] ID 20485 (heatran-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20491 (darkrai-mega) [Normal] - Arquivo ausente
+- [ ] ID 20491 (darkrai-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20500 (emboar-mega) [Normal] - Arquivo ausente
+- [ ] ID 20500 (emboar-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20530 (excadrill-mega) [Normal] - Arquivo ausente
+- [ ] ID 20530 (excadrill-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20545 (scolipede-mega) [Normal] - Arquivo ausente
+- [ ] ID 20545 (scolipede-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20560 (scrafty-mega) [Normal] - Arquivo ausente
+- [ ] ID 20560 (scrafty-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20604 (eelektross-mega) [Normal] - Arquivo ausente
+- [ ] ID 20604 (eelektross-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20609 (chandelure-mega) [Normal] - Arquivo ausente
+- [ ] ID 20609 (chandelure-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20623 (golurk-mega) [Normal] - Arquivo ausente
+- [ ] ID 20623 (golurk-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20652 (chesnaught-mega) [Normal] - Arquivo ausente
+- [ ] ID 20652 (chesnaught-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20655 (delphox-mega) [Normal] - Arquivo ausente
+- [ ] ID 20655 (delphox-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20658 (greninja-mega) [Normal] - Arquivo ausente
+- [ ] ID 20658 (greninja-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20668 (pyroar-mega) [Normal] - Arquivo ausente
+- [ ] ID 20668 (pyroar-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20678 (meowstic-mega) [Normal] - Arquivo ausente
+- [ ] ID 20678 (meowstic-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20687 (malamar-mega) [Normal] - Arquivo ausente
+- [ ] ID 20687 (malamar-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20689 (barbaracle-mega) [Normal] - Arquivo ausente
+- [ ] ID 20689 (barbaracle-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20691 (dragalge-mega) [Normal] - Arquivo ausente
+- [ ] ID 20691 (dragalge-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20701 (hawlucha-mega) [Normal] - Arquivo ausente
+- [ ] ID 20701 (hawlucha-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20718 (zygarde-mega) [Normal] - Arquivo ausente
+- [ ] ID 20718 (zygarde-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20740 (crabominable-mega) [Normal] - Arquivo ausente
+- [ ] ID 20740 (crabominable-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20768 (golisopod-mega) [Normal] - Arquivo ausente
+- [ ] ID 20768 (golisopod-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20780 (drampa-mega) [Normal] - Arquivo ausente
+- [ ] ID 20780 (drampa-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20801 (magearna-mega) [Normal] - Arquivo ausente
+- [ ] ID 20801 (magearna-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20807 (zeraora-mega) [Normal] - Arquivo ausente
+- [ ] ID 20807 (zeraora-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20870 (falinks-mega) [Normal] - Arquivo ausente
+- [ ] ID 20870 (falinks-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20952 (scovillain-mega) [Normal] - Arquivo ausente
+- [ ] ID 20952 (scovillain-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20970 (glimmora-mega) [Normal] - Arquivo ausente
+- [ ] ID 20970 (glimmora-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20978 (tatsugiri-curly-mega) [Normal] - Arquivo ausente
+- [ ] ID 20978 (tatsugiri-curly-mega) [Shiny] - Arquivo ausente
+- [ ] ID 20998 (baxcalibur-mega) [Normal] - Arquivo ausente
+- [ ] ID 20998 (baxcalibur-mega) [Shiny] - Arquivo ausente
+- [ ] ID 21026 (raichu-megay) [Normal] - Arquivo ausente
+- [ ] ID 21026 (raichu-megay) [Shiny] - Arquivo ausente
+- [ ] ID 21359 (absol-megaz) [Normal] - Arquivo ausente
+- [ ] ID 21359 (absol-megaz) [Shiny] - Arquivo ausente
+- [ ] ID 21445 (garchomp-megaz) [Normal] - Arquivo ausente
+- [ ] ID 21445 (garchomp-megaz) [Shiny] - Arquivo ausente
+- [ ] ID 21448 (lucario-megaz) [Normal] - Arquivo ausente
+- [ ] ID 21448 (lucario-megaz) [Shiny] - Arquivo ausente
+- [ ] ID 30003 (venusaur-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30003 (venusaur-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30006 (charizard-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30006 (charizard-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30009 (blastoise-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30009 (blastoise-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30012 (butterfree-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30012 (butterfree-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30025 (pikachu-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30025 (pikachu-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30052 (meowth-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30052 (meowth-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30068 (machamp-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30068 (machamp-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30091 (cloyster-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30091 (cloyster-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30094 (gengar-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30094 (gengar-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30099 (kingler-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30099 (kingler-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30131 (lapras-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30131 (lapras-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30133 (eevee-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30133 (eevee-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30143 (snorlax-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30143 (snorlax-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30569 (garbodor-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30569 (garbodor-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30809 (melmetal-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30809 (melmetal-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30812 (rillaboom-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30812 (rillaboom-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30815 (cinderace-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30815 (cinderace-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30818 (inteleon-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30818 (inteleon-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30823 (corviknight-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30823 (corviknight-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30826 (orbeetle-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30826 (orbeetle-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30834 (drednaw-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30834 (drednaw-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30839 (coalossal-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30839 (coalossal-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30841 (flapple-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30841 (flapple-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30842 (appletun-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30842 (appletun-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30844 (sandaconda-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30844 (sandaconda-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30849 (toxtricity-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30849 (toxtricity-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30851 (centiskorch-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30851 (centiskorch-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30858 (hatterene-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30858 (hatterene-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30861 (grimmsnarl-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30861 (grimmsnarl-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30869 (alcremie-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30869 (alcremie-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30879 (copperajah-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30879 (copperajah-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30884 (duraludon-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30884 (duraludon-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30890 (eternatus-eternamax) [Normal] - Arquivo ausente
+- [ ] ID 30890 (eternatus-eternamax) [Shiny] - Arquivo ausente
+- [ ] ID 30892 (urshifu-single-strike-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30892 (urshifu-single-strike-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 30893 (urshifu-rapid-strike-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30893 (urshifu-rapid-strike-gmax) [Shiny] - Arquivo ausente
+- [ ] ID 210147 (magearna-original-mega) [Normal] - Arquivo ausente
+- [ ] ID 210147 (magearna-original-mega) [Shiny] - Arquivo ausente
+
+---
+
+## 🤖 Automático / Fetchable
+Abaixo estão os Pokémon (3D Artworks) dos quais eu consigo buscar a arte oficial (caso exista na PokeAPI oficial/Pokemon Home) e adicionar automaticamente as imagens:
+- ID 492: shaymin-land
+- ID 892: urshifu-single-strike
+- ID 10492: shaymin-sky
+- ID 10892: urshifu-rapid-strike
+- ID 20003: venusaur-mega
+- ID 20006: charizard-megax
+- ID 20009: blastoise-mega
+- ID 20015: beedrill-mega
+- ID 20018: pidgeot-mega
+- ID 20026: raichu-megax
+- ID 20036: clefable-mega
+- ID 20065: alakazam-mega
+- ID 20071: victreebel-mega
+- ID 20080: slowbro-mega
+- ID 20094: gengar-mega
+- ID 20115: kangaskhan-mega
+- ID 20121: starmie-mega
+- ID 20127: pinsir-mega
+- ID 20130: gyarados-mega
+- ID 20142: aerodactyl-mega
+- ID 20149: dragonite-mega
+- ID 20150: mewtwo-megax
+- ID 20154: meganium-mega
+- ID 20160: feraligatr-mega
+- ID 20181: ampharos-mega
+- ID 20208: steelix-mega
+- ID 20212: scizor-mega
+- ID 20214: heracross-mega
+- ID 20227: skarmory-mega
+- ID 20229: houndoom-mega
+- ID 20239: tatsugiri-droopy-mega
+- ID 20248: tyranitar-mega
+- ID 20254: sceptile-mega
+- ID 20257: blaziken-mega
+- ID 20260: swampert-mega
+- ID 20282: gardevoir-mega
+- ID 20302: sableye-mega
+- ID 20303: mawile-mega
+- ID 20306: aggron-mega
+- ID 20308: medicham-mega
+- ID 20310: manectric-mega
+- ID 20319: sharpedo-mega
+- ID 20323: camerupt-mega
+- ID 20334: altaria-mega
+- ID 20354: banette-mega
+- ID 20358: chimecho-mega
+- ID 20359: absol-mega
+- ID 20362: glalie-mega
+- ID 20373: salamence-mega
+- ID 20376: metagross-mega
+- ID 20380: latias-mega
+- ID 20381: latios-mega
+- ID 20382: kyogre-primal
+- ID 20383: groudon-primal
+- ID 20384: rayquaza-mega
+- ID 20398: staraptor-mega
+- ID 20428: lopunny-mega
+- ID 20445: garchomp-mega
+- ID 20448: lucario-mega
+- ID 20460: abomasnow-mega
+- ID 20475: gallade-mega
+- ID 20478: froslass-mega
+- ID 20485: heatran-mega
+- ID 20491: darkrai-mega
+- ID 20500: emboar-mega
+- ID 20530: excadrill-mega
+- ID 20531: audino-mega
+- ID 20545: scolipede-mega
+- ID 20560: scrafty-mega
+- ID 20604: eelektross-mega
+- ID 20609: chandelure-mega
+- ID 20623: golurk-mega
+- ID 20652: chesnaught-mega
+- ID 20655: delphox-mega
+- ID 20658: greninja-mega
+- ID 20668: pyroar-mega
+- ID 20670: floette-eternal
+- ID 20678: meowstic-mega
+- ID 20687: malamar-mega
+- ID 20689: barbaracle-mega
+- ID 20691: dragalge-mega
+- ID 20701: hawlucha-mega
+- ID 20718: zygarde-mega
+- ID 20719: diancie-mega
+- ID 20740: crabominable-mega
+- ID 20768: golisopod-mega
+- ID 20780: drampa-mega
+- ID 20801: magearna-mega
+- ID 20807: zeraora-mega
+- ID 20870: falinks-mega
+- ID 20952: scovillain-mega
+- ID 20970: glimmora-mega
+- ID 20978: tatsugiri-curly-mega
+- ID 20998: baxcalibur-mega
+- ID 21006: charizard-megay
+- ID 21026: raichu-megay
+- ID 21150: mewtwo-megay
+- ID 21359: absol-megaz
+- ID 21445: garchomp-megaz
+- ID 21448: lucario-megaz
+- ID 30003: venusaur-gmax
+- ID 30006: charizard-gmax
+- ID 30009: blastoise-gmax
+- ID 30012: butterfree-gmax
+- ID 30025: pikachu-gmax
+- ID 30052: meowth-gmax
+- ID 30068: machamp-gmax
+- ID 30091: cloyster-gmax
+- ID 30094: gengar-gmax
+- ID 30099: kingler-gmax
+- ID 30131: lapras-gmax
+- ID 30133: eevee-gmax
+- ID 30143: snorlax-gmax
+- ID 30569: garbodor-gmax
+- ID 30809: melmetal-gmax
+- ID 30812: rillaboom-gmax
+- ID 30815: cinderace-gmax
+- ID 30818: inteleon-gmax
+- ID 30823: corviknight-gmax
+- ID 30826: orbeetle-gmax
+- ID 30834: drednaw-gmax
+- ID 30839: coalossal-gmax
+- ID 30841: flapple-gmax
+- ID 30842: appletun-gmax
+- ID 30844: sandaconda-gmax
+- ID 30849: toxtricity-gmax
+- ID 30851: centiskorch-gmax
+- ID 30858: hatterene-gmax
+- ID 30861: grimmsnarl-gmax
+- ID 30869: alcremie-gmax
+- ID 30879: copperajah-gmax
+- ID 30884: duraludon-gmax
+- ID 30890: eternatus-eternamax
+- ID 30892: urshifu-single-strike-gmax
+- ID 30893: urshifu-rapid-strike-gmax
+- ID 210147: magearna-original-mega

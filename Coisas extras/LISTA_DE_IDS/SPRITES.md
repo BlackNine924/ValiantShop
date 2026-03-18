@@ -1,67 +1,156 @@
-# Guia de Atualização de Sprites (Mega & G-Max)
+# Audit: 2D Sprites
+Aqui estão todos os arquivos de Sprites 2D que precisam de atenção, agrupados por categoria. (Shinys ignorados conforme solicitado)
 
-Para que os sprites especiais apareçam, renomeie os arquivos `.png` com os IDs abaixo dentro de suas respectivas pastas em `public/assets/sprites/`.
+## Megas (Faixa 20000+)
+Nenhum problema encontrado.
 
----
+## Dynamax/Gigantamax (Faixa 30000+)
+- [ ] ID 30091 (cloyster-gmax) [Normal] - Arquivo ausente
+- [ ] ID 30893 (urshifu-rapid-strike-gmax) [Normal] - Arquivo ausente
+- [ ] Arquivo extra não esperado nesta pasta: 31311.png
 
-### 🧬 Lista de IDs para Mega Evoluções
-**Pasta:** `public/assets/sprites/mega/`
-
-| Pokémon | ID | Pokémon | ID |
-| :--- | :--- | :--- | :--- |
-| Mega Raichu X | `20026` | Mega Malamar | `20687` |
-| Mega Raichu Y | `21026` | Mega Barbaracle | `20689` |
-| Mega Clefable | `20036` | Mega Dragalge | `20691` |
-| Mega Victreebel | `20071` | Mega Hawlucha | `20701` |
-| Mega Starmie | `20121` | Mega Zygarde | `20718` |
-| Mega Dragonite | `20149` | Mega Crabominable | `20740` |
-| Mega Meganium | `20154` | Mega Golisopod | `20768` |
-| Mega Feraligatr | `20160` | Mega Drampa | `20780` |
-| Mega Emboar | `20500` | Mega Magearna | `20801` |
-| Mega Skarmory | `20227` | Mega Zeraora | `20807` |
-| Mega Chimecho | `20358` | Mega Falinks | `20870` |
-| Mega Staraptor | `20398` | Mega Scovillain | `20952` |
-| Mega Garchomp Z | `21445` | Mega Glimmora | `20970` |
-| Mega Lucario Z | `21448` | Mega Tatsugiri | `20978` |
-| Mega Froslass | `20478` | Mega Baxcalibur | `20998` |
-| Mega Heatran | `20485` | Mega Absol Z | `21359` |
-| Mega Darkrai | `20491` | Mega Scolipede | `20545` |
-| Mega Excadrill | `20530` | Mega Scrafty | `20560` |
-| Mega Eelektross | `20604` | Mega Chandelure | `20609` |
-| Mega Golurk | `20623` | Mega Chesnaught | `20652` |
-| Mega Delphox | `20655` | Mega Greninja | `20658` |
-| Mega Pyroar | `20668` | Mega Floette | `20670` |
-| Mega Meowstic | `20678` | | |
+## Variantes Especiais (Faixa 10000+ e Especiais)
+- [ ] ID 492 (shaymin-land) [Normal] - Arquivo ausente
+- [ ] ID 892 (urshifu-single-strike) [Normal] - Arquivo ausente
+- [ ] ID 10892 (urshifu-rapid-strike) [Normal] - Arquivo ausente
 
 ---
 
-### 🔴 Lista de IDs para Dynamax / Gigantamax
-**Pasta:** `public/assets/sprites/dynamax/`
-
-| Pokémon | ID | Pokémon | ID |
-| :--- | :--- | :--- | :--- |
-| G-Max Venusaur | `30003` | G-Max Charizard | `30006` |
-| G-Max Blastoise | `30009` | G-Max Butterfree | `30012` |
-| G-Max Pikachu | `30025` | G-Max Meowth | `30052` |
-| G-Max Machamp | `30068` | G-Max Gengar | `30094` |
-| G-Max Kingler | `30099` | G-Max Lapras | `30131` |
-| G-Max Eevee | `30133` | G-Max Snorlax | `30143` |
-| G-Max Garbodor | `30569` | G-Max Melmetal | `30809` |
-| G-Max Rillaboom | `30812` | G-Max Cinderace | `30815` |
-| G-Max Inteleon | `30818` | G-Max Corviknight | `30823` |
-| G-Max Orbeetle | `30826` | G-Max Drednaw | `30834` |
-| G-Max Coalossal | `30839` | G-Max Flapple | `30841` |
-| G-Max Appletun | `30842` | G-Max Sandaconda | `30844` |
-| G-Max Toxtricity | `30849` | G-Max Centiskorch | `30851` |
-| G-Max Hatterene | `30858` | G-Max Grimmsnarl | `30861` |
-| G-Max Alcremie | `30869` | G-Max Copperajah | `30879` |
-| G-Max Duraludon | `30884` | Eternamax Eternatus | `30890` |
-| G-Max Urshifu | `30892` | | |
-
----
-
-### 💡 Como aplicar as imagens:
-1. Pegue o arquivo `.png`.
-2. Renomeie para o **ID** desejado (ex: `30006.png`).
-3. Mova para a pasta correta mencionada acima.
-4. O jogo usará sua imagem automaticamente!
+## 🤖 Automático / Fetchable
+Abaixo estão os Pokémon (2D Sprites) dos quais eu consigo baixar e adicionar as imagens automaticamente via script (Pokemon Showdown / PokeAPI), sem que você precise fazer isso manualmente:
+- ID 492: shaymin-land
+- ID 892: urshifu-single-strike
+- ID 10492: shaymin-sky
+- ID 10892: urshifu-rapid-strike
+- ID 20003: venusaur-mega
+- ID 20006: charizard-megax
+- ID 20009: blastoise-mega
+- ID 20015: beedrill-mega
+- ID 20018: pidgeot-mega
+- ID 20026: raichu-megax
+- ID 20036: clefable-mega
+- ID 20065: alakazam-mega
+- ID 20071: victreebel-mega
+- ID 20080: slowbro-mega
+- ID 20094: gengar-mega
+- ID 20115: kangaskhan-mega
+- ID 20121: starmie-mega
+- ID 20127: pinsir-mega
+- ID 20130: gyarados-mega
+- ID 20142: aerodactyl-mega
+- ID 20149: dragonite-mega
+- ID 20150: mewtwo-megax
+- ID 20154: meganium-mega
+- ID 20160: feraligatr-mega
+- ID 20181: ampharos-mega
+- ID 20208: steelix-mega
+- ID 20212: scizor-mega
+- ID 20214: heracross-mega
+- ID 20227: skarmory-mega
+- ID 20229: houndoom-mega
+- ID 20239: tatsugiri-droopy-mega
+- ID 20248: tyranitar-mega
+- ID 20254: sceptile-mega
+- ID 20257: blaziken-mega
+- ID 20260: swampert-mega
+- ID 20282: gardevoir-mega
+- ID 20302: sableye-mega
+- ID 20303: mawile-mega
+- ID 20306: aggron-mega
+- ID 20308: medicham-mega
+- ID 20310: manectric-mega
+- ID 20319: sharpedo-mega
+- ID 20323: camerupt-mega
+- ID 20334: altaria-mega
+- ID 20354: banette-mega
+- ID 20358: chimecho-mega
+- ID 20359: absol-mega
+- ID 20362: glalie-mega
+- ID 20373: salamence-mega
+- ID 20376: metagross-mega
+- ID 20380: latias-mega
+- ID 20381: latios-mega
+- ID 20382: kyogre-primal
+- ID 20383: groudon-primal
+- ID 20384: rayquaza-mega
+- ID 20398: staraptor-mega
+- ID 20428: lopunny-mega
+- ID 20445: garchomp-mega
+- ID 20448: lucario-mega
+- ID 20460: abomasnow-mega
+- ID 20475: gallade-mega
+- ID 20478: froslass-mega
+- ID 20485: heatran-mega
+- ID 20491: darkrai-mega
+- ID 20500: emboar-mega
+- ID 20530: excadrill-mega
+- ID 20531: audino-mega
+- ID 20545: scolipede-mega
+- ID 20560: scrafty-mega
+- ID 20604: eelektross-mega
+- ID 20609: chandelure-mega
+- ID 20623: golurk-mega
+- ID 20652: chesnaught-mega
+- ID 20655: delphox-mega
+- ID 20658: greninja-mega
+- ID 20668: pyroar-mega
+- ID 20670: floette-eternal
+- ID 20678: meowstic-mega
+- ID 20687: malamar-mega
+- ID 20689: barbaracle-mega
+- ID 20691: dragalge-mega
+- ID 20701: hawlucha-mega
+- ID 20718: zygarde-mega
+- ID 20719: diancie-mega
+- ID 20740: crabominable-mega
+- ID 20768: golisopod-mega
+- ID 20780: drampa-mega
+- ID 20801: magearna-mega
+- ID 20807: zeraora-mega
+- ID 20870: falinks-mega
+- ID 20952: scovillain-mega
+- ID 20970: glimmora-mega
+- ID 20978: tatsugiri-curly-mega
+- ID 20998: baxcalibur-mega
+- ID 21006: charizard-megay
+- ID 21026: raichu-megay
+- ID 21150: mewtwo-megay
+- ID 21359: absol-megaz
+- ID 21445: garchomp-megaz
+- ID 21448: lucario-megaz
+- ID 30003: venusaur-gmax
+- ID 30006: charizard-gmax
+- ID 30009: blastoise-gmax
+- ID 30012: butterfree-gmax
+- ID 30025: pikachu-gmax
+- ID 30052: meowth-gmax
+- ID 30068: machamp-gmax
+- ID 30091: cloyster-gmax
+- ID 30094: gengar-gmax
+- ID 30099: kingler-gmax
+- ID 30131: lapras-gmax
+- ID 30133: eevee-gmax
+- ID 30143: snorlax-gmax
+- ID 30569: garbodor-gmax
+- ID 30809: melmetal-gmax
+- ID 30812: rillaboom-gmax
+- ID 30815: cinderace-gmax
+- ID 30818: inteleon-gmax
+- ID 30823: corviknight-gmax
+- ID 30826: orbeetle-gmax
+- ID 30834: drednaw-gmax
+- ID 30839: coalossal-gmax
+- ID 30841: flapple-gmax
+- ID 30842: appletun-gmax
+- ID 30844: sandaconda-gmax
+- ID 30849: toxtricity-gmax
+- ID 30851: centiskorch-gmax
+- ID 30858: hatterene-gmax
+- ID 30861: grimmsnarl-gmax
+- ID 30869: alcremie-gmax
+- ID 30879: copperajah-gmax
+- ID 30884: duraludon-gmax
+- ID 30890: eternatus-eternamax
+- ID 30892: urshifu-single-strike-gmax
+- ID 30893: urshifu-rapid-strike-gmax
+- ID 210147: magearna-original-mega

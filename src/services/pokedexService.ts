@@ -69,8 +69,9 @@ export interface DetailedPokemon {
 }
 
 const POKE_API_BASE = 'https://pokeapi.co/api/v2';
-import { translateDescription } from '../utils/translationHelper';
+import { MANUAL_DESCRIPTIONS } from '../data/manualDescriptions';
 const pokemonCache: Record<string, DetailedPokemon> = {};
+
 
 export const TYPE_TRADUCOES: Record<string, string> = {
   normal: 'Normal', fire: 'Fogo', water: 'Água', grass: 'Planta', electric: 'Elétrico',
@@ -78,6 +79,8 @@ export const TYPE_TRADUCOES: Record<string, string> = {
   psychic: 'Psíquico', bug: 'Inseto', rock: 'Pedra', ghost: 'Fantasma', dragon: 'Dragão',
   dark: 'Noturno', steel: 'Aço', fairy: 'Fada'
 };
+
+const normalizeType = (type: string): string => type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 
 export async function getDetailedPokemon(idOrName: number | string): Promise<DetailedPokemon> {
   const cacheKey = idOrName.toString().toLowerCase();
@@ -87,7 +90,9 @@ export async function getDetailedPokemon(idOrName: number | string): Promise<Det
   // For now, these will have limited data from PokeAPI or fallback to local
   const id = typeof idOrName === 'number' ? idOrName : parseInt(idOrName);
   
-  const response = await fetch(`${POKE_API_BASE}/pokemon/${id > 10000 ? (id % 10000) : id}`);
+  // Normalização de busca para IDs oficiais vs customizados
+  const requestPath = id > 10000 ? `pokemon/${id}` : `pokemon/${id}`;
+  const response = await fetch(`${POKE_API_BASE}/${requestPath}`);
   const data = await response.json();
 
   const stats: Omit<PokemonStats, 'baseTotal'> = {
@@ -109,24 +114,33 @@ export async function getDetailedPokemon(idOrName: number | string): Promise<Det
   const speciesResponse = await fetch(data.species.url);
   const speciesData = await speciesResponse.json();
 
-  const ptEntries = speciesData.flavor_text_entries.filter((entry: any) => 
-    entry.language.name === 'pt' || entry.language.name === 'pt-BR'
-  );
+  // Use strictly the exact scraped and translated description
+  let flavorText = MANUAL_DESCRIPTIONS[data.id] || "Descrição não encontrada em português.";
 
-  let flavorText = ptEntries.length > 0 
-    ? ptEntries[ptEntries.length - 1].flavor_text.replace(/\f/g, ' ')
-    : translateDescription(speciesData.flavor_text_entries.find((entry: any) => entry.language.name === 'en')?.flavor_text.replace(/\f/g, ' ') || '', data.id);
-      
-  if (!ptEntries.length && flavorText && !flavorText.includes('é um Pokémon')) {
-    // If it's still probably English (no manual translation found), prefix it
-    if (/[a-zA-Z]/.test(flavorText) && !flavorText.startsWith('(')) {
-       flavorText = `(Trad. Automática) ${flavorText}`;
-    }
-  }
+
+
+  const EGG_GROUP_MAP: Record<string, string> = {
+    'plant': 'Grass',
+    'ground': 'Field',
+    'humanshape': 'Human-Like',
+    'indeterminate': 'Amorphous',
+    'no-eggs': 'No Eggs Discovered',
+    'undiscovered': 'No Eggs Discovered',
+    'monster': 'Monster',
+    'water1': 'Water 1',
+    'water2': 'Water 2',
+    'water3': 'Water 3',
+    'bug': 'Bug',
+    'flying': 'Flying',
+    'fairy': 'Fairy',
+    'mineral': 'Mineral',
+    'dragon': 'Dragon',
+    'ditto': 'Ditto'
+  };
 
   const species: PokemonSpecies = {
     flavor_text: flavorText,
-    egg_groups: speciesData.egg_groups.map((g: any) => g.name),
+    egg_groups: speciesData.egg_groups.map((g: any) => EGG_GROUP_MAP[g.name] || g.name),
     generation: speciesData.generation.name,
     evolution_chain_url: speciesData.evolution_chain.url,
     habitat: speciesData.habitat?.name || 'unknown',
@@ -157,7 +171,7 @@ export async function getDetailedPokemon(idOrName: number | string): Promise<Det
         variations.push({
           id: vData.id,
           name: vData.name.split('-').map((s: string) => s === 'mega' ? 'Mega' : s === 'gmax' ? 'G-Max' : s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-          types: vData.types.map((t: any) => t.type.name),
+          types: vData.types.map((t: any) => normalizeType(t.type.name)),
           sprites: {
             official: vData.sprites.other['official-artwork'].front_default || vData.sprites.front_default,
             shiny: vData.sprites.other['official-artwork'].front_shiny || vData.sprites.front_shiny,
@@ -174,7 +188,7 @@ export async function getDetailedPokemon(idOrName: number | string): Promise<Det
   const result: DetailedPokemon = {
     id: data.id,
     name: data.name,
-    types: data.types.map((t: any) => t.type.name),
+    types: data.types.map((t: any) => normalizeType(t.type.name)),
     height: data.height / 10,
     weight: data.weight / 10,
     stats: { ...stats, baseTotal: base_total },

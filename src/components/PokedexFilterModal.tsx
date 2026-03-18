@@ -63,6 +63,10 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
     { id: 'gmax', name: 'G-Max', icon: <Anchor size={14} /> },
     { id: 'ub', name: 'Ultra Beasts', icon: <Target size={14} /> },
     { id: 'paradox', name: 'Paradoxos', icon: <Layers size={14} /> },
+    { id: 'alola', name: 'F. Alola', icon: <Sparkles size={14} /> },
+    { id: 'galar', name: 'F. Galar', icon: <Sparkles size={14} /> },
+    { id: 'hisui', name: 'F. Hisui', icon: <Sparkles size={14} /> },
+    { id: 'paldea', name: 'F. Paldea', icon: <Sparkles size={14} /> },
   ];
 
   return (

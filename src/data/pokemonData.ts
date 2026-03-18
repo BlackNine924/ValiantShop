@@ -1139,6 +1139,14 @@ export const POKEMON_DATA = [
     "hiddenAbility": "Hydration"
   },
   {
+    "id": 132,
+    "name": "Ditto",
+    "abilities": [
+      "Limber"
+    ],
+    "hiddenAbility": "Imposter"
+  },
+  {
     "id": 133,
     "name": "Eevee",
     "abilities": [

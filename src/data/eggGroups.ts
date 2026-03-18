@@ -2,15 +2,15 @@
 export const EGG_GROUPS_MAP: Record<string, string[]> = {
   "bulbasaur": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "ivysaur": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "venusaur": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "charmander": [
     "Monster",
@@ -64,10 +64,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "rattata": [
-    "Ground"
+    "Field"
   ],
   "raticate": [
-    "Ground"
+    "Field"
   ],
   "spearow": [
     "Flying"
@@ -76,48 +76,48 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "ekans": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "arbok": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "pikachu": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "raichu": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "sandshrew": [
-    "Ground"
+    "Field"
   ],
   "sandslash": [
-    "Ground"
+    "Field"
   ],
   "nidoranf": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "nidorina": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "nidoqueen": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "nidoranm": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "nidorino": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "nidoking": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "clefairy": [
     "Fairy"
@@ -126,10 +126,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Fairy"
   ],
   "vulpix": [
-    "Ground"
+    "Field"
   ],
   "ninetales": [
-    "Ground"
+    "Field"
   ],
   "jigglypuff": [
     "Fairy"
@@ -144,21 +144,21 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "oddish": [
-    "Plant"
+    "Grass"
   ],
   "gloom": [
-    "Plant"
+    "Grass"
   ],
   "vileplume": [
-    "Plant"
+    "Grass"
   ],
   "paras": [
     "Bug",
-    "Plant"
+    "Grass"
   ],
   "parasect": [
     "Bug",
-    "Plant"
+    "Grass"
   ],
   "venonat": [
     "Bug"
@@ -167,36 +167,36 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "diglett": [
-    "Ground"
+    "Field"
   ],
   "dugtrio": [
-    "Ground"
+    "Field"
   ],
   "meowth": [
-    "Ground"
+    "Field"
   ],
   "persian": [
-    "Ground"
+    "Field"
   ],
   "psyduck": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "golduck": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "mankey": [
-    "Ground"
+    "Field"
   ],
   "primeape": [
-    "Ground"
+    "Field"
   ],
   "growlithe": [
-    "Ground"
+    "Field"
   ],
   "arcanine": [
-    "Ground"
+    "Field"
   ],
   "poliwag": [
     "Water 1"
@@ -208,31 +208,31 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "abra": [
-    "Humanshape"
+    "Human-Like"
   ],
   "kadabra": [
-    "Humanshape"
+    "Human-Like"
   ],
   "alakazam": [
-    "Humanshape"
+    "Human-Like"
   ],
   "machop": [
-    "Humanshape"
+    "Human-Like"
   ],
   "machoke": [
-    "Humanshape"
+    "Human-Like"
   ],
   "machamp": [
-    "Humanshape"
+    "Human-Like"
   ],
   "bellsprout": [
-    "Plant"
+    "Grass"
   ],
   "weepinbell": [
-    "Plant"
+    "Grass"
   ],
   "victreebel": [
-    "Plant"
+    "Grass"
   ],
   "tentacool": [
     "Water 3"
@@ -250,10 +250,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "ponyta": [
-    "Ground"
+    "Field"
   ],
   "rapidash": [
-    "Ground"
+    "Field"
   ],
   "slowpoke": [
     "Monster",
@@ -271,7 +271,7 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "farfetchd": [
     "Flying",
-    "Ground"
+    "Field"
   ],
   "doduo": [
     "Flying"
@@ -281,17 +281,17 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "seel": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "dewgong": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "grimer": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "muk": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "shellder": [
     "Water 3"
@@ -300,22 +300,22 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 3"
   ],
   "gastly": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "haunter": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "gengar": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "onix": [
     "Mineral"
   ],
   "drowzee": [
-    "Humanshape"
+    "Human-Like"
   ],
   "hypno": [
-    "Humanshape"
+    "Human-Like"
   ],
   "krabby": [
     "Water 3"
@@ -330,10 +330,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "exeggcute": [
-    "Plant"
+    "Grass"
   ],
   "exeggutor": [
-    "Plant"
+    "Grass"
   ],
   "cubone": [
     "Monster"
@@ -342,33 +342,33 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Monster"
   ],
   "hitmonlee": [
-    "Humanshape"
+    "Human-Like"
   ],
   "hitmonchan": [
-    "Humanshape"
+    "Human-Like"
   ],
   "lickitung": [
     "Monster"
   ],
   "koffing": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "weezing": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "rhyhorn": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "rhydon": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "chansey": [
     "Fairy"
   ],
   "tangela": [
-    "Plant"
+    "Grass"
   ],
   "kangaskhan": [
     "Monster"
@@ -394,25 +394,25 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 3"
   ],
   "mrmime": [
-    "Humanshape"
+    "Human-Like"
   ],
   "scyther": [
     "Bug"
   ],
   "jynx": [
-    "Humanshape"
+    "Human-Like"
   ],
   "electabuzz": [
-    "Humanshape"
+    "Human-Like"
   ],
   "magmar": [
-    "Humanshape"
+    "Human-Like"
   ],
   "pinsir": [
     "Bug"
   ],
   "tauros": [
-    "Ground"
+    "Field"
   ],
   "magikarp": [
     "Water 2",
@@ -430,16 +430,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Ditto"
   ],
   "eevee": [
-    "Ground"
+    "Field"
   ],
   "vaporeon": [
-    "Ground"
+    "Field"
   ],
   "jolteon": [
-    "Ground"
+    "Field"
   ],
   "flareon": [
-    "Ground"
+    "Field"
   ],
   "porygon": [
     "Mineral"
@@ -467,13 +467,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Monster"
   ],
   "articuno": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zapdos": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "moltres": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "dratini": [
     "Water 1",
@@ -488,31 +488,31 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "mewtwo": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "mew": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "chikorita": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "bayleef": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "meganium": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "cyndaquil": [
-    "Ground"
+    "Field"
   ],
   "quilava": [
-    "Ground"
+    "Field"
   ],
   "typhlosion": [
-    "Ground"
+    "Field"
   ],
   "totodile": [
     "Monster",
@@ -527,10 +527,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "sentret": [
-    "Ground"
+    "Field"
   ],
   "furret": [
-    "Ground"
+    "Field"
   ],
   "hoothoot": [
     "Flying"
@@ -560,16 +560,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 2"
   ],
   "pichu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "cleffa": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "igglybuff": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "togepi": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "togetic": [
     "Flying",
@@ -583,18 +583,18 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "mareep": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "flaaffy": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "ampharos": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "bellossom": [
-    "Plant"
+    "Grass"
   ],
   "marill": [
     "Water 1",
@@ -612,41 +612,41 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "hoppip": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "skiploom": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "jumpluff": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "aipom": [
-    "Ground"
+    "Field"
   ],
   "sunkern": [
-    "Plant"
+    "Grass"
   ],
   "sunflora": [
-    "Plant"
+    "Grass"
   ],
   "yanma": [
     "Bug"
   ],
   "wooper": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "quagsire": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "espeon": [
-    "Ground"
+    "Field"
   ],
   "umbreon": [
-    "Ground"
+    "Field"
   ],
   "murkrow": [
     "Flying"
@@ -656,16 +656,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "misdreavus": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "unown": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "wobbuffet": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "girafarig": [
-    "Ground"
+    "Field"
   ],
   "pineco": [
     "Bug"
@@ -674,7 +674,7 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "dunsparce": [
-    "Ground"
+    "Field"
   ],
   "gligar": [
     "Bug"
@@ -683,11 +683,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "snubbull": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "granbull": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "qwilfish": [
@@ -703,25 +703,25 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "sneasel": [
-    "Ground"
+    "Field"
   ],
   "teddiursa": [
-    "Ground"
+    "Field"
   ],
   "ursaring": [
-    "Ground"
+    "Field"
   ],
   "slugma": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "magcargo": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "swinub": [
-    "Ground"
+    "Field"
   ],
   "piloswine": [
-    "Ground"
+    "Field"
   ],
   "corsola": [
     "Water 1",
@@ -737,7 +737,7 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "delibird": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "mantine": [
     "Water 1"
@@ -746,59 +746,59 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "houndour": [
-    "Ground"
+    "Field"
   ],
   "houndoom": [
-    "Ground"
+    "Field"
   ],
   "kingdra": [
     "Water 1",
     "Dragon"
   ],
   "phanpy": [
-    "Ground"
+    "Field"
   ],
   "donphan": [
-    "Ground"
+    "Field"
   ],
   "porygon2": [
     "Mineral"
   ],
   "stantler": [
-    "Ground"
+    "Field"
   ],
   "smeargle": [
-    "Ground"
+    "Field"
   ],
   "tyrogue": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "hitmontop": [
-    "Humanshape"
+    "Human-Like"
   ],
   "smoochum": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "elekid": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "magby": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "miltank": [
-    "Ground"
+    "Field"
   ],
   "blissey": [
     "Fairy"
   ],
   "raikou": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "entei": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "suicune": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "larvitar": [
     "Monster"
@@ -810,13 +810,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Monster"
   ],
   "lugia": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "hooh": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "celebi": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "treecko": [
     "Monster",
@@ -831,13 +831,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "torchic": [
-    "Ground"
+    "Field"
   ],
   "combusken": [
-    "Ground"
+    "Field"
   ],
   "blaziken": [
-    "Ground"
+    "Field"
   ],
   "mudkip": [
     "Monster",
@@ -852,16 +852,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "poochyena": [
-    "Ground"
+    "Field"
   ],
   "mightyena": [
-    "Ground"
+    "Field"
   ],
   "zigzagoon": [
-    "Ground"
+    "Field"
   ],
   "linoone": [
-    "Ground"
+    "Field"
   ],
   "wurmple": [
     "Bug"
@@ -880,27 +880,27 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "lotad": [
     "Water 1",
-    "Plant"
+    "Grass"
   ],
   "lombre": [
     "Water 1",
-    "Plant"
+    "Grass"
   ],
   "ludicolo": [
     "Water 1",
-    "Plant"
+    "Grass"
   ],
   "seedot": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "nuzleaf": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "shiftry": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "taillow": [
     "Flying"
@@ -917,16 +917,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "ralts": [
-    "Humanshape",
-    "Indeterminate"
+    "Human-Like",
+    "Amorphous"
   ],
   "kirlia": [
-    "Humanshape",
-    "Indeterminate"
+    "Human-Like",
+    "Amorphous"
   ],
   "gardevoir": [
-    "Humanshape",
-    "Indeterminate"
+    "Human-Like",
+    "Amorphous"
   ],
   "surskit": [
     "Water 1",
@@ -938,20 +938,20 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "shroomish": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "breloom": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "slakoth": [
-    "Ground"
+    "Field"
   ],
   "vigoroth": [
-    "Ground"
+    "Field"
   ],
   "slaking": [
-    "Ground"
+    "Field"
   ],
   "nincada": [
     "Bug"
@@ -964,41 +964,41 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "whismur": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "loudred": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "exploud": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "makuhita": [
-    "Humanshape"
+    "Human-Like"
   ],
   "hariyama": [
-    "Humanshape"
+    "Human-Like"
   ],
   "azurill": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "nosepass": [
     "Mineral"
   ],
   "skitty": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "delcatty": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "sableye": [
-    "Humanshape"
+    "Human-Like"
   ],
   "mawile": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "aron": [
@@ -1011,16 +1011,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Monster"
   ],
   "meditite": [
-    "Humanshape"
+    "Human-Like"
   ],
   "medicham": [
-    "Humanshape"
+    "Human-Like"
   ],
   "electrike": [
-    "Ground"
+    "Field"
   ],
   "manectric": [
-    "Ground"
+    "Field"
   ],
   "plusle": [
     "Fairy"
@@ -1030,21 +1030,21 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "volbeat": [
     "Bug",
-    "Humanshape"
+    "Human-Like"
   ],
   "illumise": [
     "Bug",
-    "Humanshape"
+    "Human-Like"
   ],
   "roselia": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "gulpin": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "swalot": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "carvanha": [
     "Water 2"
@@ -1053,31 +1053,31 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 2"
   ],
   "wailmer": [
-    "Ground",
+    "Field",
     "Water 2"
   ],
   "wailord": [
-    "Ground",
+    "Field",
     "Water 2"
   ],
   "numel": [
-    "Ground"
+    "Field"
   ],
   "camerupt": [
-    "Ground"
+    "Field"
   ],
   "torkoal": [
-    "Ground"
+    "Field"
   ],
   "spoink": [
-    "Ground"
+    "Field"
   ],
   "grumpig": [
-    "Ground"
+    "Field"
   ],
   "spinda": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "trapinch": [
     "Bug",
@@ -1092,12 +1092,12 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "cacnea": [
-    "Plant",
-    "Humanshape"
+    "Grass",
+    "Human-Like"
   ],
   "cacturne": [
-    "Plant",
-    "Humanshape"
+    "Grass",
+    "Human-Like"
   ],
   "swablu": [
     "Flying",
@@ -1108,10 +1108,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "zangoose": [
-    "Ground"
+    "Field"
   ],
   "seviper": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "lunatone": [
@@ -1162,35 +1162,35 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "castform": [
     "Fairy",
-    "Indeterminate"
+    "Amorphous"
   ],
   "kecleon": [
-    "Ground"
+    "Field"
   ],
   "shuppet": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "banette": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "duskull": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "dusclops": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "tropius": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "chimecho": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "absol": [
-    "Ground"
+    "Field"
   ],
   "wynaut": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "snorunt": [
     "Fairy",
@@ -1202,15 +1202,15 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "spheal": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "sealeo": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "walrein": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "clamperl": [
     "Water 1"
@@ -1247,70 +1247,70 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "regirock": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "regice": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "registeel": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "latias": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "latios": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "kyogre": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "groudon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "rayquaza": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "jirachi": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "deoxys": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "turtwig": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "grotle": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "torterra": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "chimchar": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "monferno": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "infernape": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "piplup": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "prinplup": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "empoleon": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "starly": [
     "Flying"
@@ -1323,11 +1323,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "bidoof": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "bibarel": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "kricketot": [
     "Bug"
@@ -1336,20 +1336,20 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "shinx": [
-    "Ground"
+    "Field"
   ],
   "luxio": [
-    "Ground"
+    "Field"
   ],
   "luxray": [
-    "Ground"
+    "Field"
   ],
   "budew": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "roserade": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "cranidos": [
     "Monster"
@@ -1379,70 +1379,70 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "pachirisu": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "buizel": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "floatzel": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "cherubi": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "cherrim": [
     "Fairy",
-    "Plant"
+    "Grass"
   ],
   "shellos": [
     "Water 1",
-    "Indeterminate"
+    "Amorphous"
   ],
   "gastrodon": [
     "Water 1",
-    "Indeterminate"
+    "Amorphous"
   ],
   "ambipom": [
-    "Ground"
+    "Field"
   ],
   "drifloon": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "drifblim": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "buneary": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "lopunny": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "mismagius": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "honchkrow": [
     "Flying"
   ],
   "glameow": [
-    "Ground"
+    "Field"
   ],
   "purugly": [
-    "Ground"
+    "Field"
   ],
   "chingling": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "stunky": [
-    "Ground"
+    "Field"
   ],
   "skuntank": [
-    "Ground"
+    "Field"
   ],
   "bronzor": [
     "Mineral"
@@ -1451,19 +1451,19 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "bonsly": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "mimejr": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "happiny": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "chatot": [
     "Flying"
   ],
   "spiritomb": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "gible": [
     "Monster",
@@ -1478,20 +1478,20 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "munchlax": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "riolu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "lucario": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "hippopotas": [
-    "Ground"
+    "Field"
   ],
   "hippowdon": [
-    "Ground"
+    "Field"
   ],
   "skorupi": [
     "Bug",
@@ -1502,13 +1502,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 3"
   ],
   "croagunk": [
-    "Humanshape"
+    "Human-Like"
   ],
   "toxicroak": [
-    "Humanshape"
+    "Human-Like"
   ],
   "carnivine": [
-    "Plant"
+    "Grass"
   ],
   "finneon": [
     "Water 2"
@@ -1517,18 +1517,18 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 2"
   ],
   "mantyke": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "snover": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "abomasnow": [
     "Monster",
-    "Plant"
+    "Grass"
   ],
   "weavile": [
-    "Ground"
+    "Field"
   ],
   "magnezone": [
     "Mineral"
@@ -1538,16 +1538,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "rhyperior": [
     "Monster",
-    "Ground"
+    "Field"
   ],
   "tangrowth": [
-    "Plant"
+    "Grass"
   ],
   "electivire": [
-    "Humanshape"
+    "Human-Like"
   ],
   "magmortar": [
-    "Humanshape"
+    "Human-Like"
   ],
   "togekiss": [
     "Flying",
@@ -1557,63 +1557,63 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "leafeon": [
-    "Ground"
+    "Field"
   ],
   "glaceon": [
-    "Ground"
+    "Field"
   ],
   "gliscor": [
     "Bug"
   ],
   "mamoswine": [
-    "Ground"
+    "Field"
   ],
   "porygonz": [
     "Mineral"
   ],
   "gallade": [
-    "Humanshape",
-    "Indeterminate"
+    "Human-Like",
+    "Amorphous"
   ],
   "probopass": [
     "Mineral"
   ],
   "dusknoir": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "froslass": [
     "Fairy",
     "Mineral"
   ],
   "rotom": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "uxie": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "mesprit": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "azelf": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "dialga": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "palkia": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "heatran": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "regigigas": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "giratina": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "cresselia": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "phione": [
     "Water 1",
@@ -1624,91 +1624,91 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Fairy"
   ],
   "darkrai": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "shaymin": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "arceus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "victini": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "snivy": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "servine": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "serperior": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "tepig": [
-    "Ground"
+    "Field"
   ],
   "pignite": [
-    "Ground"
+    "Field"
   ],
   "emboar": [
-    "Ground"
+    "Field"
   ],
   "oshawott": [
-    "Ground"
+    "Field"
   ],
   "dewott": [
-    "Ground"
+    "Field"
   ],
   "samurott": [
-    "Ground"
+    "Field"
   ],
   "patrat": [
-    "Ground"
+    "Field"
   ],
   "watchog": [
-    "Ground"
+    "Field"
   ],
   "lillipup": [
-    "Ground"
+    "Field"
   ],
   "herdier": [
-    "Ground"
+    "Field"
   ],
   "stoutland": [
-    "Ground"
+    "Field"
   ],
   "purrloin": [
-    "Ground"
+    "Field"
   ],
   "liepard": [
-    "Ground"
+    "Field"
   ],
   "pansage": [
-    "Ground"
+    "Field"
   ],
   "simisage": [
-    "Ground"
+    "Field"
   ],
   "pansear": [
-    "Ground"
+    "Field"
   ],
   "simisear": [
-    "Ground"
+    "Field"
   ],
   "panpour": [
-    "Ground"
+    "Field"
   ],
   "simipour": [
-    "Ground"
+    "Field"
   ],
   "munna": [
-    "Ground"
+    "Field"
   ],
   "musharna": [
-    "Ground"
+    "Field"
   ],
   "pidove": [
     "Flying"
@@ -1720,10 +1720,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "blitzle": [
-    "Ground"
+    "Field"
   ],
   "zebstrika": [
-    "Ground"
+    "Field"
   ],
   "roggenrola": [
     "Mineral"
@@ -1735,30 +1735,30 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "woobat": [
-    "Ground",
+    "Field",
     "Flying"
   ],
   "swoobat": [
-    "Ground",
+    "Field",
     "Flying"
   ],
   "drilbur": [
-    "Ground"
+    "Field"
   ],
   "excadrill": [
-    "Ground"
+    "Field"
   ],
   "audino": [
     "Fairy"
   ],
   "timburr": [
-    "Humanshape"
+    "Human-Like"
   ],
   "gurdurr": [
-    "Humanshape"
+    "Human-Like"
   ],
   "conkeldurr": [
-    "Humanshape"
+    "Human-Like"
   ],
   "tympole": [
     "Water 1"
@@ -1770,10 +1770,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "throh": [
-    "Humanshape"
+    "Human-Like"
   ],
   "sawk": [
-    "Humanshape"
+    "Human-Like"
   ],
   "sewaddle": [
     "Bug"
@@ -1794,39 +1794,39 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "cottonee": [
-    "Plant",
+    "Grass",
     "Fairy"
   ],
   "whimsicott": [
-    "Plant",
+    "Grass",
     "Fairy"
   ],
   "petilil": [
-    "Plant"
+    "Grass"
   ],
   "lilligant": [
-    "Plant"
+    "Grass"
   ],
   "basculin": [
     "Water 2"
   ],
   "sandile": [
-    "Ground"
+    "Field"
   ],
   "krokorok": [
-    "Ground"
+    "Field"
   ],
   "krookodile": [
-    "Ground"
+    "Field"
   ],
   "darumaka": [
-    "Ground"
+    "Field"
   ],
   "darmanitan": [
-    "Ground"
+    "Field"
   ],
   "maractus": [
-    "Plant"
+    "Grass"
   ],
   "dwebble": [
     "Bug",
@@ -1837,11 +1837,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "scraggy": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "scrafty": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "sigilyph": [
@@ -1849,11 +1849,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "yamask": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "cofagrigus": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "tirtouga": [
     "Water 1",
@@ -1878,34 +1878,34 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "zorua": [
-    "Ground"
+    "Field"
   ],
   "zoroark": [
-    "Ground"
+    "Field"
   ],
   "minccino": [
-    "Ground"
+    "Field"
   ],
   "cinccino": [
-    "Ground"
+    "Field"
   ],
   "gothita": [
-    "Humanshape"
+    "Human-Like"
   ],
   "gothorita": [
-    "Humanshape"
+    "Human-Like"
   ],
   "gothitelle": [
-    "Humanshape"
+    "Human-Like"
   ],
   "solosis": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "duosion": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "reuniclus": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "ducklett": [
     "Water 1",
@@ -1925,13 +1925,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "deerling": [
-    "Ground"
+    "Field"
   ],
   "sawsbuck": [
-    "Ground"
+    "Field"
   ],
   "emolga": [
-    "Ground"
+    "Field"
   ],
   "karrablast": [
     "Bug"
@@ -1940,16 +1940,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "foongus": [
-    "Plant"
+    "Grass"
   ],
   "amoonguss": [
-    "Plant"
+    "Grass"
   ],
   "frillish": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "jellicent": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "alomomola": [
     "Water 1",
@@ -1962,11 +1962,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "ferroseed": [
-    "Plant",
+    "Grass",
     "Mineral"
   ],
   "ferrothorn": [
-    "Plant",
+    "Grass",
     "Mineral"
   ],
   "klink": [
@@ -1979,28 +1979,28 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "tynamo": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "eelektrik": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "eelektross": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "elgyem": [
-    "Humanshape"
+    "Human-Like"
   ],
   "beheeyem": [
-    "Humanshape"
+    "Human-Like"
   ],
   "litwick": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "lampent": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "chandelure": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "axew": [
     "Monster",
@@ -2015,10 +2015,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "cubchoo": [
-    "Ground"
+    "Field"
   ],
   "beartic": [
-    "Ground"
+    "Field"
   ],
   "cryogonal": [
     "Mineral"
@@ -2031,15 +2031,15 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "stunfisk": [
     "Water 1",
-    "Indeterminate"
+    "Amorphous"
   ],
   "mienfoo": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "mienshao": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "druddigon": [
     "Dragon",
@@ -2052,13 +2052,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "pawniard": [
-    "Humanshape"
+    "Human-Like"
   ],
   "bisharp": [
-    "Humanshape"
+    "Human-Like"
   ],
   "bouffalant": [
-    "Ground"
+    "Field"
   ],
   "rufflet": [
     "Flying"
@@ -2073,7 +2073,7 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "heatmor": [
-    "Ground"
+    "Field"
   ],
   "durant": [
     "Bug"
@@ -2094,58 +2094,58 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "cobalion": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "terrakion": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "virizion": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "tornadus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "thundurus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "reshiram": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zekrom": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "landorus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "kyurem": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "keldeo": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "meloetta": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "genesect": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "chespin": [
-    "Ground"
+    "Field"
   ],
   "quilladin": [
-    "Ground"
+    "Field"
   ],
   "chesnaught": [
-    "Ground"
+    "Field"
   ],
   "fennekin": [
-    "Ground"
+    "Field"
   ],
   "braixen": [
-    "Ground"
+    "Field"
   ],
   "delphox": [
-    "Ground"
+    "Field"
   ],
   "froakie": [
     "Water 1"
@@ -2157,10 +2157,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "bunnelby": [
-    "Ground"
+    "Field"
   ],
   "diggersby": [
-    "Ground"
+    "Field"
   ],
   "fletchling": [
     "Flying"
@@ -2181,10 +2181,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "litleo": [
-    "Ground"
+    "Field"
   ],
   "pyroar": [
-    "Ground"
+    "Field"
   ],
   "flabebe": [
     "Fairy"
@@ -2196,27 +2196,27 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Fairy"
   ],
   "skiddo": [
-    "Ground"
+    "Field"
   ],
   "gogoat": [
-    "Ground"
+    "Field"
   ],
   "pancham": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "pangoro": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "furfrou": [
-    "Ground"
+    "Field"
   ],
   "espurr": [
-    "Ground"
+    "Field"
   ],
   "meowstic": [
-    "Ground"
+    "Field"
   ],
   "honedge": [
     "Mineral"
@@ -2292,14 +2292,14 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Monster"
   ],
   "sylveon": [
-    "Ground"
+    "Field"
   ],
   "hawlucha": [
     "Flying",
-    "Humanshape"
+    "Human-Like"
   ],
   "dedenne": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "carbink": [
@@ -2319,18 +2319,18 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "phantump": [
-    "Plant",
-    "Indeterminate"
+    "Grass",
+    "Amorphous"
   ],
   "trevenant": [
-    "Plant",
-    "Indeterminate"
+    "Grass",
+    "Amorphous"
   ],
   "pumpkaboo": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "gourgeist": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "bergmite": [
     "Monster",
@@ -2349,22 +2349,22 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "xerneas": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "yveltal": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zygarde": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "diancie": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "hoopa": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "volcanion": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "rowlet": [
     "Flying"
@@ -2376,25 +2376,25 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "litten": [
-    "Ground"
+    "Field"
   ],
   "torracat": [
-    "Ground"
+    "Field"
   ],
   "incineroar": [
-    "Ground"
+    "Field"
   ],
   "popplio": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "brionne": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "primarina": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "pikipek": [
     "Flying"
@@ -2406,10 +2406,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "yungoos": [
-    "Ground"
+    "Field"
   ],
   "gumshoos": [
-    "Ground"
+    "Field"
   ],
   "grubbin": [
     "Bug"
@@ -2438,10 +2438,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Fairy"
   ],
   "rockruff": [
-    "Ground"
+    "Field"
   ],
   "lycanroc": [
-    "Ground"
+    "Field"
   ],
   "wishiwashi": [
     "Water 2"
@@ -2453,10 +2453,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "mudbray": [
-    "Ground"
+    "Field"
   ],
   "mudsdale": [
-    "Ground"
+    "Field"
   ],
   "dewpider": [
     "Water 1",
@@ -2467,16 +2467,16 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "fomantis": [
-    "Plant"
+    "Grass"
   ],
   "lurantis": [
-    "Plant"
+    "Grass"
   ],
   "morelull": [
-    "Plant"
+    "Grass"
   ],
   "shiinotic": [
-    "Plant"
+    "Grass"
   ],
   "salandit": [
     "Monster",
@@ -2487,28 +2487,28 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "stufful": [
-    "Ground"
+    "Field"
   ],
   "bewear": [
-    "Ground"
+    "Field"
   ],
   "bounsweet": [
-    "Plant"
+    "Grass"
   ],
   "steenee": [
-    "Plant"
+    "Grass"
   ],
   "tsareena": [
-    "Plant"
+    "Grass"
   ],
   "comfey": [
-    "Plant"
+    "Grass"
   ],
   "oranguru": [
-    "Ground"
+    "Field"
   ],
   "passimian": [
-    "Ground"
+    "Field"
   ],
   "wimpod": [
     "Bug",
@@ -2519,36 +2519,36 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 3"
   ],
   "sandygast": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "palossand": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "pyukumuku": [
     "Water 1"
   ],
   "typenull": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "silvally": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "minior": [
     "Mineral"
   ],
   "komala": [
-    "Ground"
+    "Field"
   ],
   "turtonator": [
     "Monster",
     "Dragon"
   ],
   "togedemaru": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "mimikyu": [
-    "Indeterminate"
+    "Amorphous"
   ],
   "bruxish": [
     "Water 2"
@@ -2570,121 +2570,121 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Dragon"
   ],
   "tapukoko": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "tapulele": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "tapubulu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "tapufini": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "cosmog": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "cosmoem": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "solgaleo": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "lunala": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "nihilego": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "buzzwole": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "pheromosa": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "xurkitree": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "celesteela": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "kartana": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "guzzlord": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "necrozma": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "magearna": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "marshadow": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "poipole": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "naganadel": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "stakataka": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "blacephalon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zeraora": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "meltan": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "melmetal": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "grookey": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "thwackey": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "rillaboom": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "scorbunny": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "raboot": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "cinderace": [
-    "Ground",
-    "Humanshape"
+    "Field",
+    "Human-Like"
   ],
   "sobble": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "drizzile": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "inteleon": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "skwovet": [
-    "Ground"
+    "Field"
   ],
   "greedent": [
-    "Ground"
+    "Field"
   ],
   "rookidee": [
     "Flying"
@@ -2705,22 +2705,22 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "nickit": [
-    "Ground"
+    "Field"
   ],
   "thievul": [
-    "Ground"
+    "Field"
   ],
   "gossifleur": [
-    "Plant"
+    "Grass"
   ],
   "eldegoss": [
-    "Plant"
+    "Grass"
   ],
   "wooloo": [
-    "Ground"
+    "Field"
   ],
   "dubwool": [
-    "Ground"
+    "Field"
   ],
   "chewtle": [
     "Monster",
@@ -2731,10 +2731,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "yamper": [
-    "Ground"
+    "Field"
   ],
   "boltund": [
-    "Ground"
+    "Field"
   ],
   "rolycoly": [
     "Mineral"
@@ -2746,23 +2746,23 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "applin": [
-    "Plant",
+    "Grass",
     "Dragon"
   ],
   "flapple": [
-    "Plant",
+    "Grass",
     "Dragon"
   ],
   "appletun": [
-    "Plant",
+    "Grass",
     "Dragon"
   ],
   "silicobra": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "sandaconda": [
-    "Ground",
+    "Field",
     "Dragon"
   ],
   "cramorant": [
@@ -2776,10 +2776,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 2"
   ],
   "toxel": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "toxtricity": [
-    "Humanshape"
+    "Human-Like"
   ],
   "sizzlipede": [
     "Bug"
@@ -2789,19 +2789,19 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "clobbopus": [
     "Water 1",
-    "Humanshape"
+    "Human-Like"
   ],
   "grapploct": [
     "Water 1",
-    "Humanshape"
+    "Human-Like"
   ],
   "sinistea": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "polteageist": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "hatenna": [
     "Fairy"
@@ -2814,21 +2814,21 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "impidimp": [
     "Fairy",
-    "Humanshape"
+    "Human-Like"
   ],
   "morgrem": [
     "Fairy",
-    "Humanshape"
+    "Human-Like"
   ],
   "grimmsnarl": [
     "Fairy",
-    "Humanshape"
+    "Human-Like"
   ],
   "obstagoon": [
-    "Ground"
+    "Field"
   ],
   "perrserker": [
-    "Ground"
+    "Field"
   ],
   "cursola": [
     "Water 1",
@@ -2836,22 +2836,22 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "sirfetchd": [
     "Flying",
-    "Ground"
+    "Field"
   ],
   "mrrime": [
-    "Humanshape"
+    "Human-Like"
   ],
   "runerigus": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "milcery": [
     "Fairy",
-    "Indeterminate"
+    "Amorphous"
   ],
   "alcremie": [
     "Fairy",
-    "Indeterminate"
+    "Amorphous"
   ],
   "falinks": [
     "Fairy",
@@ -2859,7 +2859,7 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "pincurchin": [
     "Water 1",
-    "Indeterminate"
+    "Amorphous"
   ],
   "snom": [
     "Bug"
@@ -2872,125 +2872,125 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
   ],
   "eiscue": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "indeedee": [
     "Fairy"
   ],
   "morpeko": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "cufant": [
-    "Ground",
+    "Field",
     "Mineral"
   ],
   "copperajah": [
-    "Ground",
+    "Field",
     "Mineral"
   ],
   "dracozolt": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "arctozolt": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "dracovish": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "arctovish": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "duraludon": [
     "Mineral",
     "Dragon"
   ],
   "dreepy": [
-    "Indeterminate",
+    "Amorphous",
     "Dragon"
   ],
   "drakloak": [
-    "Indeterminate",
+    "Amorphous",
     "Dragon"
   ],
   "dragapult": [
-    "Indeterminate",
+    "Amorphous",
     "Dragon"
   ],
   "zacian": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zamazenta": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "eternatus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "kubfu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "urshifu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "zarude": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "regieleki": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "regidrago": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "glastrier": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "spectrier": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "calyrex": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "wyrdeer": [
-    "Ground"
+    "Field"
   ],
   "kleavor": [
     "Bug"
   ],
   "ursaluna": [
-    "Ground"
+    "Field"
   ],
   "basculegion": [
     "Water 2"
   ],
   "sneasler": [
-    "Ground"
+    "Field"
   ],
   "overqwil": [
     "Water 2"
   ],
   "enamorus": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "sprigatito": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "floragato": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "meowscarada": [
-    "Ground",
-    "Plant"
+    "Field",
+    "Grass"
   ],
   "fuecoco": [
-    "Ground"
+    "Field"
   ],
   "crocalor": [
-    "Ground"
+    "Field"
   ],
   "skeledirge": [
-    "Ground"
+    "Field"
   ],
   "quaxly": [
     "Flying",
@@ -3005,10 +3005,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 1"
   ],
   "lechonk": [
-    "Ground"
+    "Field"
   ],
   "oinkologne": [
-    "Ground"
+    "Field"
   ],
   "tarountula": [
     "Bug"
@@ -3023,38 +3023,38 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Bug"
   ],
   "pawmi": [
-    "Ground"
+    "Field"
   ],
   "pawmo": [
-    "Ground"
+    "Field"
   ],
   "pawmot": [
-    "Ground"
+    "Field"
   ],
   "tandemaus": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "maushold": [
-    "Ground",
+    "Field",
     "Fairy"
   ],
   "fidough": [
-    "Ground",
+    "Field",
     "Mineral"
   ],
   "dachsbun": [
-    "Ground",
+    "Field",
     "Mineral"
   ],
   "smoliv": [
-    "Plant"
+    "Grass"
   ],
   "dolliv": [
-    "Plant"
+    "Grass"
   ],
   "arboliva": [
-    "Plant"
+    "Grass"
   ],
   "squawkabilly": [
     "Flying"
@@ -3069,13 +3069,13 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "charcadet": [
-    "Humanshape"
+    "Human-Like"
   ],
   "armarouge": [
-    "Humanshape"
+    "Human-Like"
   ],
   "ceruledge": [
-    "Humanshape"
+    "Human-Like"
   ],
   "tadbulb": [
     "Water 1"
@@ -3092,37 +3092,37 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "maschiff": [
-    "Ground"
+    "Field"
   ],
   "mabosstiff": [
-    "Ground"
+    "Field"
   ],
   "shroodle": [
-    "Ground"
+    "Field"
   ],
   "grafaiai": [
-    "Ground"
+    "Field"
   ],
   "bramblin": [
-    "Plant"
+    "Grass"
   ],
   "brambleghast": [
-    "Plant"
+    "Grass"
   ],
   "toedscool": [
-    "Plant"
+    "Grass"
   ],
   "toedscruel": [
-    "Plant"
+    "Grass"
   ],
   "klawf": [
     "Water 3"
   ],
   "capsakid": [
-    "Plant"
+    "Grass"
   ],
   "scovillain": [
-    "Plant"
+    "Grass"
   ],
   "rellor": [
     "Bug"
@@ -3155,11 +3155,11 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Flying"
   ],
   "finizen": [
-    "Ground",
+    "Field",
     "Water 2"
   ],
   "palafin": [
-    "Ground",
+    "Field",
     "Water 2"
   ],
   "varoom": [
@@ -3169,10 +3169,10 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "cyclizar": [
-    "Ground"
+    "Field"
   ],
   "orthworm": [
-    "Ground"
+    "Field"
   ],
   "glimmet": [
     "Mineral"
@@ -3181,19 +3181,19 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "greavard": [
-    "Ground"
+    "Field"
   ],
   "houndstone": [
-    "Ground"
+    "Field"
   ],
   "flamigo": [
     "Flying"
   ],
   "cetoddle": [
-    "Ground"
+    "Field"
   ],
   "cetitan": [
-    "Ground"
+    "Field"
   ],
   "veluza": [
     "Water 2"
@@ -3205,56 +3205,56 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Water 2"
   ],
   "annihilape": [
-    "Ground"
+    "Field"
   ],
   "clodsire": [
     "Water 1",
-    "Ground"
+    "Field"
   ],
   "farigiraf": [
-    "Ground"
+    "Field"
   ],
   "dudunsparce": [
-    "Ground"
+    "Field"
   ],
   "kingambit": [
-    "Humanshape"
+    "Human-Like"
   ],
   "greattusk": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "screamtail": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "brutebonnet": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "fluttermane": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "slitherwing": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "sandyshocks": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "irontreads": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironbundle": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironhands": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironjugulis": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironmoth": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironthorns": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "frigibax": [
     "Dragon",
@@ -3269,94 +3269,94 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
     "Mineral"
   ],
   "gimmighoul": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "gholdengo": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "wochien": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "chienpao": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "tinglu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "chiyu": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "roaringmoon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironvaliant": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "koraidon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "miraidon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "walkingwake": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironleaves": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "dipplin": [
-    "Plant",
+    "Grass",
     "Dragon"
   ],
   "poltchageist": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "sinistcha": [
     "Mineral",
-    "Indeterminate"
+    "Amorphous"
   ],
   "okidogi": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "munkidori": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "fezandipiti": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ogerpon": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "archaludon": [
     "Mineral",
     "Dragon"
   ],
   "hydrapple": [
-    "Plant",
+    "Grass",
     "Dragon"
   ],
   "gougingfire": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ragingbolt": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironboulder": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "ironcrown": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "terapagos": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ],
   "pecharunt": [
-    "Undiscovered"
+    "No Eggs Discovered"
   ]
 };
 
 export const getEggGroups = (pokemonName: string): string[] => {
     const cleanName = pokemonName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return EGG_GROUPS_MAP[cleanName] || ['Undiscovered'];
+    return EGG_GROUPS_MAP[cleanName] || ['No Eggs Discovered'];
 };

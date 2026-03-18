@@ -41,10 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEnabledCriteriaIds(new Set(ALL_CRITERIA.map(c => c.id)));
   };
 
-  const selectNone = () => {
-    // Keep at least 6 random ones or first 6 to avoid breakage
-    setEnabledCriteriaIds(new Set(ALL_CRITERIA.slice(0, 18).map(c => c.id)));
-  };
+
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade">
@@ -93,7 +90,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <h3 className="font-black text-xs uppercase tracking-widest text-gray-300">Categorias ({enabledCriteriaIds.size})</h3>
               <div className="flex gap-4">
                 <button onClick={selectAll} className="text-[10px] font-bold text-primary hover:underline uppercase">Todas</button>
-                <button onClick={selectNone} className="text-[10px] font-bold text-gray-500 hover:underline uppercase">Padrão</button>
               </div>
             </div>
             

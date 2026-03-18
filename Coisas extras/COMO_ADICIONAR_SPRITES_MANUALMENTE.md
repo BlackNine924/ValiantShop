@@ -13,10 +13,12 @@ Use estas pastas para as sprites que aparecem no minigame Pokégrid.
 
 ### **B. Pokédex (Artworks do Anime)**
 Use esta pasta para as imagens de alta qualidade que aparecem no detalhe da Pokédex.
-- **Artworks (Megas/Dynamax/Outros):** `public/assets/sprites/artwork/`
+- **Megas:** `public/assets/artwork/mega/`
+- **Dynamax:** `public/assets/artwork/dynamax/`
+- **Variações:** `public/assets/artwork/variations/`
 
 > [!IMPORTANT]
-> **Separação Estrita:** As pastas acima são **independentes**. Você pode ter um arquivo `20006.png` na pasta `mega/` e outro arquivo `20006.png` na pasta `artwork/`. O Pokégrid usará o da pasta `mega/` e a Pokédex usará o da pasta `artwork/`. Não há conflito.
+> **Separação Estrita:** As pastas acima são **independentes**. Você pode ter um arquivo `20006.png` na pasta `sprites/mega/` (usado no Jogo/Grid) e outro arquivo `20006.png` na pasta `artwork/mega/` (usado na Pokédex). Não há conflito.
 
 ---
 
@@ -31,13 +33,13 @@ O nome do arquivo deve ser exatamente o **ID do Pokémon** definido no sistema.
 ### **Exemplos de IDs:**
 - **Mega Charizard X:** `20006`
     - Sprite Jogo: `public/assets/sprites/mega/20006.png`
-    - Artwork Anime: `public/assets/sprites/artwork/20006.png`
+    - Artwork Anime: `public/assets/artwork/mega/20006.png`
 - **Mega Charizard X Shiny:**
-    - Sprite Jogo: `public/assets/sprites/mega/20006-shiny.png`
-    - Artwork Anime: `public/assets/sprites/artwork/20006-shiny.png`
+    - Sprite Jogo: `public/assets/sprites/mega/20006-shiny.png` (Opcional)
+    - Artwork Anime: `public/assets/artwork/mega/20006-shiny.png`
 - **Gigantamax Pikachu:** `30025`
     - Sprite Jogo: `public/assets/sprites/dynamax/30025.png`
-    - Artwork Anime: `public/assets/sprites/artwork/30025.png`
+    - Artwork Anime: `public/assets/artwork/dynamax/30025.png`
 
 ---
 
@@ -45,8 +47,8 @@ O nome do arquivo deve ser exatamente o **ID do Pokémon** definido no sistema.
 
 | Tipo | Pasta (Jogo/Grid) | Pasta (Anime/Dex) | Faixa de ID |
 | :--- | :--- | :--- | :--- |
-| **Mega** | `/assets/sprites/mega/` | `/assets/sprites/artwork/` | `20000` a `29999` |
-| **Dynamax** | `/assets/sprites/dynamax/` | `/assets/sprites/artwork/` | `30000` a `39999` |
+| **Mega** | `/assets/sprites/mega/` | `/assets/artwork/mega/` | `20000` a `29999` |
+| **Dynamax** | `/assets/sprites/dynamax/` | `/assets/artwork/dynamax/` | `30000` a `39999` |
 
 ---
 
