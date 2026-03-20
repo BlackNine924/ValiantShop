@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Quote, Trophy, Lightbulb, Lock } from 'lucide-react';
+import { Search, Quote, Trophy, Lightbulb, Lock, X } from 'lucide-react';
 import { getSpriteUrl, POKEMON_TYPE_DATA } from '../../data/pokemonTypes';
 import type { PokemonEntry } from '../../data/pokemonTypes';
 import { useAuth } from '../../context/AuthContext';
@@ -11,10 +11,11 @@ export const DescriptionMode = ({ target, description }: { target: PokemonEntry,
   const { user } = useAuth();
   const [guesses, setGuesses] = useState<PokemonEntry[]>([]);
   const [gameOver, setGameOver] = useState(false);
+  const [isSurrendered, setIsSurrendered] = useState(false);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PokemonEntry[]>([]);
 
-  const dateStr = new Date().toLocaleDateString('en-CA');
+  const dateStr = new Date().toISOString().split('T')[0];
 
   // Derive hints & wrong count
   const wrongGuesses = guesses.filter((g: any) => g.id !== target.id).length;
@@ -46,14 +47,13 @@ export const DescriptionMode = ({ target, description }: { target: PokemonEntry,
   const censoredDescription = description.replace(new RegExp(target.name, 'gi'), '█ █ █ █ █');
 
   useEffect(() => {
-    if (user?.displayName) {
-      loadPokedleState(user.displayName, 'description', dateStr).then(saved => {
-        if (saved) {
-          setGuesses(saved.guesses || []);
-          setGameOver(saved.gameOver || false);
-        }
-      });
-    }
+    loadPokedleState(user?.displayName || null, 'description', dateStr).then(saved => {
+      if (saved) {
+        setGuesses(saved.guesses || []);
+        setGameOver(saved.gameOver || false);
+        setIsSurrendered(saved.isSurrendered || false);
+      }
+    });
   }, [user, dateStr, target.id]);
 
   const handleGuess = (p: PokemonEntry) => {
@@ -70,12 +70,21 @@ export const DescriptionMode = ({ target, description }: { target: PokemonEntry,
       setGameOver(true);
     }
 
-    if (user?.displayName) {
-      savePokedleState(user.displayName, 'description', dateStr, {
-        guesses: newGuesses,
-        gameOver: isWin
-      });
-    }
+    savePokedleState(user?.displayName || null, 'description', dateStr, {
+      guesses: newGuesses,
+      gameOver: isWin,
+      isSurrendered: false
+    });
+  };
+
+  const handleSurrender = () => {
+    setGameOver(true);
+    setIsSurrendered(true);
+    savePokedleState(user?.displayName || null, 'description', dateStr, {
+      guesses: guesses,
+      gameOver: true,
+      isSurrendered: true
+    });
   };
 
   useEffect(() => {
@@ -116,6 +125,14 @@ export const DescriptionMode = ({ target, description }: { target: PokemonEntry,
               onChange={e => setQuery(e.target.value)}
             />
           </div>
+          {!gameOver && (
+            <button 
+              onClick={handleSurrender}
+              className="mt-4 w-full bg-red-500/10 border-2 border-red-500/20 text-red-500 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-red-500/20 transition-all"
+            >
+              Desistir e Revelar Resposta
+            </button>
+          )}
           
           <AnimatePresence>
             {suggestions.length > 0 && (
@@ -146,14 +163,21 @@ export const DescriptionMode = ({ target, description }: { target: PokemonEntry,
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-primary/10 border border-primary/30 p-10 rounded-3xl text-center space-y-6"
+          className={`p-10 rounded-3xl text-center space-y-6 border ${isSurrendered ? 'bg-red-500/10 border-red-500/30' : 'bg-primary/10 border-primary/30'}`}
         >
-          <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary animate-bounce">
-            <Trophy size={40} />
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto animate-bounce ${isSurrendered ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
+            {isSurrendered ? <X size={40} /> : <Trophy size={40} />}
           </div>
-          <h3 className="pixel-title text-3xl">{target.name}</h3>
-          <img src={getSpriteUrl(target.id)} alt={target.name} className="w-32 h-32 mx-auto" />
-          <p className="text-primary font-black uppercase tracking-widest text-xs">O Mestre da Pokédex! 🎉</p>
+          <h3 className="pixel-title text-3xl">{isSurrendered ? 'VOCÊ DESISTIU' : target.name}</h3>
+          {!isSurrendered && <img src={getSpriteUrl(target.id)} alt={target.name} className="w-32 h-32 mx-auto" />}
+          {isSurrendered ? (
+            <div className="space-y-4">
+              <img src={getSpriteUrl(target.id)} alt={target.name} className="w-32 h-32 mx-auto grayscale opacity-50" />
+              <p className="text-red-500 font-black uppercase tracking-widest text-xs">O Pokémon era {target.name}. Tente novamente amanhã!</p>
+            </div>
+          ) : (
+            <p className="text-primary font-black uppercase tracking-widest text-xs">O Mestre da Pokédex! 🎉</p>
+          )}
         </motion.div>
       )}
 

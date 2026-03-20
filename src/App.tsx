@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, History, Table, Shield, LogOut, Grid3X3, Smartphone, Trophy, Star, Quote, X } from 'lucide-react';
+import { ShoppingBag, History, Table, Shield, LogOut, Grid3X3, Smartphone, Trophy, Star, Quote, X, Gamepad2, Bell, Trash2 } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
@@ -8,13 +8,14 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { PokeGridPage } from './pages/PokeGridPage';
 import { PokedexPage } from './pages/PokedexPage';
 import { PokedlePage } from './pages/PokedlePage';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { CartProvider, useCart } from './context/CartContext';
+import { useAuth } from './context/AuthContext';
+import { useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, query, onSnapshot, limit, orderBy } from 'firebase/firestore';
 import logoUrl from './assets/hero.png';
+import { ReviewModal } from './components/ReviewModal';
 
 const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
   return (
@@ -58,9 +59,6 @@ const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
           desc="Acompanhe sua encomenda ao vivo."
           color="secondary"
         />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl w-full mt-2">
         <CategoryCard 
           to="/pokegrid" 
           icon={<Grid3X3 size={32} />} 
@@ -70,28 +68,26 @@ const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
         />
         <CategoryCard 
           to="/pokedle" 
-          icon={<Quote size={32} />} 
+          icon={<Gamepad2 size={32} />} 
           title="POKÉDLE" 
           desc="Adivinhe o Pokémon do dia em 3 modos diferentes!"
+          color="secondary"
+        />
+        <CategoryCard 
+          to="/pokedex" 
+          icon={<Smartphone size={32} />} 
+          title="POKÉDEX" 
+          desc="Enciclopédia completa de Pokémon."
           color="secondary"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl w-full mt-12">
-        <div onClick={() => setShowRankingModal(true)} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
+        <div onClick={() => { setShowRankingModal(true); setShowReviewsModal(false); }} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
           <RichTrainers limitCount={5} />
         </div>
-        <div className="flex flex-col gap-6">
-          <div onClick={() => setShowReviewsModal(true)} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
-            <ClientReviews limitCount={5} />
-          </div>
-          <CategoryCard 
-            to="/pokedex" 
-            icon={<Smartphone size={32} />} 
-            title="POKÉDEX" 
-            desc="Enciclopédia completa de Pokémon."
-            color="secondary"
-          />
+        <div onClick={() => { setShowReviewsModal(true); setShowRankingModal(false); }} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
+          <ClientReviews limitCount={5} />
         </div>
       </div>
     </div>
@@ -101,7 +97,13 @@ const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
 const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number, isModal?: boolean }) => {
   const [topTrainers, setTopTrainers] = useState<any[]>([]);
 
+  const { user } = useAuth();
+
   useEffect(() => {
+    if (!user) {
+      setTopTrainers([]);
+      return;
+    }
     const q = query(collection(db, 'orders'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const trainersMap = snapshot.docs.reduce((acc, doc) => {
@@ -118,9 +120,11 @@ const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number
         .slice(0, limitCount);
       
       setTopTrainers(sorted);
+    }, (error) => {
+      console.error("Firestore error in RichTrainers:", error);
     });
     return unsubscribe;
-  }, []);
+  }, [user, limitCount]);
 
   return (
     <div className={`glow-card p-8 border-primary/20 bg-black/40 relative overflow-hidden h-full ${isModal ? '!border-none !bg-transparent !p-0' : ''}`}>
@@ -151,13 +155,21 @@ const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number
 const ClientReviews = ({ limitCount = 3, isModal = false }: { limitCount?: number, isModal?: boolean }) => {
   const [reviews, setReviews] = useState<any[]>([]);
 
+  const { user } = useAuth();
+
   useEffect(() => {
-    const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'), limit(limitCount));
+    if (!user) {
+      setReviews([]);
+      return;
+    }
+    const q = query(collection(db, 'ClientReviews'), orderBy('rating', 'desc'), orderBy('createdAt', 'desc'), limit(limitCount));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setReviews(snapshot.docs.map(doc => doc.data()));
+    }, (error) => {
+      console.error("Firestore error in ClientReviews:", error);
     });
     return unsubscribe;
-  }, []);
+  }, [user, limitCount]);
 
   return (
     <div className={`glow-card p-8 border-secondary/20 bg-black/40 relative overflow-hidden h-full ${isModal ? '!border-none !bg-transparent !p-0' : ''}`}>
@@ -187,32 +199,130 @@ const ClientReviews = ({ limitCount = 3, isModal = false }: { limitCount?: numbe
   );
 };
 
-const CategoryCard = ({ to, icon, title, desc, color }: any) => (
-  <Link to={to} className="glow-card group p-8 block">
-    <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 transition-all group-hover:scale-110 ${color === 'primary' ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'}`}>
-      {icon}
-    </div>
-    <h3 className="pixel-title text-sm mb-2 group-hover:text-primary transition-colors">{title}</h3>
-    <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-  </Link>
-);
+const CategoryCard = ({ to, icon, title, desc, color }: any) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <Link 
+      to={isActive ? "#" : to} 
+      onClick={(e) => { if (isActive) e.preventDefault(); }}
+      className={`glow-card group p-8 block ${isActive ? 'pointer-events-none' : ''}`}
+    >
+      <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 transition-all group-hover:scale-110 ${color === 'primary' ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'}`}>
+        {icon}
+      </div>
+      <h3 className="pixel-title text-sm mb-2 group-hover:text-primary transition-colors">{title}</h3>
+      <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+    </Link>
+  );
+};
 
 import { LoginModal } from './components/LoginModal';
 
-const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowReviewsModal }: any) => {
+const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowReviewsModal, notifications, setNotifications, removeNotification }: any) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const isActive = (path: string) => location.pathname === path;
   const { cart, setIsCartOpen } = useCart();
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const unreadCount = notifications.filter((n: any) => !n.read).length;
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifDropdown(false);
+      }
+    };
+    if (showNotifDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifDropdown]);
 
   return (
     <>
       <nav className="sticky top-0 w-full z-50 bg-black/90 backdrop-blur-md border-b border-primary/20 px-6 py-4">
         <div className="w-full grid grid-cols-3 items-center">
-          <Link to="/" className="flex items-center gap-3 group justify-self-start">
-            <img src={logoUrl} alt="Logo" className="w-8 h-8 group-hover:rotate-12 transition-transform" />
-            <span className="pixel-title text-xl tracking-tighter text-white">VALIANT SHOP</span>
-          </Link>
+          <div className="flex items-center gap-4 justify-self-start">
+            <Link to="/" className="flex items-center gap-3 group">
+              <img src={logoUrl} alt="Logo" className="w-8 h-8 group-hover:rotate-12 transition-transform" />
+              <span className="pixel-title text-xl tracking-tighter text-white">VALIANT SHOP</span>
+            </Link>
+            
+            {/* Notification Bell */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className={`p-2 rounded-lg transition-all ${showNotifDropdown ? 'bg-primary/20 text-primary' : 'text-gray-400 hover:text-white'}`}
+              >
+                <Bell size={20} className={unreadCount > 0 ? 'animate-swing' : ''} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_10px_var(--primary-glow)]"></span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showNotifDropdown && (
+                  <motion.div 
+                    ref={notifRef}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute left-0 mt-4 w-80 bg-black/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden z-[60]"
+                  >
+                    <div className="p-4 border-b border-white/5 flex justify-between items-center">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notificações</h4>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={() => setNotifications(notifications.map((n: any) => ({ ...n, read: true })))}
+                          className="text-[8px] font-black text-primary hover:underline uppercase"
+                        >
+                          Lidas
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Bell size={32} className="text-gray-800 mx-auto mb-2 opacity-20" />
+                          <p className="text-[10px] text-gray-600 font-bold uppercase italic">Nenhuma notificação por enquanto</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/5">
+                          {notifications.map((n: any) => (
+                            <div key={n.id} className={`p-4 transition-colors hover:bg-white/[0.02] ${!n.read ? 'bg-primary/5' : ''}`}>
+                              <div className="flex gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${n.type === 'order' ? 'bg-secondary/20 text-secondary' : 'bg-primary/20 text-primary'}`}>
+                                  {n.type === 'order' ? <ShoppingBag size={14} /> : <Star size={14} />}
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex justify-between items-start">
+                                    <p className="text-xs text-white font-bold">{n.title}</p>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}
+                                      className="p-1.5 text-gray-700 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 leading-tight">{n.message}</p>
+                                  <p className="text-[8px] text-gray-600 font-black uppercase">{new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                                {!n.read && <div className="w-1.5 h-1.5 bg-primary rounded-full shrink-0 mt-1"></div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
           
           <div className="hidden lg:flex gap-6 items-center justify-center">
             <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokéGrid</Link>
@@ -220,8 +330,8 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowRevie
             <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
             {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
             <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
-            <button onClick={() => setShowRankingModal(true)} className="nav-link-manda">Placar</button>
-            <button onClick={() => setShowReviewsModal(true)} className="nav-link-manda">Feedbacks</button>
+            <button onClick={() => { setShowRankingModal(true); setShowReviewsModal(false); }} className="nav-link-manda">Placar</button>
+            <button onClick={() => { setShowReviewsModal(true); setShowRankingModal(false); }} className="nav-link-manda">Feedbacks</button>
             <Link to="/pokedex" className={`nav-link-manda ${isActive('/pokedex') ? 'active' : ''}`}>Pokédex</Link>
             <Link to="/pokedle" className={`nav-link-manda ${isActive('/pokedle') ? 'active' : ''}`}>PokéDLE</Link>
           </div>
@@ -288,121 +398,318 @@ function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [showRankingModal, setShowRankingModal] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [showAdminConfirm, setShowAdminConfirm] = useState(false);
+  const [showFinishedNotification, setShowFinishedNotification] = useState<any>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const rankingRef = useRef<HTMLDivElement>(null);
+  const reviewsRef = useRef<HTMLDivElement>(null);
+  const adminConfirmRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (adminConfirmRef.current && !adminConfirmRef.current.contains(event.target as Node)) {
+        setShowAdminConfirm(false);
+      }
+    };
+    if (showAdminConfirm) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAdminConfirm]);
+
+  const [notifications, setNotifications] = useState<any[]>(() => {
+    const saved = localStorage.getItem('user_notifications');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  useEffect(() => {
+    localStorage.setItem('user_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, 'orders'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const relevantOrders = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(order => 
+          order.playerNick === user.displayName && 
+          (order.status === 'Finalizado' || order.status === 'Breeding')
+        );
+
+      if (relevantOrders.length > 0) {
+        const notifiedIds = JSON.parse(sessionStorage.getItem('notified_orders') || '{}');
+        const newNotifs: any[] = [];
+        let showModalOrder: any = null;
+
+        relevantOrders.forEach(o => {
+          const lastNotifiedStatus = notifiedIds[o.id];
+          
+          if (lastNotifiedStatus !== o.status) {
+            const notifId = `order-${o.id}-${o.status}`;
+            
+            if (o.status === 'Finalizado') {
+              newNotifs.push({
+                id: notifId,
+                type: 'order',
+                title: 'ENCOMENDA PRONTA!',
+                message: `Seu ${o.pokemon} está pronto para entrega.`,
+                time: Date.now(),
+                read: false,
+                orderData: o
+              });
+              if (!o.isReviewed) showModalOrder = o;
+            } else if (o.status === 'Breeding') {
+              newNotifs.push({
+                id: notifId,
+                type: 'order',
+                title: 'BREEDING INICIADO!',
+                message: `Seu ${o.pokemon} entrou em fase de breeding.`,
+                time: Date.now(),
+                read: false,
+                orderData: o
+              });
+            }
+            
+            notifiedIds[o.id] = o.status;
+          }
+        });
+
+        if (newNotifs.length > 0) {
+          setNotifications(prev => [...newNotifs, ...prev].slice(0, 50));
+          if (showModalOrder) setShowFinishedNotification(showModalOrder);
+          sessionStorage.setItem('notified_orders', JSON.stringify(notifiedIds));
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [user, notifications.length]);
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <div className="min-h-screen relative overflow-x-hidden flex flex-col">
-            <div className="bg-overlay"></div>
-            <Navbar 
-              isLoginOpen={isLoginOpen} 
-              setIsLoginOpen={setIsLoginOpen} 
-              setShowRankingModal={setShowRankingModal}
-              setShowReviewsModal={setShowReviewsModal}
-            />
-            <main className="py-12 relative z-10 flex-1">
-              <Routes>
-                <Route path="/" element={<HomePage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
-                <Route 
-                  path="/order" 
-                  element={
-                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                      <OrderForm />
-                    </ProtectedOrderRoute>
-                  } 
-                />
-                <Route path="/prices" element={<Prices />} />
-                <Route path="/status" element={<Status />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route 
-                  path="/pokegrid" 
-                  element={
-                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                      <PokeGridPage />
-                    </ProtectedOrderRoute>
-                  } 
-                />
-                <Route 
-                  path="/pokedex" 
-                  element={
-                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                      <PokedexPage />
-                    </ProtectedOrderRoute>
-                  } 
-                />
-                <Route 
-                  path="/pokedle" 
-                  element={
-                    <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                      <PokedlePage />
-                    </ProtectedOrderRoute>
-                  } 
-                />
-              </Routes>
-            </main>
+    <div className="min-h-screen relative overflow-x-hidden flex flex-col">
+      <div className="bg-overlay"></div>
+      <Navbar 
+        isLoginOpen={isLoginOpen} 
+        setIsLoginOpen={setIsLoginOpen} 
+        setShowRankingModal={setShowRankingModal}
+        setShowReviewsModal={setShowReviewsModal}
+        notifications={notifications}
+        setNotifications={setNotifications}
+        removeNotification={removeNotification}
+      />
+      <main className="py-12 relative z-10 flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
+          <Route 
+            path="/order" 
+            element={
+              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                <OrderForm />
+              </ProtectedOrderRoute>
+            } 
+          />
+          <Route path="/prices" element={<Prices />} />
+          <Route path="/status" element={<Status />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route 
+            path="/pokegrid" 
+            element={
+              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                <PokeGridPage />
+              </ProtectedOrderRoute>
+            } 
+          />
+          <Route 
+            path="/pokedex" 
+            element={
+              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                <PokedexPage />
+              </ProtectedOrderRoute>
+            } 
+          />
+          <Route 
+            path="/pokedle" 
+            element={
+              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                <PokedlePage />
+              </ProtectedOrderRoute>
+            } 
+          />
+        </Routes>
+      </main>
 
-            {/* Global Modals */}
-            <AnimatePresence>
-              {showRankingModal && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-pointer"
-                  onClick={() => setShowRankingModal(false)}
-                >
-                  <motion.div 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="glow-card max-w-2xl w-full p-8 space-y-6 relative overflow-visible max-h-[80vh] overflow-y-auto custom-scrollbar cursor-default"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <button onClick={() => setShowRankingModal(false)} className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"><X size={20} /></button>
-                    <RichTrainers limitCount={20} isModal />
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {showReviewsModal && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-pointer"
-                  onClick={() => setShowReviewsModal(false)}
-                >
-                  <motion.div 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="glow-card max-w-2xl w-full p-8 space-y-6 relative overflow-visible max-h-[80vh] overflow-y-auto custom-scrollbar cursor-default"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <button onClick={() => setShowReviewsModal(false)} className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"><X size={20} /></button>
-                    <ClientReviews limitCount={20} isModal />
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
-              <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-                <div onClick={() => { if (window.confirm('Acessar Terminal Admin?')) window.location.href='/admin'; }} className="opacity-20 hover:opacity-100 transition-opacity cursor-pointer mb-2">
-                  <Shield size={16} className="text-gray-500" />
-                </div>
-                <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
+      {/* Global Modals */}
+      <AnimatePresence>
+        {showRankingModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md cursor-pointer"
+              onClick={() => setShowRankingModal(false)}
+            >
+              <motion.div 
+                ref={rankingRef}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="glow-card max-w-2xl w-full relative overflow-visible max-h-[90vh] flex flex-col cursor-default"
+                onClick={e => e.stopPropagation()}
+              >
+              <button 
+                onClick={() => setShowRankingModal(false)} 
+                className="absolute -top-3 -right-3 w-10 h-10 bg-black/80 border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-[110] backdrop-blur-md"
+              >
+                <X size={20} />
+              </button>
+              <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+                <RichTrainers limitCount={20} isModal />
               </div>
-            </footer>
-          </div>
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showReviewsModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md cursor-pointer"
+              onClick={() => setShowReviewsModal(false)}
+            >
+              <motion.div 
+                ref={reviewsRef}
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="glow-card max-w-2xl w-full relative overflow-visible max-h-[90vh] flex flex-col cursor-default"
+                onClick={e => e.stopPropagation()}
+              >
+              <button 
+                onClick={() => setShowReviewsModal(false)} 
+                className="absolute -top-3 -right-3 w-10 h-10 bg-black/80 border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-[110] backdrop-blur-md"
+              >
+                <X size={20} />
+              </button>
+              <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
+                <ClientReviews limitCount={20} isModal />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAdminConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm shadow-2xl"
+          >
+            <motion.div 
+              ref={adminConfirmRef}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glow-card max-w-sm w-full p-8 text-center border-primary/50 relative overflow-visible"
+            >
+              <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-primary/40 shadow-[0_0_20px_var(--primary-glow)]">
+                <Shield size={32} className="text-primary" />
+              </div>
+              <h3 className="pixel-title text-lg mb-2">ACESSO RESTRITO</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-8">Deseja entrar no Terminal Admin?</p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowAdminConfirm(false)}
+                  className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 text-gray-500 rounded-xl font-black text-[10px] uppercase transition-all"
+                >
+                  CANCELAR
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowAdminConfirm(false);
+                    navigate('/admin');
+                  }}
+                  className="flex-1 btn-manda !py-3 !text-[10px]"
+                >
+                  CONFIRMAR
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showFinishedNotification && (
+          <motion.div 
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-8 right-8 z-[100] max-w-sm w-full"
+          >
+            <div className="glow-card p-6 border-secondary/50 bg-black/95 shadow-2xl overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-secondary animate-pulse" />
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-secondary/10 rounded-xl flex items-center justify-center text-secondary border border-secondary/20 shadow-[0_0_15px_var(--secondary-glow)]">
+                  <Bell size={24} className="animate-bounce" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="pixel-title text-xs text-secondary mb-1">ENCOMENDA PRONTA!</h4>
+                  <p className="text-xs font-bold text-white mb-4">Seu {showFinishedNotification.pokemon} foi finalizado. Deixe sua avaliação!</p>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => {
+                        setShowFinishedNotification({ ...showFinishedNotification, isReviewing: true });
+                      }} 
+                     className="btn-manda !bg-secondary !py-2 !px-4 text-[10px] flex-1"
+                    >
+                      AVALIAR AGORA
+                    </button>
+                    <button 
+                      onClick={() => setShowFinishedNotification(null)}
+                      className="bg-white/5 hover:bg-white/10 text-gray-400 p-2 rounded-lg transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ReviewModal 
+        isOpen={!!showFinishedNotification && showFinishedNotification.isReviewing} 
+        order={showFinishedNotification}
+        onClose={() => setShowFinishedNotification(null)}
+      />
+
+      <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
+          <button 
+            onClick={() => setShowAdminConfirm(true)} 
+            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-primary transition-all rounded-full hover:bg-primary/10 mb-2 group"
+            title="Acesso Administrador"
+          >
+            <Shield size={18} className="group-hover:rotate-12 transition-transform" />
+          </button>
+          <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
+        </div>
+      </footer>
+    </div>
   );
 }
 

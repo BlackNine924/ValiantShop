@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Trophy, ArrowUp, ArrowDown, Lightbulb, Lock } from 'lucide-react';
+import { Search, Trophy, ArrowUp, ArrowDown, Lightbulb, Lock, X } from 'lucide-react';
 import { getSpriteUrl, POKEMON_TYPE_DATA } from '../../data/pokemonTypes';
 import type { PokemonEntry } from '../../data/pokemonTypes';
-import { comparePokemon, getGeneration, TYPE_PT_TRADUCOES, HABITAT_TRADUCOES } from '../../data/pokedleLogic';
+import { comparePokemon, getGeneration, TYPE_PT_TRADUCOES, COLOR_TRADUCOES } from '../../data/pokedleLogic';
 import type { ComparisonResult } from '../../data/pokedleLogic';
 import { getDetailedPokemon } from '../../services/pokedexService';
 import { useAuth } from '../../context/AuthContext';
@@ -13,41 +13,56 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
   const { user } = useAuth();
   const [guesses, setGuesses] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
+  const [isSurrendered, setIsSurrendered] = useState(false);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PokemonEntry[]>([]);
   const [targetData, setTargetData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const dateStr = new Date().toLocaleDateString('en-CA');
+  const dateStr = new Date().toISOString().split('T')[0];
 
   // Load target data and previous progress
   useEffect(() => {
     const init = async () => {
-      const data = await getDetailedPokemon(target.id);
-      setTargetData({
-        ...data,
-        color: data.species?.habitat === 'unknown' ? 'unknown' : (data as any).species?.color || 'unknown', // Mock if missing or fetch properly
-        habitat: data.species?.habitat || 'unknown'
+      // First, set base data from props immediately if not already set
+      setTargetData((prev: any) => prev || {
+        id: target.id,
+        name: target.name,
+        types: target.types,
+        height: 0,
+        weight: 0,
+        color: 'unknown',
+        habitat: 'unknown',
+        abilities: []
       });
 
-      // Special handling: PokeAPI provides color in species, let's ensure we get it
-      const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${target.id}`);
-      if (speciesRes.ok) {
-        const sData = await speciesRes.json();
-        setTargetData((prev: any) => ({
-          ...prev,
-          color: sData.color?.name || 'unknown',
-          habitat: sData.habitat?.name || 'unknown'
-        }));
+      try {
+        const data = await getDetailedPokemon(target.id);
+        const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${target.id}`);
+        let color = 'unknown';
+        let habitat = 'unknown';
+        if (speciesRes.ok) {
+          const sData = await speciesRes.json();
+          color = sData.color?.name || 'unknown';
+          habitat = sData.habitat?.name || 'unknown';
+        }
+
+        setTargetData({
+          ...data,
+          color,
+          habitat,
+          abilities: data.abilities?.map((a: any) => a.name || a.ability?.name) || []
+        });
+      } catch (err) {
+        console.error('Error loading target data:', err);
       }
 
-      if (user?.displayName) {
-        const saved = await loadPokedleState(user.displayName, 'classic', dateStr);
-        if (saved) {
-          setGuesses(saved.guesses || []);
-          setGameOver(saved.gameOver || false);
-        }
+      const saved = await loadPokedleState(user?.displayName || null, 'classic', dateStr);
+      if (saved) {
+        setGuesses(saved.guesses || []);
+        setGameOver(saved.gameOver || false);
+        setIsSurrendered(saved.isSurrendered || false);
       }
     };
     init();
@@ -85,12 +100,12 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
       const isWin = p.id === target.id;
       if (isWin) setGameOver(true);
 
-      if (user?.displayName) {
-        savePokedleState(user.displayName, 'classic', dateStr, {
-          guesses: newGuesses,
-          gameOver: isWin
-        });
-      }
+      savePokedleState(user?.displayName || null, 'classic', dateStr, {
+        guesses: newGuesses,
+        gameOver: isWin
+      });
+    } catch (err) {
+      console.error('Erro ao processar palpite:', err);
     } finally {
       setLoading(false);
     }
@@ -116,7 +131,7 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
       id: 'gen',
       requiredWrong: 3,
       label: 'Geração',
-      getValue: () => targetData ? `Gen ${getGeneration(target.id)}` : '...',
+      getValue: () => `Gen ${getGeneration(target.id)}`,
       icon: '🌍',
     },
     {
@@ -127,13 +142,23 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
       icon: '⚡',
     },
     {
-      id: 'habitat',
+      id: 'color',
       requiredWrong: 7,
-      label: 'Habitat',
-      getValue: () => targetData ? (HABITAT_TRADUCOES[targetData.habitat] || targetData.habitat || '...') : '...',
-      icon: '🌿',
+      label: 'Cor Principal',
+      getValue: () => targetData?.color ? (COLOR_TRADUCOES[targetData.color] || targetData.color.charAt(0).toUpperCase() + targetData.color.slice(1)) : '...',
+      icon: '🎨',
     },
   ];
+
+  const handleSurrender = () => {
+    setGameOver(true);
+    setIsSurrendered(true);
+    savePokedleState(user?.displayName || null, 'classic', dateStr, {
+      guesses: guesses,
+      gameOver: true,
+      isSurrendered: true
+    });
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 pb-20">
@@ -155,6 +180,14 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
               )}
             </div>
+            {!gameOver && (
+              <button 
+                onClick={handleSurrender}
+                className="bg-red-500/10 border-2 border-red-500/20 text-red-500 px-6 rounded-2xl font-black text-[10px] uppercase hover:bg-red-500/20 transition-all"
+              >
+                Desistir
+              </button>
+            )}
           </div>
           
           <AnimatePresence>
@@ -186,18 +219,20 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="glow-card p-10 text-center space-y-6 border-primary bg-primary/5 max-w-2xl mx-auto"
+          className={`glow-card p-10 text-center space-y-6 max-w-2xl mx-auto ${isSurrendered ? 'border-red-500/30 bg-red-500/5' : 'border-primary bg-primary/5'}`}
         >
-          <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary animate-bounce">
-            <Trophy size={40} />
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto animate-bounce ${isSurrendered ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
+            {isSurrendered ? <X size={40} /> : <Trophy size={40} />}
           </div>
           <div>
-            <h3 className="pixel-title text-3xl mb-2">VOCÊ VENCEU!</h3>
-            <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px]">Parabéns, treinador! Você descobriu o Pokémon do dia.</p>
+            <h3 className="pixel-title text-3xl mb-2">{isSurrendered ? 'VOCÊ DESISTIU' : 'VOCÊ VENCEU!'}</h3>
+            <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px]">
+              {isSurrendered ? 'O Pokémon foi revelado abaixo. Tente novamente amanhã!' : 'Parabéns, treinador! Você descobriu o Pokémon do dia.'}
+            </p>
           </div>
           <div className="flex flex-col items-center gap-4">
             <img src={getSpriteUrl(target.id)} alt={target.name} className="w-32 h-32" />
-            <span className="pixel-title text-xl text-primary">{target.name}</span>
+            <span className={`pixel-title text-xl ${isSurrendered ? 'text-red-500' : 'text-primary'}`}>{target.name}</span>
           </div>
         </motion.div>
       )}

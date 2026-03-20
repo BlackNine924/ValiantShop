@@ -42,7 +42,7 @@ export const TYPE_COLORS: Record<string, string> = {
   Steel: '#B8B8D0',
   Fairy: '#EE99AC'
 };
-const MEGA_NAME_MAP: Record<number, string> = {
+const MEGA_NAME_MAP: Record<string, string> = {
   "20003": "venusaur-mega",
   "20006": "charizard-megax",
   "20009": "blastoise-mega",
@@ -121,6 +121,8 @@ const MEGA_NAME_MAP: Record<number, string> = {
   "20691": "dragalge-mega",
   "20701": "hawlucha-mega",
   "20718": "zygarde-mega",
+  "21718": "zygarde-cell",
+  "21719": "zygarde-core",
   "20719": "diancie-mega",
   "20740": "crabominable-mega",
   "20768": "golisopod-mega",
@@ -177,49 +179,40 @@ const DYNAMAX_NAME_MAP: Record<number, string> = {
   30884: "duraludon-gmax",
   30890: "eternatus-eternamax",
   30892: "urshifu-single-strike-gmax",
-  30893: "urshifu-rapid-strike-gmax"
+  31311: "urshifu-rapid-strike-gmax"
 };
 
+// IDs that only have artwork (no pixel sprites) — always route to artwork/mega
+const ARTWORK_ONLY_IDS = new Set([21359, 21445, 21448, 210147, 21718, 21719]);
+
 export function getSpriteUrl(id: number, shiny: boolean = false): string {
-  // 0. Shiny-locked forms (Pikachu Cosplay, Libre, Starter, Eevee Starter, etc)
+  // 0. Shiny-locked forms
   const SHINY_LOCKED_IDS = [10080, 10081, 10082, 10083, 10084, 10158];
   if (shiny && SHINY_LOCKED_IDS.includes(id)) {
       shiny = false;
   }
 
-  // 1. Check for custom local sprites (Predictable paths - STICKLY SEPARATED from Pokedex)
-  // This uses /assets/sprites/mega or /assets/sprites/dynamax
+  // 1. IDs that only have artworks (Z-A Megas etc) — must come before range checks
+  if (ARTWORK_ONLY_IDS.has(id)) {
+    return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
+  }
+
+  // 2. Mega range (20000-29999) → local sprites
   if (id >= 20000 && id < 30000) {
-    // Mega
-    const path = `/assets/sprites/mega/${id}${shiny ? '-shiny' : ''}.png`;
-    return path;
+    return `/assets/sprites/mega/${id}${shiny ? '-shiny' : ''}.png`;
   }
+
+  // 3. Dynamax range (30000-39999) → local sprites
   if (id >= 30000 && id < 40000) {
-    // Dynamax
-    const path = `/assets/sprites/dynamax/${id}${shiny ? '-shiny' : ''}.png`;
-    return path;
+    return `/assets/sprites/dynamax/${id}${shiny ? '-shiny' : ''}.png`;
   }
 
-  // 2. Use Showdown for Megas (more complete and consistent Gen 5 style)
-  if (MEGA_NAME_MAP[id]) {
-    const shinyPrefix = shiny ? 'ani-shiny' : 'gen5';
-    const extension = shiny ? 'gif' : 'png';
-    return `https://play.pokemonshowdown.com/sprites/${shinyPrefix}/${MEGA_NAME_MAP[id]}.${extension}`;
+  // 4. Large custom Mega IDs without sprites (e.g. 210147) → artwork fallback
+  if (MEGA_NAME_MAP[String(id)]) {
+    return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
   }
 
-  // 3. Use Showdown for G-Max (Gen 8 style sprites)
-  if (DYNAMAX_NAME_MAP[id]) {
-    const shinyPrefix = shiny ? 'ani-shiny' : 'ani';
-    return `https://play.pokemonshowdown.com/sprites/${shinyPrefix}/${DYNAMAX_NAME_MAP[id]}.gif`;
-  }
-  
-  if (id >= 10000 && id < 20000) {
-    // Variations/Forms
-    const path = `/assets/sprites/variations/${id}${shiny ? '-shiny' : ''}.png`;
-    return path;
-  }
-  
-  // Official PokeAPI for standard Pokemon
+  // 5. Official PokeAPI for base Pokémon
   const shinyPath = shiny ? 'shiny/' : '';
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyPath}${id}.png`;
 }
@@ -250,13 +243,17 @@ export function getCustomArtworkByName(displayName: string, shiny: boolean = fal
  * Prioritizes custom local artwork, then falls back to PokeAPI Official Artwork.
  */
 export function getPokemonArtwork(id: number, shiny: boolean = false): string {
-  // 1. Custom local artwork (Anime style - predictable paths)
-  if (id >= 20000 && id < 30000) {
+  // 1. Check MEGA_NAME_MAP first — covers all custom Mega IDs including 210147 etc.
+  if (MEGA_NAME_MAP[String(id)]) {
     return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
   }
+
+  // 2. Dynamax
   if (id >= 30000 && id < 40000) {
     return `/assets/artwork/dynamax/${id}${shiny ? '-shiny' : ''}.png`;
   }
+
+  // 3. Form variations (10000-19999)
   if (id >= 10000 && id < 20000) {
       return `/assets/artwork/variations/${id}${shiny ? '-shiny' : ''}.png`;
   }
@@ -1177,7 +1174,7 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 890, name: "Eternatus", types: ["Poison", "Dragon"] },
   { id: 891, name: "Kubfu", types: ["Fighting"] },
   { id: 892, name: "Urshifu Single Strike Style", types: ["Fighting", "Dark"] },
-  { id: 10892, name: "Urshifu Rapid Strike Style", types: ["Fighting", "Water"] },
+  { id: 10191, name: "Urshifu Rapid Strike Style", types: ["Fighting", "Water"] },
   { id: 893, name: "Zarude", types: ["Dark", "Grass"] },
   { id: 894, name: "Regieleki", types: ["Electric"] },
   { id: 895, name: "Regidrago", types: ["Dragon"] },
@@ -1443,6 +1440,6 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 30884, name: "G-Max Duraludon", types: ["Steel", "Dragon"] },
   { id: 30890, name: "Eternamax Eternatus", types: ["Poison", "Dragon"] },
   { id: 30892, name: "G-Max Urshifu (Single)", types: ["Fighting", "Dark"] },
-  { id: 30893, name: "G-Max Urshifu (Rapid)", types: ["Fighting", "Water"] },
+  { id: 31311, name: "G-Max Urshifu (Rapid)", types: ["Fighting", "Water"] },
   { id: 30091, name: "G-Max Cloyster", types: ["Water", "Ice"] },
 ];

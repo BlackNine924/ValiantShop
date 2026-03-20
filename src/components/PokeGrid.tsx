@@ -15,8 +15,7 @@ import { savePokeGridState, loadPokeGridState, savePokeGridSettings, loadPokeGri
 
 export const PokeGrid: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
-  const hasLoadedRef = React.useRef(false); // prevent double-load race condition
-
+  const lastLoadedGridIdRef = React.useRef<string | null>(null); // prevent double-load race condition while allowing gridId changes
   
   // Settings State
   const [enabledCriteriaIds, setEnabledCriteriaIds] = useState<Set<string>>(new Set(ALL_CRITERIA.map(c => c.id)));
@@ -49,9 +48,12 @@ export const PokeGrid: React.FC = () => {
 
   // Load from Firebase/LocalStorage
   useEffect(() => {
-    // Already loaded from a previous effect run — skip to avoid race conditions
-    if (hasLoadedRef.current) return;
+    // Already loaded from a previous effect run for this gridId — skip to avoid race conditions
+    if (lastLoadedGridIdRef.current === gridId) return;
     if (authLoading) return; // don't run until auth resolves
+    
+    lastLoadedGridIdRef.current = gridId;
+
     if (!user) {
       // Not logged in - just use local storage or fresh grid
       const local = localStorage.getItem('pokegrid_state');
@@ -60,7 +62,10 @@ export const PokeGrid: React.FC = () => {
           const parsed = JSON.parse(local);
           const dateStr = new Date().toLocaleDateString('en-CA');
           if (parsed?.date === dateStr && !parsed.unlimitedMode === !unlimitedMode) {
-            setGrid(parsed.grid);
+            setGrid(parsed.grid || parsed.gridCells ? parsed : generateDailyGrid());
+            if (parsed.gridCells) {
+               // ... (it will be loaded fully below if needed, but local is fallback)
+            }
             setScore(parsed.score || 0);
             setGuesses(parsed.guesses || 0);
             setUsedPokemon(new Set(parsed.usedPokemon || []));
@@ -74,13 +79,9 @@ export const PokeGrid: React.FC = () => {
       } else {
         handleRestartToDaily();
       }
-      hasLoadedRef.current = true;
       setHasLoaded(true);
       return;
     }
-
-    // Mark as loading started to prevent second run
-    hasLoadedRef.current = true;
 
     const loadState = async () => {
       let savedState = null;
@@ -248,6 +249,7 @@ export const PokeGrid: React.FC = () => {
       timerEnabled,
     }).catch(err => console.error('❌ [Pokégrid] Erro ao salvar config:', err));
   }, [enabledCriteriaIds, unlimitedMode, timerEnabled, user, hasLoaded]);
+  
 
 
   const correctCount = grid.cells.flat().filter(c => c.isCorrect).length;
@@ -366,7 +368,8 @@ export const PokeGrid: React.FC = () => {
     setSelectedCell(null);
     setTime(0);
     setTimerActive(false);
-    hasLoadedRef.current = false; 
+    lastLoadedGridIdRef.current = null; 
+    setHasLoaded(false); // Trigger reload in main effect
   }, []);
 
 
@@ -606,7 +609,6 @@ export const PokeGrid: React.FC = () => {
         setUnlimitedMode={setUnlimitedMode}
         timerEnabled={timerEnabled}
         setTimerEnabled={setTimerEnabled}
-        onRestart={handleNewGame}
       />
     </div>
   );

@@ -113,9 +113,9 @@ export const PALDEA_IDS = new Set([
 ]);
 
 export const HAS_ALOLA_IDS = new Set([19, 20, 26, 27, 28, 37, 38, 50, 51, 52, 53, 74, 75, 76, 88, 89, 103, 105]);
-export const HAS_GALAR_IDS = new Set([52, 77, 78, 79, 80, 83, 110, 122, 144, 145, 146, 199, 222, 263, 264, 554, 555, 562, 618]);
-export const HAS_HISUI_IDS = new Set([58, 59, 100, 101, 157, 211, 215, 503, 549, 550, 570, 571, 628, 705, 706, 713, 724]);
-export const HAS_PALDEA_IDS = new Set([128, 194]);
+export const HAS_GALAR_IDS = new Set([52, 77, 78, 79, 80, 83, 110, 122, 144, 145, 146, 199, 222, 263, 264, 554, 555, 562, 618, 862, 863, 864, 865, 866, 867]);
+export const HAS_HISUI_IDS = new Set([58, 59, 100, 101, 157, 211, 215, 503, 549, 550, 570, 571, 628, 705, 706, 713, 724, 902, 903, 904]);
+export const HAS_PALDEA_IDS = new Set([128, 194, 980]);
 
 // 3. Dynamax/Gigantamax
 export const HAS_GMAX_IDS = new Set([

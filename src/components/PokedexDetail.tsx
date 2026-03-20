@@ -24,21 +24,42 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
 }) => {
   const [basePokemon, setBasePokemon] = useState<DetailedPokemon | null>(null);
   const [currentVariation, setCurrentVariation] = useState<Variation | null>(null);
+  const [internalId, setInternalId] = useState(initialId);
+  const [pendingVariationName, setPendingVariationName] = useState<string | null>(null);
   const [isShiny, setIsShiny] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'about' | 'stats' | 'evolution' | 'competitive'>('about');
 
   useEffect(() => {
     if (isOpen) {
-      if (basePokemon?.id !== initialId) {
+      setInternalId(initialId);
+      setPendingVariationName(null);
+    }
+  }, [initialId, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (basePokemon?.id !== internalId) {
         setLoading(true);
-        setCurrentVariation(null);
-        getDetailedPokemon(initialId)
-          .then(setBasePokemon)
+        getDetailedPokemon(internalId)
+          .then(base => {
+            setBasePokemon(base);
+            if (pendingVariationName && base.variations) {
+              const targetSuffix = pendingVariationName.toLowerCase().match(/(alola|galar|hisui|paldea)/)?.[0];
+              if (targetSuffix) {
+                const matchedVar = base.variations.find(v => v.name.toLowerCase().includes(targetSuffix));
+                setCurrentVariation(matchedVar || null);
+              } else {
+                setCurrentVariation(null);
+              }
+            } else {
+              setCurrentVariation(null);
+            }
+          })
           .finally(() => setLoading(false));
       }
     }
-  }, [initialId, isOpen, basePokemon]);
+  }, [internalId, isOpen, basePokemon, pendingVariationName]);
 
   if (!isOpen) return null;
 
@@ -48,7 +69,10 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
     name: basePokemon?.name,
     types: basePokemon?.types || [],
     sprites: basePokemon?.sprites,
-    stats: basePokemon?.stats
+    stats: basePokemon?.stats,
+    height: basePokemon?.height,
+    weight: basePokemon?.weight,
+    competitive: basePokemon?.competitive
   };
 
   const mainType = displayData.types[0] || 'normal';
@@ -80,13 +104,13 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
       const isOfficial3D = official?.includes('official-artwork');
       
       return { 
-        normal: isOfficial3D ? official : getPokemonArtwork(initialId, isShiny),
+        normal: isOfficial3D ? official : getPokemonArtwork(internalId, isShiny),
         shiny: currentVariation.sprites?.shiny || basePokemon?.sprites?.shiny
       };
     }
-    // No variation selected: use initialId (handles custom megas like 20978)
+    // No variation selected: use internalId (handles custom megas like 20978)
     return {
-      normal: getPokemonArtwork(initialId, isShiny),
+      normal: getPokemonArtwork(internalId, isShiny),
       shiny: basePokemon?.sprites?.shiny
     };
   };
@@ -170,16 +194,7 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                   >
                     Original
                   </button>
-                  {basePokemon.variations.filter(v => {
-                  const lowerName = v.name.toLowerCase();
-                  if (basePokemon.id === 25) {
-                    return !['cap', 'partner', 'starter', 'world', 'original', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola'].some(bad => lowerName.includes(bad));
-                  }
-                  if (basePokemon.id === 718) {
-                    return !['power-construct'].some(bad => lowerName.includes(bad));
-                  }
-                  return true;
-                }).map(v => (
+                  {basePokemon.variations.map(v => (
                     <button
                       key={v.id}
                       onClick={() => selectVariation(v)}
@@ -233,15 +248,15 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                         <div className="absolute -left-4 top-0 bottom-0 w-1 bg-primary rounded-full opacity-40 group-hover:opacity-100 transition-opacity"></div>
                         <div className="space-y-3 max-h-40 overflow-y-auto custom-scrollbar pr-3">
                           <p className="text-gray-300 text-sm leading-relaxed italic pl-2">
-                            "{basePokemon?.species?.flavor_text}"
+                            "{currentVariation?.description || basePokemon?.species?.flavor_text}"
                           </p>
                         </div>
                       </div>
 
 
                       <div className="grid grid-cols-2 gap-4">
-                        <DataBox title="Altura" value={`${basePokemon?.height}m`} icon={<Ruler size={14} />} />
-                        <DataBox title="Peso" value={`${basePokemon?.weight}kg`} icon={<Weight size={14} />} />
+                        <DataBox title="Altura" value={`${displayData.height}m`} icon={<Ruler size={14} />} />
+                        <DataBox title="Peso" value={`${displayData.weight}kg`} icon={<Weight size={14} />} />
                         <DataBox title="Geração" value={basePokemon?.species?.generation.toUpperCase().replace('GENERATION-', 'GEN ') || 'N/A'} icon={<Calendar size={14} />} />
                         <DataBox title="Egg Groups" value={basePokemon?.species?.egg_groups.join(', ').toUpperCase() || 'N/A' || 'N/A'} icon={<Globe size={14} />} />
                       </div>
@@ -251,7 +266,7 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           <Shield size={12} /> Efetividade de Tipos (Dano Recebido)
                         </h4>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                        <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 items-start">
                           {(Object.entries(calculateEffectiveness(displayData.types as PokemonType[])) as [EffectivenessCategory, PokemonType[]][]).map(([category, types]) => {
                             if (types.length === 0) return null;
                             
@@ -260,27 +275,27 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                             
                             if (category.includes('4x')) {
                               colorClass = "text-red-600 font-black";
-                              icon = <Zap size={12} className="animate-pulse" />;
+                              icon = <Zap size={10} className="animate-pulse" />;
                             } else if (category.includes('2x')) {
                               colorClass = "text-red-400";
-                              icon = <Swords size={12} />;
+                              icon = <Swords size={10} />;
                             } else if (category.includes('0x')) {
                               colorClass = "text-primary font-black";
-                              icon = <Shield size={12} />;
+                              icon = <Shield size={10} />;
                             } else if (category.includes('0.25x')) {
                               colorClass = "text-green-600";
-                              icon = <Shield size={12} />;
+                              icon = <Shield size={10} />;
                             } else if (category.includes('0.5x')) {
                               colorClass = "text-green-400";
-                              icon = <Shield size={12} />;
+                              icon = <Shield size={10} />;
                             }
 
                             return (
-                              <div key={category} className="p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
-                                <p className={`text-[8px] uppercase tracking-tighter mb-2 flex items-center gap-1.5 ${colorClass}`}>
+                              <div key={category} className="p-1.5 bg-white/[0.03] rounded-lg border border-white/5 hover:border-white/10 transition-all group/eff">
+                                <p className={`text-[6px] uppercase tracking-tighter mb-1 flex items-center gap-1 ${colorClass}`}>
                                   {icon} {category}
                                 </p>
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex flex-wrap gap-1">
                                   {types.map(t => (
                                     <TypeBadge key={t} type={TYPE_TRADUCOES[t.toLowerCase()] || t} colorName={t} />
                                   ))}
@@ -348,24 +363,10 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                               stage={stage}
                               formSuffix={currentVariation?.name.toLowerCase().match(/(alola|galar|hisui|paldea)/)?.[0]}
                               isActive={basePokemon?.id === stage.id}
-                              onClick={async (targetVariationName: string) => {
+                              onClick={(targetVariationName: string) => {
                                 if (basePokemon?.id !== stage.id) {
-                                  setCurrentVariation(null);
-                                  setBasePokemon(null);
-                                  const base = await getDetailedPokemon(stage.id);
-                                  // Attempt to pre-select the variation if it was a regional form stage
-                                  if (targetVariationName && base.variations) {
-                                    const targetSuffix = targetVariationName.toLowerCase().match(/(alola|galar|hisui|paldea)/)?.[0];
-                                    if (targetSuffix) {
-                                      const matchedVar = base.variations.find(v => v.name.toLowerCase().includes(targetSuffix));
-                                      if (matchedVar) {
-                                        setBasePokemon(base);
-                                        setCurrentVariation(matchedVar);
-                                        return;
-                                      }
-                                    }
-                                  }
-                                  setBasePokemon(base);
+                                  setPendingVariationName(targetVariationName);
+                                  setInternalId(stage.id);
                                 }
                               }}
                             />
@@ -407,16 +408,16 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                           </div>
                           <div>
                             <h4 className="text-xs font-black uppercase tracking-widest text-primary">Análise Competitiva</h4>
-                            <p className="text-[9px] font-black uppercase tracking-widest text-white/40">{basePokemon?.competitive?.role}</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-white/40">{displayData.competitive?.role}</p>
                           </div>
                         </div>
 
                         <p className="text-sm text-gray-300 leading-relaxed mb-8 relative z-10 font-medium">
-                          {basePokemon?.competitive?.description}
+                          {displayData.competitive?.description}
                         </p>
 
                         <a 
-                          href={basePokemon?.competitive?.smogonUrl}
+                          href={displayData.competitive?.smogonUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full py-4 bg-primary rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-black hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(var(--primary-rgb),0.3)]"
@@ -479,10 +480,10 @@ const TypeBadge = ({ type, colorName, isImmunity }: { type: string; colorName: s
   const color = TYPE_COLORS[colorName.charAt(0).toUpperCase() + colorName.slice(1) as any] || '#777';
   return (
     <span 
-      className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border flex items-center gap-2 ${isImmunity ? 'brightness-125' : ''}`}
-      style={{ borderColor: `${color}44`, backgroundColor: `${color}11`, color }}
+      className={`px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase tracking-tight border flex items-center gap-1 ${isImmunity ? 'brightness-125' : ''}`}
+      style={{ borderColor: `${color}33`, backgroundColor: `${color}08`, color }}
     >
-      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }}></div>
+      <div className="w-1 h-1 rounded-full" style={{ backgroundColor: color }}></div>
       {type}
     </span>
   );

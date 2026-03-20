@@ -1,33 +1,84 @@
-# PokeGrid: Categorias (Critérios) Disponíveis
+# Categorias do PokéGrid
 
-Atualmente, o jogo PokeGrid suporta as seguintes categorias para geração de grades:
+Todas as categorias disponíveis no sistema:
 
-## ⚔️ Tipos de Pokémon
-Todos os 18 tipos elementais da franquia:
-Normal, Fogo, Água, Planta, Elétrico, Gelo, Lutador, Veneno, Terra, Voador, Psíquico, Inseto, Pedra, Fantasma, Dragão, Noturno, Aço, Fada.
+### Tipos Elementares
+- 💧 Água
+- 🔥 Fogo
+- 🌿 Planta
+- ⚡ Elétrico
+- ❄️ Gelo
+- 👊 Lutador
+- ☠️ Veneno
+- 🏜️ Terra
+- 🕊️ Voador
+- 🧠 Psíquico
+- 🐞 Inseto
+- 🪨 Pedra
+- 👻 Fantasma
+- 🐲 Dragão
+- 🌙 Sombrio
+- ⚙️ Aço
+- ✨ Fada
+- 🔘 Normal
 
-## ⚠️ Fraquezas (Defensivas)
-Pokémon que recebem dano super efetivo (x2+) de:
-Fogo, Água, Elétrico, Gelo, Terra, Fada, Lutador, Noturno.
+### Gerações e Regiões
+- **Gen 1** (Kanto)
+- **Gen 2** (Johto)
+- **Gen 3** (Hoenn)
+- **Gen 4** (Sinnoh)
+- **Gen 5** (Unova)
+- **Gen 6** (Kalos)
+- **Gen 7** (Alola)
+- **Gen 8** (Galar)
+- **Gen 9** (Paldea)
 
-## 📅 Gerações (Região de Origem)
-- Gen 1 (Kanto) até Gen 9 (Paldea).
+### Fraquezas (Defensivo)
+- Fraco vs Água
+- Fraco vs Fogo
+- Fraco vs Planta
+- Fraco vs Elétrico
+- Fraco vs Gelo
+- Fraco vs Lutador
+- Fraco vs Veneno
+- Fraco vs Terra
+- Fraco vs Voador
+- Fraco vs Psíquico
+- Fraco vs Inseto
+- Fraco vs Pedra
+- Fraco vs Fantasma
+- Fraco vs Dragão
+- Fraco vs Sombrio
+- Fraco vs Aço
+- Fraco vs Fada
 
-## 🧬 Evolução e Estados
-- **Estágios**: 3 Estágios, Sem Evolução, Pode Evoluir, Forma Final, Forma do Meio, Forma Inicial.
-- **Métodos**: Evolui por Pedra, Evolui por Troca, Evolui por Amizade.
-- **Tipagem**: Tipo Único, Tipo Duplo.
+### Estados e Evolução
+- **Sem Evolução**: Pokémon que não evolui e não tem pré-evolução.
+- **Evolução Final**: Pokémon no estágio final de sua linha.
+- **Pode Evoluir**: Pokémon que ainda tem estágios futuros.
+- **Bebê**: Pokémon da categoria Baby.
+- **Lendário**: Pokémon Lendários.
+- **Mítico**: Pokémon Míticos.
+- **Pseudo-Lendário**: Pokémon com BST de 600 (ex: Dragonite, Tyranitar).
+- **Fóssil**: Pokémon ressuscitados de fósseis.
+- **Paradoxo**: Pokémon do Passado/Futuro (Scarlet/Violet).
+- **Ultra Beast**: Pokémon de outra dimensão (Sun/Moon).
 
-## 🏝️ Formas Regionais
-- Alola, Galar, Hisui, Paldea.
+### Mecânicas Especiais
+- **Mega Evolução**: Pode mega evoluir.
+- **Gigantamax**: Possui forma G-Max.
+- **Forma Regional**: Pokémon que possui variante de outra região (Alola, Galar, Hisui, Paldea).
 
-## 🌟 Classificações Especiais
-- **Status**: Tem Mega, Lendário, Mítico, Pseudo-Lendário.
-- **Grupos**: Iniciais (Starter Base), Babys, Paradoxo, Ultrabeast.
-- **Mecânicas**: Dynamax.
-
-## 🥚 Grupos de Ovos (Egg Groups)
-- Monster, Bug, Flying, Plant, Mineral, Dragon, Fairy, Humanshape, Water 1, Water 2, Water 3, Indeterminate.
-
----
-*Nota: Você pode escolher quais categorias aparecem no grid através da engrenagem de configurações no jogo.*
+### Grupos de Ovos
+- Monster
+- Water 1, Water 2, Water 3
+- Bug
+- Flying
+- Field
+- Fairy
+- Grass
+- Human-Like
+- Mineral
+- Amorphous
+- Dragon
+- Ditto

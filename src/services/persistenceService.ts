@@ -83,21 +83,41 @@ export const loadPokedexState = async (nick: string) => {
   return [];
 };
 
-export const savePokedleState = async (userId: string, mode: string, date: string, state: any) => {
-  if (!userId) return;
+export const savePokedleState = async (userId: string | null, mode: string, date: string, state: any) => {
   const stateJson = JSON.stringify(state);
-  const key = `${userId}_${mode}_${date}`;
-  const ref = doc(db, 'pokedle', key);
-  await setDoc(ref, { stateJson, userId, mode, date, lastUpdated: new Date().toISOString() }, { merge: true });
+  const key = `pokedle_${mode}_${date}`;
+  
+  // Always save to localStorage for immediate persistence (Refresh/Same device)
+  localStorage.setItem(key, stateJson);
+
+  // If user is logged in, sync to Firestore
+  if (userId) {
+    const firestoreKey = `${userId}_${mode}_${date}`;
+    const ref = doc(db, 'pokedle', firestoreKey);
+    await setDoc(ref, { stateJson, userId, mode, date, lastUpdated: new Date().toISOString() }, { merge: true });
+  }
 };
 
-export const loadPokedleState = async (userId: string, mode: string, date: string) => {
-  if (!userId) return null;
-  const key = `${userId}_${mode}_${date}`;
-  const ref = doc(db, 'pokedle', key);
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    return JSON.parse(snap.data().stateJson);
+export const loadPokedleState = async (userId: string | null, mode: string, date: string) => {
+  const key = `pokedle_${mode}_${date}`;
+  
+  // Try localStorage first (fastest for current session/device)
+  const localSaved = localStorage.getItem(key);
+  if (localSaved) {
+    return JSON.parse(localSaved);
+  }
+
+  // If user is logged in and no local save, try Firestore
+  if (userId) {
+    const firestoreKey = `${userId}_${mode}_${date}`;
+    const ref = doc(db, 'pokedle', firestoreKey);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = JSON.parse(snap.data().stateJson);
+      // Sink to local after loading from cloud
+      localStorage.setItem(key, snap.data().stateJson);
+      return data;
+    }
   }
   return null;
 };

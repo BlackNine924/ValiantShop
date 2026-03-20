@@ -40,7 +40,7 @@ export const Status = () => {
   const handleReview = async () => {
     if (!showReviewModal) return;
     try {
-      await addDoc(collection(db, 'reviews'), {
+      await addDoc(collection(db, 'ClientReviews'), {
         orderId: showReviewModal.id,
         pokemon: showReviewModal.pokemon,
         playerNick: user?.displayName,

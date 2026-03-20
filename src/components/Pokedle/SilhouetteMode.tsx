@@ -11,20 +11,20 @@ export const SilhouetteMode = ({ target }: { target: PokemonEntry }) => {
   const { user } = useAuth();
   const [guesses, setGuesses] = useState<PokemonEntry[]>([]);
   const [gameOver, setGameOver] = useState(false);
+  const [isSurrendered, setIsSurrendered] = useState(false);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PokemonEntry[]>([]);
 
-  const dateStr = new Date().toLocaleDateString('en-CA');
+  const dateStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    if (user?.displayName) {
-      loadPokedleState(user.displayName, 'silhouette', dateStr).then(saved => {
-        if (saved) {
-          setGuesses(saved.guesses || []);
-          setGameOver(saved.gameOver || false);
-        }
-      });
-    }
+    loadPokedleState(user?.displayName || null, 'silhouette', dateStr).then(saved => {
+      if (saved) {
+        setGuesses(saved.guesses || []);
+        setGameOver(saved.gameOver || false);
+        setIsSurrendered(saved.isSurrendered || false);
+      }
+    });
   }, [user, dateStr]);
 
   const handleGuess = (p: PokemonEntry) => {
@@ -41,12 +41,21 @@ export const SilhouetteMode = ({ target }: { target: PokemonEntry }) => {
       setGameOver(true);
     }
 
-    if (user?.displayName) {
-      savePokedleState(user.displayName, 'silhouette', dateStr, {
-        guesses: newGuesses,
-        gameOver: isWin
-      });
-    }
+    savePokedleState(user?.displayName || null, 'silhouette', dateStr, {
+      guesses: newGuesses,
+      gameOver: isWin,
+      isSurrendered: false
+    });
+  };
+
+  const handleSurrender = () => {
+    setGameOver(true);
+    setIsSurrendered(true);
+    savePokedleState(user?.displayName || null, 'silhouette', dateStr, {
+      guesses: guesses,
+      gameOver: true,
+      isSurrendered: true
+    });
   };
 
   useEffect(() => {
@@ -133,6 +142,14 @@ export const SilhouetteMode = ({ target }: { target: PokemonEntry }) => {
               onChange={e => setQuery(e.target.value)}
             />
           </div>
+          {!gameOver && (
+            <button 
+              onClick={handleSurrender}
+              className="mt-4 w-full bg-red-500/10 border-2 border-red-500/20 text-red-500 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-red-500/20 transition-all"
+            >
+              Desistir e Revelar Resposta
+            </button>
+          )}
           
           <AnimatePresence>
             {suggestions.length > 0 && (
@@ -161,9 +178,15 @@ export const SilhouetteMode = ({ target }: { target: PokemonEntry }) => {
         </div>
       ) : (
         <div className="flex justify-center">
-            <div className="bg-primary/20 text-primary px-8 py-4 rounded-2xl pixel-title text-sm border border-primary/20">
-              Vencedor do Dia! 🎉
-            </div>
+            {isSurrendered ? (
+              <div className="bg-red-500/20 text-red-500 px-8 py-4 rounded-2xl pixel-title text-sm border border-red-500/20">
+                Você Desistiu! 🏳️
+              </div>
+            ) : (
+              <div className="bg-primary/20 text-primary px-8 py-4 rounded-2xl pixel-title text-sm border border-primary/20">
+                Vencedor do Dia! 🎉
+              </div>
+            )}
         </div>
       )}
 

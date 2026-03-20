@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Package, Filter, Trash2, Bell, Edit3, MessageSquare, Plus, Minus, Calculator, Zap, Star, HelpCircle } from 'lucide-react';
+import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Package, Filter, Trash2, Bell, Edit3, MessageSquare, Plus, Minus, Star, Calculator, Zap, HelpCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
@@ -14,22 +14,22 @@ export const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [inventorySearch, setInventorySearch] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'estoque' | 'inbox' | 'analytics' | 'calculator'>('pedidos');
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'estoque' | 'inbox' | 'analytics' | 'calculator' | 'feedbacks'>('pedidos');
+  const [inventory] = useState<any[]>([]);
   const [showAddStockModal, setShowAddStockModal] = useState(false);
   const [newStock, setNewStock] = useState({
     id: '',
     pokemon: '',
-    f4: 0,
-    f5: 0,
-    f6: 0,
-    gender: { male: 0, female: 0 },
-    abilities: [] as { name: string, count: number }[],
+    f4: { male: 0, female: 0, abilities: [] as { name: string, count: number }[] },
+    f5: { male: 0, female: 0, abilities: [] as { name: string, count: number }[] },
+    f6: { male: 0, female: 0, abilities: [] as { name: string, count: number }[] },
     f4Details: [] as { missingStats: string, count: number }[],
     f5Details: [] as { missingStat: string, count: number }[],
     nature: '',
-    pokeball: ''
+    pokeball: '',
+    isEgg: false
   });
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Match' | 'Pedido'>('Todos');
   const [isExitingStockModal, setIsExitingStockModal] = useState(false);
@@ -38,7 +38,18 @@ export const AdminDashboard = () => {
   const [expandedStockId, setExpandedStockId] = useState<string | null>(null);
   const [isEditingStock, setIsEditingStock] = useState(false);
   const [expandedTrainerNick, setExpandedTrainerNick] = useState<string | null>(null);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set());
+  const [stockLimitWarning, setStockLimitWarning] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ 
+    isOpen: boolean, 
+    type: 'order' | 'stock' | 'notification' | 'feedback', 
+    id: string, 
+    name: string 
+  } | null>(null);
+  const [filterStars, setFilterStars] = useState<number | null>(null);
+  const [showFeedbackFilters, setShowFeedbackFilters] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const deleteModalRef = useRef<HTMLDivElement>(null);
 
   const closeStockModal = () => {
     setIsExitingStockModal(true);
@@ -50,13 +61,15 @@ export const AdminDashboard = () => {
       setShowPokemonDropdown(false);
       setNewStock({ 
         id: '',
-        pokemon: '', f4: 0, f5: 0, f6: 0, 
-        gender: { male: 0, female: 0 }, 
-        abilities: [], 
+        pokemon: '', 
+        f4: { male: 0, female: 0, abilities: [] },
+        f5: { male: 0, female: 0, abilities: [] },
+        f6: { male: 0, female: 0, abilities: [] },
         f4Details: [],
         f5Details: [], 
         nature: '', 
-        pokeball: '' 
+        pokeball: '',
+        isEgg: false
       });
     }, 300);
   };
@@ -118,17 +131,50 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    const q = query(collection(db, 'inventory'));
+    const q = query(collection(db, 'ClientReviews'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const inventoryData = snapshot.docs.map(doc => ({
+      const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })).sort((a: any, b: any) => a.pokemon?.localeCompare(b.pokemon));
-      setInventory(inventoryData);
+      })).sort((a: any, b: any) => {
+        // First sort by stars (highest first)
+        const starsA = a.rating || 0;
+        const starsB = b.rating || 0;
+        if (starsB !== starsA) return starsB - starsA;
+        
+        // Then by date
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeB - timeA;
+      });
+      setFeedbacks(data);
     });
 
     return unsubscribe;
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    // Fetch dismissed notification IDs from Firebase
+    const q = query(collection(db, 'admin_dismissed_notifications'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ids = new Set(snapshot.docs.map(doc => doc.data().notificationId));
+      setDismissedNotifIds(ids);
+    });
+
+    return unsubscribe;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (deleteModalRef.current && !deleteModalRef.current.contains(event.target as Node)) {
+        setDeleteConfirm(null);
+      }
+    };
+    if (deleteConfirm?.isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [deleteConfirm]);
 
   useEffect(() => {
     if (!isAuthenticated || orders.length === 0 || inventory.length === 0) return;
@@ -143,11 +189,18 @@ export const AdminDashboard = () => {
             ? stockItem.abilities?.some((a: any) => a.count > 0)
             : stockItem.abilities?.some((a: any) => a.name.toLowerCase() === order.ability?.toLowerCase() && a.count > 0);
           
+          const getIvCount = (item: any, ivKey: string) => {
+            const val = item[ivKey.toLowerCase()];
+            if (typeof val === 'number') return val;
+            if (typeof val === 'object' && val !== null) return (val.male || 0) + (val.female || 0);
+            return 0;
+          };
+
           const hasMatchingIVs = 
-            (order.ivs.includes('4 IVs') && stockItem.f4 > 0) ||
-            (order.ivs.includes('5 IVs') && stockItem.f5 > 0) || 
-            (order.ivs.includes('6 IVs') && stockItem.f6 > 0) ||
-            (order.ivs.includes('Qualquer IV') && (stockItem.f4 > 0 || stockItem.f5 > 0 || stockItem.f6 > 0));
+            (order.ivs.includes('4 IVs') && getIvCount(stockItem, 'f4') > 0) ||
+            (order.ivs.includes('5 IVs') && getIvCount(stockItem, 'f5') > 0) || 
+            (order.ivs.includes('6 IVs') && getIvCount(stockItem, 'f6') > 0) ||
+            (order.ivs.includes('Qualquer IV') && (getIvCount(stockItem, 'f4') > 0 || getIvCount(stockItem, 'f5') > 0 || getIvCount(stockItem, 'f6') > 0));
           
           if (hasMatchingAbility || hasMatchingIVs) {
             allItems.push({
@@ -175,8 +228,9 @@ export const AdminDashboard = () => {
       }
     });
 
-    // Remove duplicates and sort by time
+    // Remove duplicates, sort by time, and FILTER out dismissed ones
     const uniqueNotifications = Array.from(new Map(allItems.map(item => [item.id, item])).values())
+      .filter(n => !dismissedNotifIds.has(n.id))
       .sort((a, b) => {
         const timeA = a.time?.toMillis ? a.time.toMillis() : Date.now();
         const timeB = b.time?.toMillis ? b.time.toMillis() : Date.now();
@@ -184,7 +238,7 @@ export const AdminDashboard = () => {
       });
 
     setNotifications(uniqueNotifications);
-  }, [orders, inventory, isAuthenticated]);
+  }, [orders, inventory, isAuthenticated, dismissedNotifIds]);
 
   if (!isAuthenticated) {
     return (
@@ -219,19 +273,45 @@ export const AdminDashboard = () => {
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (window.confirm('Tem certeza que deseja apagar essa encomenda para sempre?')) {
-      try {
-        await deleteDoc(doc(db, 'orders', orderId));
-      } catch (e) {
-        console.error('Erro ao deletar:', e);
-        alert('Falha ao deletar no banco de dados.');
-      }
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      setDeleteConfirm(null);
+    } catch (e) {
+      console.error('Erro ao deletar:', e);
+      alert('Falha ao deletar no banco de dados.');
+    }
+  };
+
+  const handleDeleteStock = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'inventory', id));
+      setDeleteConfirm(null);
+    } catch (e) {
+      console.error('Erro ao deletar estoque:', e);
     }
   };
 
   const handleAddStock = async (e: any) => {
     e.preventDefault();
     if (!newStock.pokemon) return;
+
+    const checkLimit = (val: any) => {
+      if (typeof val === 'number') return val > 54;
+      if (typeof val === 'object' && val !== null) {
+        return (val.male > 54 || val.female > 54 || (val.abilities && val.abilities.some((a: any) => a.count > 54)));
+      }
+      return false;
+    };
+
+    const hasExceededLimit = 
+      checkLimit(newStock.f4) || checkLimit(newStock.f5) || checkLimit(newStock.f6) || 
+      (newStock.f4Details && newStock.f4Details.some((d: any) => d.count > 54)) ||
+      (newStock.f5Details && newStock.f5Details.some((d: any) => d.count > 54));
+
+    if (hasExceededLimit) {
+        alert('Não é possível adicionar ou atualizar os dados. O estoque máximo para qualquer configuração (Gênero ou Habilidade por IV) é 54.');
+        return;
+    }
 
     const stockId = newStock.pokemon.toLowerCase().trim();
     
@@ -259,17 +339,26 @@ export const AdminDashboard = () => {
     }
   };
 
-  const addAbility = () => {
+  const addAbility = (ivType: 'f4' | 'f5' | 'f6') => {
     setNewStock({
       ...newStock,
-      abilities: [...newStock.abilities, { name: '', count: 1 }]
+      [ivType]: {
+        ...(newStock[ivType] as any),
+        abilities: [...(newStock[ivType] as any).abilities, { name: '', count: 1 }]
+      }
     });
   };
 
-  const removeAbility = (index: number) => {
-    const newAbilities = [...newStock.abilities];
+  const removeAbility = (ivType: 'f4' | 'f5' | 'f6', index: number) => {
+    const newAbilities = [...(newStock[ivType] as any).abilities];
     newAbilities.splice(index, 1);
-    setNewStock({ ...newStock, abilities: newAbilities });
+    setNewStock({ 
+      ...newStock, 
+      [ivType]: {
+        ...(newStock[ivType] as any),
+        abilities: newAbilities
+      }
+    });
   };
 
   const addF5Detail = () => {
@@ -287,9 +376,22 @@ export const AdminDashboard = () => {
 
   const handleEditStock = (item: any) => {
     setIsEditingStock(true);
+    
+    // Convert old schema to new schema if necessary
+    const ensureNewSchema = (val: any, oldGenderMap: any, oldAbilities: any[]) => {
+      if (typeof val === 'object' && val !== null && 'male' in val) return val;
+      return {
+        male: oldGenderMap?.male || 0,
+        female: oldGenderMap?.female || 0,
+        abilities: oldAbilities || []
+      };
+    };
+
     setNewStock({ 
       ...item,
-      abilities: item.abilities || [],
+      f4: ensureNewSchema(item.f4, item.gender, item.abilities),
+      f5: ensureNewSchema(item.f5, item.gender, item.abilities),
+      f6: ensureNewSchema(item.f6, item.gender, item.abilities),
       f4Details: item.f4Details || [],
       f5Details: item.f5Details || []
     });
@@ -318,19 +420,19 @@ export const AdminDashboard = () => {
     setNewStock({ ...newStock, f4Details: newDetails });
   };
 
-  const handleDeleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
-  const handleDeleteStock = async (id: string) => {
-    if (window.confirm('Remover este item do estoque?')) {
-      try {
-        await deleteDoc(doc(db, 'inventory', id));
-      } catch (e) {
-        console.error('Erro ao deletar estoque:', e);
-      }
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      // Mark as dismissed in Firebase to persist across sessions/F5
+      await setDoc(doc(db, 'admin_dismissed_notifications', id), {
+        notificationId: id,
+        dismissedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error('Erro ao dispensar notificação:', e);
     }
   };
+
+  // Replaced by custom modal and improved handleDeleteStock
 
   const filteredOrders = orders.filter(o => {
     const matchesSearch = (o.pokemon?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -424,6 +526,12 @@ export const AdminDashboard = () => {
                 className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'calculator' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
               >
                 <Calculator size={18} /> Calculadora
+              </button>
+              <button 
+                onClick={() => setActiveTab('feedbacks')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'feedbacks' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
+                <Star size={18} /> Feedbacks ({feedbacks.length})
               </button>
               <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
                 <ShieldCheck size={18} /> Caixa: {totalEconomy}k
@@ -586,7 +694,12 @@ export const AdminDashboard = () => {
                                 {notif.type === 'Match' ? `Match Found: ${notif.order.pokemon}` : `Nova Encomenda: ${notif.order.pokemon}`}
                               </h4>
                               <button 
-                                onClick={() => handleDeleteNotification(notif.id)}
+                                onClick={() => setDeleteConfirm({ 
+                                  isOpen: true, 
+                                  type: 'notification', 
+                                  id: notif.id, 
+                                  name: notif.type === 'Match' ? `Match: ${notif.order.pokemon}` : `Notif: ${notif.order.pokemon}` 
+                                })}
                                 className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover/notif:opacity-100"
                                 title="Remover Notificação"
                               >
@@ -668,6 +781,96 @@ export const AdminDashboard = () => {
                 </div>
               ) : activeTab === 'calculator' ? (
                 <BreedingCalculator />
+              ) : activeTab === 'feedbacks' ? (
+                <div className="p-8 space-y-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary">GERENCIAMENTO DE FEEDBACKS</h3>
+                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Avaliações recebidas dos clientes</p>
+                    </div>
+
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowFeedbackFilters(!showFeedbackFilters)}
+                        className={`p-3 rounded-xl border transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${filterStars || showFeedbackFilters ? 'bg-primary border-primary text-black' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}
+                      >
+                        <Filter size={14} /> Filtro {filterStars ? `(${filterStars}★)` : ''}
+                      </button>
+                      
+                      {showFeedbackFilters && (
+                        <div className="absolute top-full right-0 mt-2 bg-black border border-white/10 rounded-2xl p-2 shadow-2xl z-50 flex gap-2">
+                           <button onClick={() => { setFilterStars(null); setShowFeedbackFilters(false); }} className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest ${filterStars === null ? 'bg-white/20 text-white' : 'text-gray-500 hover:text-white'}`}>Tudo</button>
+                           {[5,4,3,2,1].map(s => (
+                             <button 
+                               key={s} 
+                               onClick={() => { setFilterStars(s); setShowFeedbackFilters(false); }}
+                               className={`p-2 rounded-lg flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${filterStars === s ? 'bg-primary text-black' : 'text-gray-500 hover:text-white'}`}
+                             >
+                               {s} <Star size={10} className="fill-current" />
+                             </button>
+                           ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {feedbacks.length === 0 ? (
+                    <div className="text-center py-20">
+                      <Star size={48} className="mx-auto text-gray-700 mb-4 opacity-20" />
+                      <p className="text-gray-500 italic font-bold">Nenhum feedback recebido ainda...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {feedbacks
+                        .filter(fb => filterStars === null || fb.rating === filterStars)
+                        .map(fb => (
+                        <div key={fb.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group/fb">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary border border-primary/20">
+                                <Users size={18} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-white text-sm">{fb.playerNick || fb.trainerNick || fb.userNick || 'Veterano Anônimo'}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <div className="flex gap-0.5">
+                                    {[...Array(5)].map((_, i) => (
+                                      <Star 
+                                        key={i} 
+                                        size={10} 
+                                        className={i < (fb.rating || 0) ? "text-primary fill-primary" : "text-gray-700"} 
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-[9px] text-gray-600 font-black uppercase">
+                                    {fb.createdAt?.toMillis ? new Date(fb.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => setDeleteConfirm({
+                                isOpen: true,
+                                type: 'feedback',
+                                id: fb.id,
+                                name: `Avaliação de ${fb.trainerNick || fb.userNick || 'Anônimo'}`
+                              })}
+                              className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover/fb:opacity-100"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-300 leading-relaxed italic pr-4">"{fb.comment || 'Nenhuma mensagem enviada.'}"</p>
+                          {fb.pokemon && (
+                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/5 text-[9px] font-bold text-gray-500">
+                              <ShoppingBag size={10} /> {fb.pokemon.toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -713,7 +916,16 @@ export const AdminDashboard = () => {
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
                                   </div>
-                                  <button onClick={() => handleDeleteOrder(o.id)} className="text-gray-500 hover:text-red-500 transition-colors p-1" title="Deletar Encomenda">
+                                  <button 
+                                    onClick={() => setDeleteConfirm({ 
+                                      isOpen: true, 
+                                      type: 'order', 
+                                      id: o.id, 
+                                      name: `${o.playerNick} - ${o.pokemon}` 
+                                    })} 
+                                    className="text-gray-500 hover:text-red-500 transition-colors p-1" 
+                                    title="Deletar Encomenda"
+                                  >
                                     <X size={20} />
                                   </button>
                                 </div>
@@ -840,10 +1052,17 @@ export const AdminDashboard = () => {
                                     <ChevronDown size={12} className="text-secondary" />
                                   </div>
                                   {item.pokemon}
+                                  {item.isEgg && <span className="ml-2 text-xl" title="Lote de Ovos">🥚</span>}
                                 </td>
-                                <td className="px-8 py-6 text-center text-gray-400 font-black">{item.f4}</td>
-                                <td className="px-8 py-6 text-center text-primary font-black">{item.f5}</td>
-                                <td className="px-8 py-6 text-center text-secondary font-black">{item.f6}</td>
+                                <td className="px-8 py-6 text-center text-gray-400 font-black">
+                                   {typeof item.f4 === 'number' ? item.f4 : (item.f4?.male || 0) + (item.f4?.female || 0)}
+                                 </td>
+                                 <td className="px-8 py-6 text-center text-primary font-black">
+                                   {typeof item.f5 === 'number' ? item.f5 : (item.f5?.male || 0) + (item.f5?.female || 0)}
+                                 </td>
+                                 <td className="px-8 py-6 text-center text-secondary font-black">
+                                   {typeof item.f6 === 'number' ? item.f6 : (item.f6?.male || 0) + (item.f6?.female || 0)}
+                                 </td>
                                 <td className="px-8 py-6">
                                   <div className="flex gap-2">
                                     {(getEggGroups(item.pokemon) || []).map(eg => (
@@ -858,7 +1077,16 @@ export const AdminDashboard = () => {
                                       <button onClick={() => handleEditStock(item)} className="text-gray-500 hover:text-blue-400 transition-all p-2" title="Editar">
                                         <Edit3 size={16} />
                                       </button>
-                                      <button onClick={() => handleDeleteStock(item.id)} className="text-gray-500 hover:text-red-500 transition-all p-2" title="Excluir">
+                                      <button 
+                                        onClick={() => setDeleteConfirm({ 
+                                          isOpen: true, 
+                                          type: 'stock', 
+                                          id: item.id, 
+                                          name: item.pokemon 
+                                        })} 
+                                        className="text-gray-500 hover:text-red-500 transition-all p-2" 
+                                        title="Excluir"
+                                      >
                                         <Trash2 size={16} />
                                       </button>
                                    </div>
@@ -867,59 +1095,67 @@ export const AdminDashboard = () => {
                               {expandedStockId === item.id && (
                                 <tr className="bg-black/40 animate-in slide-in-from-top-2 duration-300 overflow-hidden">
                                   <td colSpan={6} className="px-12 py-8 border-x border-white/5">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                      <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Habilidades Disponíveis</h4>
-                                        <div className="space-y-2">
-                                          {item.abilities?.length > 0 ? item.abilities.map((a: any) => (
-                                            <div key={a.name} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                                              <span className="text-xs font-bold text-primary uppercase">{a.name}</span>
-                                              <span className="text-xs font-black text-white bg-primary/20 px-2 py-0.5 rounded-md">{a.count}</span>
-                                            </div>
-                                          )) : <p className="text-[10px] text-gray-600 italic">Sem habilidades registradas</p>}
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Gênero em Estoque</h4>
-                                        <div className="grid grid-cols-2 gap-3">
-                                           <div className="bg-blue-500/5 border border-blue-500/10 p-4 rounded-xl text-center">
-                                              <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Macho ♂</p>
-                                              <p className="text-2xl font-black text-blue-400">{item.gender?.male || 0}</p>
-                                           </div>
-                                           <div className="bg-pink-500/5 border border-pink-500/10 p-4 rounded-xl text-center">
-                                              <p className="text-[9px] font-bold text-pink-400 uppercase mb-1">Fêmea ♀</p>
-                                              <p className="text-2xl font-black text-pink-400">{item.gender?.female || 0}</p>
-                                           </div>
-                                        </div>
-                                      </div>
+                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                       {(['f4', 'f5', 'f6'] as const).map(iv => {
+                                         const data = item[iv];
+                                         const label = iv.toUpperCase();
+                                         const color = iv === 'f4' ? 'gray' : iv === 'f5' ? 'primary' : 'secondary';
+                                         const details = iv === 'f4' ? item.f4Details : item.f5Details;
 
-                                      <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Variações de F4</h4>
-                                        <div className="space-y-2">
-                                          {item.f4Details?.length > 0 ? item.f4Details.map((d: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                                              <span className="text-xs font-bold text-gray-400 uppercase">{d.missingStats}</span>
-                                              <span className="text-xs font-black text-white bg-white/10 px-2 py-0.5 rounded-md">{d.count}</span>
-                                            </div>
-                                          )) : <p className="text-[10px] text-gray-600 italic">Sem detalhes de F4 registrados</p>}
-                                        </div>
-                                      </div>
+                                         if (typeof data === 'number') return (
+                                           <div key={iv} className="space-y-4">
+                                              <h4 className={`text-[10px] font-black text-${color}-500 uppercase tracking-[0.2em] mb-4`}>Dados {label} (Legado)</h4>
+                                              <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                                <p className="text-2xl font-black text-white">{data}</p>
+                                              </div>
+                                           </div>
+                                         );
 
-                                      <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Variações de F5</h4>
-                                        <div className="space-y-2">
-                                          {item.f5Details?.length > 0 ? item.f5Details.map((d: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                                              <span className="text-xs font-bold text-secondary uppercase">{d.missingStat}</span>
-                                              <span className="text-xs font-black text-white bg-secondary/20 px-2 py-0.5 rounded-md">{d.count}</span>
-                                            </div>
-                                          )) : <p className="text-[10px] text-gray-600 italic">Sem detalhes de F5 registrados</p>}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
+                                         return (
+                                           <div key={iv} className="space-y-6">
+                                              <div className="flex justify-between items-end border-b border-white/5 pb-2">
+                                                <h4 className={`text-[10px] font-black text-${iv === 'f4' ? 'gray-400' : iv === 'f5' ? 'primary' : 'secondary'} uppercase tracking-[0.2em]`}>Dados {label}</h4>
+                                                <span className="text-[10px] font-bold text-white uppercase opacity-50">{(data?.male || 0) + (data?.female || 0)} Total</span>
+                                              </div>
+
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div className="bg-blue-500/5 border border-blue-500/10 p-3 rounded-xl text-center">
+                                                  <p className="text-[8px] font-bold text-blue-400 uppercase">Macho ♂</p>
+                                                  <p className="text-lg font-black text-blue-400">{data?.male || 0}</p>
+                                                </div>
+                                                <div className="bg-pink-500/5 border border-pink-500/10 p-3 rounded-xl text-center">
+                                                  <p className="text-[8px] font-bold text-pink-400 uppercase">Fêmea ♀</p>
+                                                  <p className="text-lg font-black text-pink-400">{data?.female || 0}</p>
+                                                </div>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest pl-1">Habilidades {label}</p>
+                                                {data?.abilities?.length > 0 ? data.abilities.map((a: any) => (
+                                                  <div key={a.name} className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/5">
+                                                    <span className="text-[10px] font-bold text-primary uppercase">{a.name}</span>
+                                                    <span className="text-[10px] font-black text-white bg-primary/20 px-2 py-0.5 rounded-md">{a.count}</span>
+                                                  </div>
+                                                )) : <p className="text-[9px] text-gray-600 italic pl-1">Sem habilidades específicas</p>}
+                                              </div>
+
+                                              {details && details.length > 0 && (
+                                                <div className="space-y-2">
+                                                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest pl-1">Detalhes de Atributos</p>
+                                                  {details.map((d: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/5">
+                                                      <span className="text-[10px] font-bold text-gray-400 uppercase">{d.missingStats || d.missingStat}</span>
+                                                      <span className="text-[10px] font-black text-white bg-white/10 px-2 py-0.5 rounded-md">{d.count}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                           </div>
+                                         );
+                                       })}
+                                     </div>
+                                   </td>
+                                 </tr>
                               )}
                             </Fragment>
                           ))}
@@ -961,6 +1197,13 @@ export const AdminDashboard = () => {
                    </button>
                 </div>
 
+                {newStock.pokemon && (
+                  <div className="mb-6 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl w-fit animate-fade-in">
+                    <ShieldCheck size={14} className="text-primary" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Pokémon Selecionado: <span className="text-primary">{newStock.pokemon}</span></span>
+                  </div>
+                )}
+
               <form onSubmit={handleAddStock} className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="relative">
@@ -975,6 +1218,13 @@ export const AdminDashboard = () => {
                           onFocus={() => setShowPokemonDropdown(true)}
                           className="w-full bg-black/50 border border-white/10 rounded-xl pl-12 pr-4 py-3 outline-none focus:border-primary transition-colors text-white font-bold"
                         />
+                        
+                        {stockLimitWarning && (
+                          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 bg-red-600/90 text-white text-[10px] font-black px-4 py-2 rounded-xl animate-fade-in shadow-lg shadow-red-900/40 whitespace-nowrap z-50 flex items-center gap-2">
+                            <Bell size={12} className="animate-bounce" />
+                            {stockLimitWarning}
+                          </div>
+                        )}
                       </div>
                       {showPokemonDropdown && pokemonSearch.trim() !== '' && (
                         <div className="absolute top-full left-0 w-full mt-2 bg-black border-2 border-primary rounded-xl overflow-y-auto max-h-60 z-[110] shadow-2xl">
@@ -994,78 +1244,121 @@ export const AdminDashboard = () => {
                           ))}
                         </div>
                       )}
-                      {newStock.pokemon && (
-                        <p className="mt-2 text-[10px] text-primary font-black uppercase tracking-widest">Selecionado: {newStock.pokemon}</p>
-                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 block text-center">Machos (♂)</label>
-                        <input type="number" value={newStock.gender.male} onChange={e => setNewStock({...newStock, gender: {...newStock.gender, male: parseInt(e.target.value) || 0}})} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-center font-bold text-blue-400" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-2 block text-center">Fêmeas (♀)</label>
-                        <input type="number" value={newStock.gender.female} onChange={e => setNewStock({...newStock, gender: {...newStock.gender, female: parseInt(e.target.value) || 0}})} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-pink-500 text-center font-bold text-pink-400" />
-                      </div>
                     </div>
-                 </div>
+                    
 
-                 <div className="grid grid-cols-3 gap-4 p-4 bg-white/[0.02] rounded-2xl border border-white/5">
-                    <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block text-center">Total F4</label>
-                        <input type="number" value={newStock.f4} onChange={e => setNewStock({...newStock, f4: parseInt(e.target.value) || 0})} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary text-center font-black text-gray-400" />
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-black text-primary uppercase tracking-widest mb-2 block text-center">Total F5</label>
-                        <input type="number" value={newStock.f5} onChange={e => setNewStock({...newStock, f5: parseInt(e.target.value) || 0})} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary text-center font-black text-primary" />
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-black text-secondary uppercase tracking-widest mb-2 block text-center">Total F6</label>
-                        <input type="number" value={newStock.f6} onChange={e => setNewStock({...newStock, f6: parseInt(e.target.value) || 0})} className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-secondary text-center font-black text-secondary" />
-                    </div>
-                 </div>
-
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Habilidades (Selecione da Lista)</label>
-                      <button type="button" onClick={addAbility} className="text-primary hover:text-white transition-all"><Plus size={16} /></button>
-                    </div>
-                    <div className="space-y-2">
-                      {newStock.abilities.map((ability, idx) => (
-                        <div key={idx} className="flex gap-2 animate-in slide-in-from-left-2 duration-200">
-                          <select 
-                            value={ability.name}
-                            onChange={e => {
-                              const na = [...newStock.abilities];
-                              na[idx].name = e.target.value;
-                              setNewStock({...newStock, abilities: na});
-                            }}
-                            className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                          >
-                            <option value="">Escolha uma Ability...</option>
-                            {newStock.pokemon ? POKEMON_DATA.find(p => p.name === newStock.pokemon)?.abilities.concat(POKEMON_DATA.find(p => p.name === newStock.pokemon)?.hiddenAbility || []).filter(Boolean).map(a => {
-                              const isHA = POKEMON_DATA.find(p => p.name === newStock.pokemon)?.hiddenAbility === a;
-                              return <option key={a} value={a}>{a}{isHA ? ' (HA)' : ''}</option>;
-                            }) : null}
-                          </select>
-                          <input 
-                            type="number"
-                            value={ability.count}
-                            onChange={e => {
-                              const na = [...newStock.abilities];
-                              na[idx].count = parseInt(e.target.value) || 0;
-                              setNewStock({...newStock, abilities: na});
-                            }}
-                            className="w-20 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-center text-primary font-bold"
-                          />
-                          <button type="button" onClick={() => removeAbility(idx)} className="text-red-500 p-2"><Minus size={14} /></button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {(['f4', 'f5', 'f6'] as const).map(iv => (
+                      <div key={iv} className={`p-6 bg-white/[0.03] border rounded-2xl space-y-4 ${iv === 'f4' ? 'border-gray-500/20' : iv === 'f5' ? 'border-primary/20' : 'border-secondary/20'}`}>
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className={`text-xs font-black uppercase ${iv === 'f4' ? 'text-gray-400' : iv === 'f5' ? 'text-primary' : 'text-secondary'}`}>Estoque {iv.toUpperCase()}</h4>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">{(newStock[iv].male || 0) + (newStock[iv].female || 0)} Total</span>
                         </div>
-                      ))}
-                      {newStock.abilities.length === 0 && (
-                        <p className="text-[10px] text-gray-700 italic">Nenhuma habilidade adicionada ainda.</p>
-                      )}
-                    </div>
-                 </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-black text-blue-400 uppercase mb-1 block">Macho ♂</label>
+                            <input 
+                              type="number" 
+                              value={newStock[iv].male} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 0;
+                                const total = val + newStock[iv].female;
+                                if (total > 54) {
+                                  setStockLimitWarning(`Limite de 54 excedido no gênero (${iv.toUpperCase()}: ${total})`);
+                                } else {
+                                  setStockLimitWarning(null);
+                                }
+                                setNewStock({
+                                  ...newStock, 
+                                  [iv]: { ...newStock[iv], male: val }
+                                });
+                              }} 
+                              className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-blue-500 text-center font-bold text-blue-400 text-sm" 
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-black text-pink-400 uppercase mb-1 block">Fêmea ♀</label>
+                            <input 
+                              type="number" 
+                              value={newStock[iv].female} 
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 0;
+                                const total = newStock[iv].male + val;
+                                if (total > 54) {
+                                  setStockLimitWarning(`Limite de 54 excedido no gênero (${iv.toUpperCase()}: ${total})`);
+                                } else {
+                                  setStockLimitWarning(null);
+                                }
+                                setNewStock({
+                                  ...newStock, 
+                                  [iv]: { ...newStock[iv], female: val }
+                                });
+                              }} 
+                              className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-pink-500 text-center font-bold text-pink-400 text-sm" 
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[9px] font-black text-gray-500 uppercase">Habilidades {iv.toUpperCase()}</label>
+                            <button type="button" onClick={() => addAbility(iv)} className="text-primary hover:text-white transition-all"><Plus size={14} /></button>
+                          </div>
+                          <div className="space-y-2">
+                            {newStock[iv].abilities.map((ability, idx) => (
+                              <div key={idx} className="flex gap-2 group/ab">
+                                <select 
+                                  value={ability.name}
+                                  onChange={e => {
+                                    const newName = e.target.value;
+                                    if (newStock[iv].abilities.some((a, i) => a.name === newName && i !== idx)) {
+                                      alert('Esta habilidade já foi adicionada para este nível de IV.');
+                                      return;
+                                    }
+                                    const na = [...newStock[iv].abilities];
+                                    na[idx].name = newName;
+                                    setNewStock({...newStock, [iv]: {...newStock[iv], abilities: na}});
+                                  }}
+                                  className="flex-1 bg-black/50 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-primary"
+                                >
+                                  <option value="">Escolha...</option>
+                                  {newStock.pokemon ? POKEMON_DATA.find(p => p.name === newStock.pokemon)?.abilities.concat(POKEMON_DATA.find(p => p.name === newStock.pokemon)?.hiddenAbility || []).filter(Boolean).map(a => {
+                                    const isHA = POKEMON_DATA.find(p => p.name === newStock.pokemon)?.hiddenAbility === a;
+                                    return <option key={a} value={a}>{a}{isHA ? ' (HA)' : ''}</option>;
+                                  }) : null}
+                                </select>
+                                <input 
+                                  type="number"
+                                  value={ability.count}
+                                  onChange={e => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    const na = [...newStock[iv].abilities];
+                                    na[idx].count = val;
+                                    
+                                    const sumAbility = na.reduce((sum, a) => sum + (a.count || 0), 0);
+                                    if (sumAbility > 54) {
+                                      setStockLimitWarning(`Soma de habilidades > 54 (${iv.toUpperCase()}: ${sumAbility})`);
+                                    } else {
+                                      setStockLimitWarning(null);
+                                    }
+                                    
+                                    setNewStock({...newStock, [iv]: {...newStock[iv], abilities: na}});
+                                  }}
+                                  className="w-12 bg-black/50 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-center text-primary font-bold outline-none"
+                                />
+                                <button type="button" onClick={() => removeAbility(iv, idx)} className="text-red-500/50 hover:text-red-500 p-1"><Minus size={12} /></button>
+                              </div>
+                            ))}
+                            {newStock[iv].abilities.length === 0 && (
+                              <p className="text-[8px] text-gray-700 italic">Nenhuma habilidade {iv.toUpperCase()}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -1079,8 +1372,13 @@ export const AdminDashboard = () => {
                               <select 
                                 value={detail.missingStats}
                                 onChange={e => {
+                                  const nextVal = e.target.value;
+                                  if (newStock.f4Details.some((d, i) => d.missingStats === nextVal && i !== idx)) {
+                                    alert("Este detalhe de IV já foi adicionado.");
+                                    return;
+                                  }
                                   const nd = [...newStock.f4Details];
-                                  nd[idx].missingStats = e.target.value;
+                                  nd[idx].missingStats = nextVal;
                                   setNewStock({...newStock, f4Details: nd});
                                 }}
                                 className="flex-1 bg-black text-[10px] border border-white/5 outline-none text-gray-400 font-bold p-1 rounded"
@@ -1128,8 +1426,13 @@ export const AdminDashboard = () => {
                               <select 
                                 value={detail.missingStat}
                                 onChange={e => {
+                                  const nextVal = e.target.value;
+                                  if (newStock.f5Details.some((d, i) => d.missingStat === nextVal && i !== idx)) {
+                                    alert("Este detalhe de IV já foi adicionado.");
+                                    return;
+                                  }
                                   const nd = [...newStock.f5Details];
-                                  nd[idx].missingStat = e.target.value;
+                                  nd[idx].missingStat = nextVal;
                                   setNewStock({...newStock, f5Details: nd});
                                 }}
                                 className="flex-1 bg-black text-[10px] border border-white/5 outline-none text-gray-400 font-bold p-1 rounded"
@@ -1160,13 +1463,74 @@ export const AdminDashboard = () => {
 
                  <div className="pt-10 flex gap-6 mt-auto">
                     <button type="button" onClick={closeStockModal} className="flex-1 px-8 py-4 border border-white/10 rounded-2xl text-sm font-black text-gray-500 hover:text-white hover:bg-white/5 transition-all uppercase tracking-widest">Cancelar</button>
-                    <button type="submit" className="flex-[3] btn-manda py-4 text-sm tracking-widest">Finalizar e Salvar no Servidor</button>
+                    <button 
+                      type="submit" 
+                      disabled={!!stockLimitWarning}
+                      className={`flex-[3] py-4 text-sm tracking-widest font-black uppercase rounded-2xl transition-all ${stockLimitWarning ? 'bg-gray-800 text-gray-600 grayscale cursor-not-allowed shadow-none' : 'btn-manda'}`}
+                    >
+                      Finalizar e Salvar no Servidor
+                    </button>
                  </div>
               </form>
               </div>
            </div>
         </div>
       )}
+      <AnimatePresence>
+        {deleteConfirm?.isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm shadow-2xl"
+          >
+            <motion.div 
+              ref={deleteModalRef}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glow-card max-w-sm w-full p-8 text-center border-red-500/50 relative overflow-visible"
+            >
+              <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
+                <Trash2 size={32} className="text-red-500" />
+              </div>
+              <h3 className="pixel-title text-lg mb-2 text-red-500">CONFIRMAR EXCLUSÃO</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-2 leading-relaxed">
+                Tem certeza que deseja apagar?
+              </p>
+              <p className="text-[10px] text-white font-black uppercase mb-8 bg-white/5 py-2 px-3 rounded-lg border border-white/5">
+                {deleteConfirm.name}
+              </p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 text-gray-500 rounded-xl font-black text-[10px] uppercase transition-all"
+                >
+                  CANCELAR
+                </button>
+                <button 
+                  onClick={() => {
+                    if (deleteConfirm.type === 'order') handleDeleteOrder(deleteConfirm.id);
+                    else if (deleteConfirm.type === 'stock') handleDeleteStock(deleteConfirm.id);
+                    else if (deleteConfirm.type === 'notification') handleDeleteNotification(deleteConfirm.id);
+                    else {
+                      deleteDoc(doc(db, 'ClientReviews', deleteConfirm.id)).catch(err => {
+                        console.error("Erro ao deletar feedback:", err);
+                        alert("Erro ao deletar: " + err.message);
+                      });
+                    }
+                    setDeleteConfirm(null);
+                  }}
+                  className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
+                >
+                  EXCLUIR AGORA
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
