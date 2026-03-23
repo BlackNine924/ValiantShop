@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, AlertCircle, CheckCircle2, X, ShoppingBag } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, Zap } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, onSnapshot, limit } from 'firebase/firestore';
 
 import { useCart } from '../context/CartContext';
+import { safeStorage } from '../utils/storageUtils';
 
 type IVOption = '4' | '5' | '6';
 
@@ -46,6 +48,8 @@ const HA_FEE = 15000;
 
 export const OrderForm = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,10 +64,32 @@ export const OrderForm = () => {
     ivs: '4' as IVOption,
     isCastrated: false, 
     hasHA: false,
-    ignoredIvs: [] as string[]
+    ignoredIvs: [] as string[],
+    giftNick: ''
   };
 
   const [form, setForm] = useState(initialForm);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    return safeStorage.getItem('pokemon_favorites', []);
+  });
+  const [hotPokemon, setHotPokemon] = useState<{name: string, count: number}[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const counts: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+        const name = doc.data().pokemon;
+        if (name) counts[name] = (counts[name] || 0) + 1;
+      });
+      const sorted = Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 3);
+      setHotPokemon(sorted);
+    });
+    return unsubscribe;
+  }, []);
 
   const [search, setSearch] = useState('');
   const [showPokemonList, setShowPokemonList] = useState(false);
@@ -102,6 +128,38 @@ export const OrderForm = () => {
   }, []);
 
   useEffect(() => {
+    if (location.state && location.state.pokemon) {
+      const s = location.state;
+      // Tratar o campo IVS que vem como string formatada no pedido (ex: "5 IVs (Breedable)")
+      const ivValue = s.ivs?.includes('4') ? '4' : s.ivs?.includes('5') ? '5' : '6';
+      const isCastrated = s.ivs?.includes('Castrado');
+      
+      setForm({
+        pokemon: s.pokemon,
+        nature: s.nature === 'Aleatória' ? '' : s.nature,
+        ability: s.ability,
+        gender: s.gender,
+        ivs: ivValue as IVOption,
+        isCastrated: isCastrated,
+        hasHA: s.hasHA || false,
+        ignoredIvs: s.ignoredIvs || [],
+        giftNick: ''
+      });
+      setSearch(s.pokemon);
+      // Limpar o state para não reaplicar ao recarregar
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
+
+  const toggleFavorite = (name: string) => {
+    const newFavs = favorites.includes(name) 
+      ? favorites.filter(f => f !== name)
+      : [...favorites, name];
+    setFavorites(newFavs);
+    safeStorage.setItem('pokemon_favorites', newFavs);
+  };
+
+  useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setError(null), 4500);
       return () => clearTimeout(timer);
@@ -120,6 +178,16 @@ export const OrderForm = () => {
   };
 
   const totalPrice = useMemo(() => calculateItemPrice(form), [form]);
+
+  const abilityOptions = useMemo(() => {
+    const opts = [
+      { label: 'Qualquer Habilidade', value: 'Qualquer' },
+      ...(selectedPokemon?.abilities.map((ab: string) => ({ label: ab, value: ab })) || []),
+      ...(selectedPokemon?.hiddenAbility ? [{ label: `${selectedPokemon.hiddenAbility} (HA +15k)`, value: selectedPokemon.hiddenAbility }] : [])
+    ];
+    console.log("Ability Options for", selectedPokemon?.name, ":", opts);
+    return opts;
+  }, [selectedPokemon]);
 
   const handleValidation = () => {
     const maxIgnored = IV_DETAILS[form.ivs].numIgnored;
@@ -166,6 +234,7 @@ export const OrderForm = () => {
         hasHA: form.hasHA,
         totalPrice: totalPrice,
         playerNick: user.displayName,
+        giftNick: form.giftNick || null,
         status: 'Pendente',
         createdAt: serverTimestamp()
       });
@@ -175,6 +244,35 @@ export const OrderForm = () => {
     } catch (e) {
       console.error(e);
       alert('Erro ao enviar pedido direto. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddToWishlist = async () => {
+    if (!user) {
+      alert('Você precisa estar logado para salvar na Wishlist!');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'wishlists'), {
+        uid: user.uid,
+        pokemon: form.pokemon,
+        nature: form.nature || 'Aleatória',
+        ability: form.ability,
+        gender: form.gender,
+        ivs: form.ivs,
+        isCastrated: form.isCastrated,
+        ignoredIvs: form.ignoredIvs,
+        hasHA: form.hasHA,
+        totalPrice: totalPrice,
+        createdAt: serverTimestamp()
+      });
+      alert(`${form.pokemon} adicionado à sua Wishlist!`);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao salvar na Wishlist.');
     } finally {
       setIsSubmitting(false);
     }
@@ -222,7 +320,58 @@ export const OrderForm = () => {
                       onChange={e => { setSearch(e.target.value); setShowPokemonList(true); }}
                       onFocus={() => setShowPokemonList(true)}
                     />
+                    {selectedPokemon && (
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleFavorite(selectedPokemon.name);
+                        }}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-secondary hover:scale-110 transition-transform p-2 cursor-pointer z-[60]"
+                        title="Toggle Favorite"
+                      >
+                        <Heart size={24} fill={favorites.includes(selectedPokemon.name) ? 'currentColor' : 'none'} className={favorites.includes(selectedPokemon.name) ? 'text-secondary' : 'text-gray-400'} />
+                      </button>
+                    )}
                   </div>
+                  
+                  {/* Atalhos de Favoritos e Tendências */}
+                  {(favorites.length > 0 || hotPokemon.length > 0) && search.trim() === '' && (
+                    <div className="flex flex-col gap-4 mt-4">
+                      {hotPokemon.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[8px] font-black text-primary uppercase tracking-widest self-center mr-2 flex items-center gap-1">
+                            <Zap size={10} className="fill-primary" /> Tendências:
+                          </span>
+                          {hotPokemon.map(p => (
+                            <button 
+                              key={p.name}
+                              onClick={() => { setForm({...form, pokemon: p.name, ability: ''}); setSearch(p.name); }}
+                              className="px-3 py-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full text-[10px] font-bold text-primary transition-all animate-pulse"
+                            >
+                              {p.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {favorites.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest self-center mr-2">Seus Favoritos:</span>
+                          {favorites.map(fav => (
+                            <button 
+                              key={fav}
+                              onClick={() => { setForm({...form, pokemon: fav, ability: ''}); setSearch(fav); }}
+                              className="px-3 py-1 bg-white/5 hover:bg-secondary/20 border border-white/10 rounded-full text-[10px] font-bold text-gray-400 hover:text-secondary transition-all"
+                            >
+                              {fav}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {showPokemonList && filteredPokemon.length > 0 && (
                     <div className="absolute top-full left-0 w-full mt-3 bg-black border-2 border-secondary rounded-2xl overflow-hidden z-50 shadow-2xl">
                       {filteredPokemon.map((p: any) => (
@@ -272,18 +421,30 @@ export const OrderForm = () => {
                   <CustomSelect 
                     label="Habilidade" 
                     value={form.ability} 
-                    onChange={(v: string) => setForm({
-                      ...form, 
-                      ability: v, 
-                      hasHA: v === selectedPokemon?.hiddenAbility 
-                    })}
+                    onChange={(v: string) => {
+                      console.log("Selecionando habilidade:", v);
+                      setForm({
+                        ...form, 
+                        ability: v, 
+                        hasHA: v === selectedPokemon?.hiddenAbility 
+                      });
+                    }}
                     placeholder="Escolher Habilidade..."
-                    options={[
-                      { label: 'Qualquer Habilidade', value: 'Qualquer' },
-                      ...(selectedPokemon?.abilities.map((ab: string) => ({ label: ab, value: ab })) || []),
-                      ...(selectedPokemon?.hiddenAbility ? [{ label: `${selectedPokemon.hiddenAbility} (HA +15k)`, value: selectedPokemon.hiddenAbility }] : [])
-                    ]}
+                    options={abilityOptions}
                   />
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block flex items-center gap-2">
+                       <Gift size={12} className="text-primary" /> Nick do Destinatário (Presente)
+                    </label>
+                    <input 
+                      type="text"
+                      className="w-full bg-black/60 border-2 border-white/5 rounded-2xl px-6 py-5 text-white font-bold transition-all outline-none focus:border-primary" 
+                      placeholder="Insira o Nick"
+                      value={form.giftNick}
+                      onChange={e => setForm({...form, giftNick: e.target.value})}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="flex gap-4 pt-4">
@@ -394,14 +555,23 @@ export const OrderForm = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row w-full gap-4 z-10">
-                  <button 
-                    disabled={isSubmitting}
-                    onClick={handleBuyNow} 
-                    className={`btn-manda flex-1 !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <span className="font-extrabold uppercase text-sm">{isSubmitting ? 'Enviando...' : 'Comprar Agora'}</span>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Apenas 1</span>
-                  </button>
+                  <div className="flex flex-col flex-1 gap-2">
+                    <button 
+                      disabled={isSubmitting}
+                      onClick={handleBuyNow} 
+                      className={`btn-manda w-full !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span className="font-extrabold uppercase text-sm">{isSubmitting ? 'Enviando...' : 'Comprar Agora'}</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Apenas 1</span>
+                    </button>
+                    <button 
+                      disabled={isSubmitting}
+                      onClick={handleAddToWishlist}
+                      className="flex items-center justify-center gap-2 py-2 text-[9px] font-black uppercase text-gray-500 hover:text-secondary transition-all"
+                    >
+                      <Heart size={10} /> Salvar na Wishlist
+                    </button>
+                  </div>
                   <button 
                     disabled={isSubmitting}
                     onClick={handleAddToCart} 

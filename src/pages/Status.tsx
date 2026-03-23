@@ -1,8 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Search, Clock, Package, CheckCircle2, Coins, Star, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Search, Clock, Package, CheckCircle2, Coins, Star, X, RefreshCw, MessageSquare, ChevronDown, ChevronUp, Heart, Filter } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { OrderChat } from '../components/OrderChat';
+import { ReviewModal } from '../components/ReviewModal';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { safeStorage } from '../utils/storageUtils';
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
@@ -10,8 +16,26 @@ export const Status = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showReviewModal, setShowReviewModal] = useState<any>(null);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'Tudo' | 'Pendentes' | 'Concluídos'>('Tudo');
+  const [monthFilter, setMonthFilter] = useState<string>('Todos');
+  const [priceFilter, setPriceFilter] = useState<'Tudo' | 'Inferior a 100k' | 'Acima de 100k' | 'Acima de 200k' | 'Acima de 500k' | 'Acima de 1M'>('Tudo');
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'history' | 'wishlist'>('history');
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [activeChat, setActiveChat] = useState<any>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (user) {
+      const hasSeenOnboarding = safeStorage.getItem(`onboarding_seen_${user.uid}`, false);
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || !user.displayName) return;
@@ -37,32 +61,73 @@ export const Status = () => {
     return unsubscribe;
   }, [user]);
 
-  const handleReview = async () => {
-    if (!showReviewModal) return;
-    try {
-      await addDoc(collection(db, 'ClientReviews'), {
-        orderId: showReviewModal.id,
-        pokemon: showReviewModal.pokemon,
-        playerNick: user?.displayName,
-        rating,
-        comment,
-        createdAt: serverTimestamp()
-      });
-      await updateDoc(doc(db, 'orders', showReviewModal.id), { isReviewed: true });
-      setShowReviewModal(null);
-      setRating(5);
-      setComment('');
-      alert('Review enviada com sucesso! ⭐');
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao enviar review.');
-    }
-  };
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'wishlists'), where('uid', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setWishlist(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsubscribe;
+  }, [user]);
 
-  const filteredOrders = orders.filter(o => 
-    o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('chat') === 'support' && user) {
+      const supportId = `support_${user.uid}`;
+      // Fix: Use setDoc to ensure the document exists so it appears for Admin
+      const createSupportDoc = async () => {
+        try {
+          await setDoc(doc(db, 'orders', supportId), {
+            id: supportId,
+            playerNick: user.displayName || 'Treinador',
+            pokemon: 'SUPORTE GERAL',
+            type: 'support',
+            status: 'Suporte',
+            createdAt: serverTimestamp()
+          }, { merge: true });
+          setActiveChat({ id: supportId, pokemon: 'SUPORTE GERAL' });
+        } catch (err) {
+          console.error("Erro ao criar chat de suporte:", err);
+        }
+      };
+      createSupportDoc();
+    }
+  }, [location.search, user]);
+
+
+
+  const filteredOrders = orders.filter(o => {
+    if (o.pokemon === 'SUPORTE GERAL') return false;
+    
+    const matchesSearch = o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         o.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const orderDate = o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()) : null;
+    const orderMonth = orderDate ? orderDate.toLocaleString('pt-BR', { month: 'long' }) : null;
+    const matchesMonth = monthFilter === 'Todos' || (orderMonth && orderMonth.toLowerCase() === monthFilter.toLowerCase());
+    
+    const matchesPrice = priceFilter === 'Tudo' || 
+                         (priceFilter === 'Inferior a 100k' && (o.totalPrice / 1000) < 100) ||
+                         (priceFilter === 'Acima de 100k' && (o.totalPrice / 1000) >= 100) ||
+                         (priceFilter === 'Acima de 200k' && (o.totalPrice / 1000) >= 200) ||
+                         (priceFilter === 'Acima de 500k' && (o.totalPrice / 1000) >= 500) ||
+                         (priceFilter === 'Acima de 1M' && (o.totalPrice / 1000) >= 1000);
+
+    let matchesStatus = true;
+    if (statusFilter === 'Pendentes') matchesStatus = (o.status === 'Pendente' || o.status === 'Breeding');
+    if (statusFilter === 'Concluídos') matchesStatus = o.status === 'Finalizado';
+    
+    return matchesSearch && matchesMonth && matchesPrice && matchesStatus;
+  });
+
+  const availableMonths = Array.from(new Set(orders.map(o => {
+    const d = o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()) : null;
+    return d ? d.toLocaleString('pt-BR', { month: 'long' }) : null;
+  }).filter(Boolean))).sort();
+
+  const handleRepeatOrder = (order: any) => {
+    navigate('/order', { state: order });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -99,123 +164,341 @@ export const Status = () => {
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="pixel-title text-3xl mb-2">Painel de <span className="text-secondary">Acompanhamento</span></h2>
-          <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Rastreamento em tempo real das suas encomendas no servidor</p>
-        </div>
-        
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={16} />
-          <input 
-            className="bg-black/40 border-2 border-white/5 rounded-xl pl-12 pr-6 py-3 focus:border-primary outline-none text-sm transition-all" 
-            placeholder="Buscar por Pokémon..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="glow-card overflow-hidden bg-black/40 border-primary/10">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 bg-white/5">
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {loading ? (
-                <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
-              ) : filteredOrders.length === 0 ? (
-                <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
-              ) : filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-white/5 transition-colors group">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
-                      <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
-                      {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-col gap-1">
-                      <span className="font-black text-white uppercase tracking-wider flex items-center gap-2">
-                        {order.pokemon} {order.gender && order.gender !== 'Aleatório' && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{order.gender}</span>}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs} • {order.nature || 'Aleatória'}</span>
-                      <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
-                      {order.ignoredIvs && order.ignoredIvs.length > 0 && (
-                        <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="font-black text-secondary">{order.totalPrice / 1000}k</span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-col items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
-                      {order.status === 'Finalizado' && !order.isReviewed && (
-                        <button 
-                          onClick={() => setShowReviewModal(order)}
-                          className="flex items-center gap-1 text-[10px] font-black text-secondary hover:text-white transition-colors uppercase tracking-tighter"
-                        >
-                          <Star size={10} fill="currentColor" /> Deixar Review
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {showReviewModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade">
-          <div className="glow-card max-w-md w-full p-8 space-y-6 relative overflow-visible">
-            <button onClick={() => setShowReviewModal(null)} className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"><X size={20} /></button>
-            <div className="text-center">
-              <h3 className="pixel-title text-xl mb-2">Avaliar <span className="text-secondary">{showReviewModal.pokemon}</span></h3>
-              <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest">Como foi sua experiência com este pedido?</p>
-            </div>
-            
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map(star => (
-                <button 
-                  key={star} 
-                  onClick={() => setRating(star)}
-                  className={`transition-all transform hover:scale-110 ${rating >= star ? 'text-secondary' : 'text-gray-700'}`}
-                >
-                  <Star size={32} fill={rating >= star ? "currentColor" : "none"} strokeWidth={2} />
-                </button>
-              ))}
-            </div>
-
-            <textarea 
-              className="w-full bg-black/60 border-2 border-white/5 rounded-2xl p-4 text-white text-sm font-bold min-h-[120px] focus:border-secondary transition-all outline-none"
-              placeholder="Escreva seu depoimento aqui (Opcional)..."
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-            />
-
-            <button onClick={handleReview} className="btn-manda w-full !bg-secondary !shadow-secondary-glow">Enviar Avaliação ⭐</button>
+          <div className="flex gap-4 mt-2">
+            <button 
+              onClick={() => setActiveSubTab('history')}
+              className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'history' ? 'border-secondary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
+            >
+              Histórico de Encomendas
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('wishlist')}
+              className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'wishlist' ? 'border-primary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
+            >
+              Minha Wishlist ({wishlist.length})
+            </button>
           </div>
         </div>
+        
+        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto items-center">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={16} />
+            <input 
+              className="w-full bg-black/40 border-2 border-white/5 rounded-xl pl-12 pr-6 py-3 focus:border-primary outline-none text-xs font-bold transition-all" 
+              placeholder="Pokémon ou ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="relative">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${showFilters ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-black/40 border-white/5 text-gray-500 hover:text-white hover:bg-white/5'}`}
+            >
+              <Filter size={14} />
+              Filtrar Encomendas
+              <ChevronDown size={14} className={`transition-transform duration-300 ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute top-full right-0 mt-3 w-80 bg-black/95 border-2 border-primary/20 rounded-2xl p-6 shadow-2xl z-[100] backdrop-blur-xl"
+                >
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Status da Forja</label>
+                      <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                        {(['Tudo', 'Pendentes', 'Concluídos'] as const).map(f => (
+                          <button 
+                            key={f}
+                            onClick={() => setStatusFilter(f)}
+                            className={`flex-1 px-2 py-2 rounded-md text-[8px] font-black uppercase tracking-tighter transition-all ${statusFilter === f ? 'bg-secondary text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Mês de Referência</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => setMonthFilter('Todos')}
+                          className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all ${monthFilter === 'Todos' ? 'border-primary bg-primary/10 text-primary' : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
+                        >
+                          Todos
+                        </button>
+                        {availableMonths.map((m: any) => (
+                          <button 
+                            key={m}
+                            onClick={() => setMonthFilter(m)}
+                            className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all truncate ${monthFilter === m ? 'border-primary bg-primary/10 text-primary' : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Faixa de Valor</label>
+                      <select 
+                        value={priceFilter}
+                        onChange={(e) => setPriceFilter(e.target.value as any)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-primary text-[10px] font-bold text-gray-300"
+                      >
+                        <option value="Tudo">Qualquer Valor</option>
+                        <option value="Inferior a 100k">Inferior a 100k</option>
+                        <option value="Acima de 100k">Acima de 100k</option>
+                        <option value="Acima de 200k">Acima de 200k</option>
+                        <option value="Acima de 500k">Acima de 500k</option>
+                        <option value="Acima de 1M">Acima de 1M</option>
+                      </select>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setStatusFilter('Tudo');
+                        setMonthFilter('Todos');
+                        setPriceFilter('Tudo');
+                        setShowFilters(false);
+                      }}
+                      className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 transition-all"
+                    >
+                      Limpar Filtros
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+        <div className="glow-card overflow-hidden bg-black/40 border-primary/10">
+          {activeSubTab === 'history' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/5">
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading ? (
+                    <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
+                  ) : filteredOrders.length === 0 ? (
+                    <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
+                  ) : filteredOrders.map((order) => (
+                    <React.Fragment key={order.id}>
+                      <tr 
+                        className={`hover:bg-white/5 transition-colors group cursor-pointer ${expandedOrder === order.id ? 'bg-white/5' : ''}`}
+                        onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                      >
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
+                            <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
+                            {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-black text-white uppercase tracking-wider flex items-center gap-2">
+                              {order.pokemon} {order.gender && order.gender !== 'Aleatório' && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{order.gender}</span>}
+                            </span>
+                            {order.giftNick && (
+                              <span className="text-[9px] text-primary font-black uppercase flex items-center gap-1">
+                                🚀 Presente para: {order.giftNick}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs || `${order.ivs} IVs`} • {order.nature || 'Aleatória'}</span>
+                            <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
+                            {order.ignoredIvs && order.ignoredIvs.length > 0 && (
+                              <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className="font-black text-secondary">{order.totalPrice / 1000}k</span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="flex flex-col items-center gap-2">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
+                                {order.status}
+                              </span>
+                            </div>
+                            {expandedOrder === order.id ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {expandedOrder === order.id && (
+                        <tr className="bg-white/[0.02]">
+                          <td colSpan={6} className="px-8 py-8">
+                            <div className="flex flex-col md:flex-row gap-12 items-center justify-between">
+                              <div className="flex-1 w-full">
+                                <OrderTimeline status={order.status} />
+                              </div>
+                              
+                              <div className="flex flex-wrap gap-4 shrink-0">
+                                {order.status === 'Finalizado' && !order.isReviewed && (
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setShowReviewModal(order); }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-secondary/20 text-secondary rounded-lg text-[10px] font-black uppercase hover:bg-secondary hover:text-white transition-all"
+                                  >
+                                    <Star size={12} fill="currentColor" /> Avaliar Pedido
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
+                                  className="flex items-center gap-2 px-4 py-2 bg-white/5 text-gray-300 rounded-lg text-[10px] font-black uppercase hover:bg-white/10 transition-all border border-white/5"
+                                >
+                                  <RefreshCw size={12} /> Repetir Pedido
+                                </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setActiveChat(order); }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary rounded-lg text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all"
+                                  >
+                                    <MessageSquare size={12} /> Abrir Chat
+                                  </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 space-y-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {wishlist.map(item => (
+                    <div key={item.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group relative">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+                            <Heart size={20} className="text-primary fill-primary/20" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-white uppercase tracking-wider">{item.pokemon}</h4>
+                            <p className="text-[9px] text-gray-500 font-bold uppercase">{item.ivs} IVs • {item.ability}</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm(`Remover ${item.pokemon} da Wishlist?`)) {
+                              const { deleteDoc, doc } = await import('firebase/firestore');
+                              await deleteDoc(doc(db, 'wishlists', item.id));
+                            }
+                          }}
+                          className="p-2 text-gray-700 hover:text-red-500 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-2 mb-6">
+                        <div className="flex justify-between text-[10px]">
+                           <span className="text-gray-500 font-bold uppercase">Gênero:</span>
+                           <span className="text-white font-black uppercase">{item.gender}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                           <span className="text-gray-500 font-bold uppercase">Natureza:</span>
+                           <span className="text-white font-black uppercase">{item.nature}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                           <span className="text-gray-500 font-bold uppercase">Preço Estimado:</span>
+                           <span className="text-primary font-black uppercase">{item.totalPrice / 1000}k</span>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => handleRepeatOrder(item)}
+                        className="w-full py-3 bg-primary/10 text-primary border border-primary/20 rounded-xl text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all shadow-lg"
+                      >
+                        Aplicar e Encomendar
+                      </button>
+                    </div>
+                  ))}
+                  {wishlist.length === 0 && (
+                    <div className="col-span-full py-20 text-center">
+                      <Heart size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
+                      <p className="text-gray-500 font-bold italic">Sua wishlist está vazia. Adicione pokémons no formulário de encomendas!</p>
+                    </div>
+                  )}
+               </div>
+            </div>
+          )}
+        </div>
+
+      <ReviewModal 
+        isOpen={!!showReviewModal}
+        order={showReviewModal}
+        onClose={() => setShowReviewModal(null)}
+      />
+
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade">
+          <div className="glow-card max-w-md w-full p-8 space-y-6 relative overflow-visible text-center">
+            <button 
+              onClick={() => {
+                setShowOnboarding(false);
+                if (user) {
+                  safeStorage.setItem(`onboarding_seen_${user.uid}`, true);
+                }
+              }} 
+              className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="pixel-title text-xl mb-2">Bem-vindo ao Painel!</h3>
+            <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-4">
+              Aqui você pode acompanhar o status de suas encomendas e interagir com a equipe.
+            </p>
+            <p className="text-sm text-white mb-6">
+              Se tiver alguma dúvida ou precisar de suporte, não hesite em nos contatar!
+            </p>
+            <button 
+              onClick={() => navigate('/status?chat=support')}
+              className="btn-manda !bg-primary !shadow-primary-glow"
+            >
+              FALAR COM SUPORTE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeChat && (
+        <OrderChat 
+          orderId={activeChat.id}
+          orderPokemon={activeChat.pokemon}
+          orderPlayerNick={user?.displayName || 'Treinador'}
+          currentUser={user}
+          onClose={() => setActiveChat(null)}
+        />
       )}
 
       <div className="mt-12 mb-20 grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -223,6 +506,56 @@ export const Status = () => {
         <StatusCard icon={<Clock className="text-orange-400" />} label="Pedidos Pendentes" value={pendingCount} border="border-orange-400/30" />
         <StatusCard icon={<CheckCircle2 className="text-green-400" />} label="Entregues / Finalizados" value={completedCount} border="border-green-400/30" />
         <StatusCard icon={<Coins className="text-secondary" />} label="Total Gasto" value={`${totalSpent / 1000}k`} border="border-secondary/30 bg-secondary/5" />
+      </div>
+    </div>
+  );
+};
+
+const OrderTimeline = ({ status }: { status: string }) => {
+  const stages = [
+    { id: 'Pendente', label: 'Recebido', icon: <Package size={14} />, description: 'Pedido na fila' },
+    { id: 'Breeding', label: 'Forjando', icon: <RefreshCw size={14} />, description: 'Em processo de breed' },
+    { id: 'Testing', label: 'Testando', icon: <Star size={14} />, description: 'Validando IVs e EVs' },
+    { id: 'Finalizado', label: 'Pronto', icon: <CheckCircle2 size={14} />, description: 'Disponível para entrega' },
+  ];
+
+  const currentIdx = stages.findIndex(s => s.id === status);
+  const activeIdx = currentIdx === -1 ? 0 : currentIdx;
+
+  return (
+    <div className="relative w-full">
+      <div className="absolute top-[22px] left-0 w-full h-[2px] bg-white/5 z-0">
+        <div 
+          className="h-full bg-secondary transition-all duration-1000 shadow-[0_0_10px_var(--secondary-glow)]" 
+          style={{ width: `${(activeIdx / (stages.length - 1)) * 100}%` }}
+        />
+      </div>
+      
+      <div className="relative z-10 flex justify-between">
+        {stages.map((stage, idx) => {
+          const isCompleted = idx < activeIdx;
+          const isActive = idx === activeIdx;
+
+          return (
+            <div key={stage.label} className="flex flex-col items-center gap-3">
+              <div 
+                className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
+                  isCompleted ? 'bg-secondary border-secondary text-white shadow-[0_0_15px_var(--secondary-glow)]' :
+                  isActive ? 'bg-black border-secondary text-secondary shadow-[0_0_20px_var(--secondary-glow)] animate-pulse' :
+                  'bg-black border-white/10 text-gray-700'
+                }`}
+              >
+                {stage.icon}
+              </div>
+              <div className="text-center">
+                <p className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-secondary' : isCompleted ? 'text-white' : 'text-gray-600'}`}>
+                  {stage.label}
+                </p>
+                <p className="text-[7px] font-bold text-gray-500 uppercase mt-0.5">{stage.description}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

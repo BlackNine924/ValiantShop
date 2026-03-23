@@ -36,6 +36,7 @@ export const CartModal = () => {
           hasHA: item.hasHA,
           totalPrice: item.price,
           playerNick: user.displayName,
+          giftNick: item.giftNick || '',
           status: 'Pendente',
           createdAt: serverTimestamp()
         })

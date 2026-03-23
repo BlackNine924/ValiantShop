@@ -11,6 +11,7 @@ import { RotateCcw, Trophy, Zap, XCircle, Settings, Timer as TimerIcon, Clock } 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { savePokeGridState, loadPokeGridState, savePokeGridSettings, loadPokeGridSettings } from '../services/persistenceService';
+import { safeStorage } from '../utils/storageUtils';
 
 
 export const PokeGrid: React.FC = () => {
@@ -56,10 +57,9 @@ export const PokeGrid: React.FC = () => {
 
     if (!user) {
       // Not logged in - just use local storage or fresh grid
-      const local = localStorage.getItem('pokegrid_state');
-      if (local) {
+      const parsed = safeStorage.getItem<any>('pokegrid_state', null);
+      if (parsed) {
         try {
-          const parsed = JSON.parse(local);
           const dateStr = new Date().toLocaleDateString('en-CA');
           if (parsed?.date === dateStr && !parsed.unlimitedMode === !unlimitedMode) {
             setGrid(parsed.grid || parsed.gridCells ? parsed : generateDailyGrid());
@@ -104,10 +104,9 @@ export const PokeGrid: React.FC = () => {
         console.log('✅ [Pokégrid] Progresso carregado do Firebase!');
       } else {
         // Fallback to localStorage
-        const local = localStorage.getItem('pokegrid_state');
-        if (local) {
+        const parsed = safeStorage.getItem<any>('pokegrid_state', null);
+        if (parsed) {
           try {
-            const parsed = JSON.parse(local);
             if (parsed && (parsed.gridId === gridId || (parsed.unlimitedMode === unlimitedMode && !unlimitedMode))) {
               savedState = parsed;
               console.log('📁 [Pokégrid] Progresso carregado do cache local.');
@@ -225,7 +224,7 @@ export const PokeGrid: React.FC = () => {
       gridId 
     };
     
-    localStorage.setItem('pokegrid_state', JSON.stringify(state));
+    safeStorage.setItem('pokegrid_state', state);
 
     if (user) {
       const userId = user.displayName?.toLowerCase() || user.uid;
@@ -388,7 +387,7 @@ export const PokeGrid: React.FC = () => {
     setTime(0);
     setTimerActive(false);
 
-    localStorage.removeItem('pokegrid_state');
+    safeStorage.removeItem('pokegrid_state');
   };
 
   const handleSurrender = () => {

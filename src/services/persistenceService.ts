@@ -1,5 +1,6 @@
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { safeStorage } from '../utils/storageUtils';
 
 export interface UserProgress {
   pokegrid?: any;
@@ -88,7 +89,7 @@ export const savePokedleState = async (userId: string | null, mode: string, date
   const key = `pokedle_${mode}_${date}`;
   
   // Always save to localStorage for immediate persistence (Refresh/Same device)
-  localStorage.setItem(key, stateJson);
+  safeStorage.setItem(key, state);
 
   // If user is logged in, sync to Firestore
   if (userId) {
@@ -102,9 +103,9 @@ export const loadPokedleState = async (userId: string | null, mode: string, date
   const key = `pokedle_${mode}_${date}`;
   
   // Try localStorage first (fastest for current session/device)
-  const localSaved = localStorage.getItem(key);
+  const localSaved = safeStorage.getItem<any>(key, null);
   if (localSaved) {
-    return JSON.parse(localSaved);
+    return localSaved;
   }
 
   // If user is logged in and no local save, try Firestore
@@ -115,7 +116,7 @@ export const loadPokedleState = async (userId: string | null, mode: string, date
     if (snap.exists()) {
       const data = JSON.parse(snap.data().stateJson);
       // Sink to local after loading from cloud
-      localStorage.setItem(key, snap.data().stateJson);
+      safeStorage.setItem(key, data);
       return data;
     }
   }
