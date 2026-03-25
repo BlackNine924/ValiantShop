@@ -212,10 +212,16 @@ export function getSpriteUrl(id: number, shiny: boolean = false): string {
     return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
   }
 
+  // 4b. Form variations (10000-19999) → local sprites folder
+  if (id >= 10000 && id < 20000) {
+    return `/assets/sprites/variations/${id}${shiny ? '-shiny' : ''}.png`;
+  }
+
   // 5. Official PokeAPI for base Pokémon
   const shinyPath = shiny ? 'shiny/' : '';
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyPath}${id}.png`;
 }
+
 
 /**
  * Finds a custom local artwork by variation display name.

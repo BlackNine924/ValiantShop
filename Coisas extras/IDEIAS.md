@@ -4,16 +4,12 @@
 
 ## 🛒 Encomendas
 
-- **Pokémon Favoritos** — Botão de coração na tela de encomendas para salvar Pokémon frequentemente pedidos, aparecendo no topo da busca.
 - **Opção "Surpresa"** — Modo especial onde o cliente paga um valor fixo e recebe um Pokémon competitivo escolhido pelo admin, com desconto.
-- **Página de Acompanhamento Melhorada** — Adicionar barra de progresso visual por etapas no card do pedido (Recebido → Em Criação → Em Teste → Entregue).
 - **Desconto por Fidelidade** — Clientes com mais de X pedidos finalizados recebem cupom ou desconto automático no próximo pedido.
 - **Notificação de Status** — Botão "Me avise" no pedido pendente que envia notificação push ou badge quando o status mudar.
 - **Pedido por Time Completo** — Aba dedicada para montar um time de 6 de uma vez com visual de card de time.
 - **Template de Pedido Salvo** — Salvar configurações de um pedido anterior como "template" para reenviar com um clique.
-- **Pedido para Presente** — Modo "Presente" onde você digita o nick de outro treinador e o Pokémon vai direto para essa pessoa.
 - **Histórico com Filtro Pessoal** — Na página de status, filtrar por Pokémon, mês, status ou valor pago.
-- **"Hot Pokémon" (tendência)** — Mostra os Pokémon mais pedidos da semana na home ou no painel de encomendas.
 
 ---
 
@@ -36,18 +32,11 @@
 
 ## ⚙️ Funcionalidades Gerais
 
-- **Modo Escuro / Claro** — Toggle de tema para alternar entre visual escuro e claro.
-- **Sistema de Notificações In-App** — Central de notificações com histórico de status e avaliações.
 - **Perfil Público do Treinador** — Página `/perfil/[nick]` com avatar, histórico, ranking e avaliações.
-- **Chat com o Admin** — Sistema de mensagens diretas entre cliente e admin por pedido.
 - **Compartilhar Pedido** — Gerar link ou imagem para compartilhar o card do Pokémon encomendado.
 - **Conquistas / Badges** — Sistema de conquistas (ex: "1º Pedido", "5 Pedidos Entregues", "Lendário Criado").
-- **Calculadora de Preço Rápida** — Widget na tela de preços para cálculo em tempo real sem formulário.
 - **Cadastro de Wishlist** — Clientes salvam uma "lista de desejos" de Pokémon que querem no futuro.
-- **Sistema de Login com Discord** — Autenticação via Discord OAuth como alternativa ao Google.
-- **FAQ Dinâmico** — Seção de perguntas frequentes editável pelo admin diretamente pelo painel.
 - **Termos de Serviço / Política** — Página com regras de uso, prazos de entrega e política de reembolso.
-- **Onboarding para Novos Usuários** — Tour guiado na primeira visita explicando as funções do site.
 - **Busca Global** — Campo de busca no header para Pokédex, pedidos e páginas.
 - **Atalhos de Teclado** — Atalhos para usuários avançados navegarem rápido.
 - **Histórico de Preços** — Galeria de mudanças de preços ao longo do tempo.
@@ -56,9 +45,7 @@
 
 ## 🎮 Minigames (PokéGrid / PokéDLE / Pokédex)
 
-- **PokéDLE — Modo Silhueta** — Adivinhar o Pokémon apenas pela sua forma sombreada.
-- **PokéDLE — Modo Choro** — Identificar o Pokémon pelo seu grito sonoro original.
-- **PokéGrid — Modo Hard** — Variante com categorias mais difíceis ou obscuras.
+
 - **PokéGrid — Ranking Semanal** — Ranking separado dos melhores scores da semana, resetado periodicamente.
 - **PokéDLE — Streak de Dias** — Contador de dias consecutivos acertando o Pokémon do dia.
 - **Pokédex — Comparador** — Tabela comparativa entre 2 ou 3 Pokémon lado a lado.

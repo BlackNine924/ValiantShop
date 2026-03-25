@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Calculator, Zap, HelpCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
+import { EVOLUTION_LINES } from '../data/evolutionLines';
 import { POKEMON_DATA } from '../data/pokemonData';
 import { ADMIN_CONFIG } from '../config/adminConfig';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,9 +16,10 @@ export const AdminDashboard = () => {
   const [password, setPassword] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
+  const [supportChats, setSupportChats] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'inbox' | 'analytics' | 'calculator' | 'feedbacks'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'inbox' | 'analytics' | 'stock_rooms' | 'feedbacks'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
@@ -161,12 +164,15 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    const q = query(collection(db, 'orders'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // 1. Listen to Orders
+    const qOrders = query(collection(db, 'orders'));
+    const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })).sort((a: any, b: any) => {
+      }))
+      .filter((o: any) => o.pokemon !== 'SUPORTE GERAL' && o.type !== 'support' && o.type !== 'Support')
+      .sort((a: any, b: any) => {
         const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
         const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
         return timeB - timeA;
@@ -176,7 +182,26 @@ export const AdminDashboard = () => {
       console.error("Admin orders stream error:", error);
     });
 
-    return unsubscribe;
+    // 2. Listen to Support Chats
+    const qSupport = query(collection(db, 'support_chats'));
+    const unsubscribeSupport = onSnapshot(qSupport, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+        return timeB - timeA;
+      });
+      setSupportChats(data);
+    }, (error) => {
+      console.error("Admin support stream error:", error);
+    });
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeSupport();
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -241,11 +266,12 @@ export const AdminDashboard = () => {
   }, [deleteConfirm]);
 
   useEffect(() => {
-    if (!isAuthenticated || orders.length === 0) return;
+    if (!isAuthenticated || (orders.length === 0 && supportChats.length === 0)) return;
 
     const allItems: any[] = [];
+    
+    // 1. New Order alerts (last 12 hours)
     orders.forEach(order => {
-      // 1. New Order alerts (last 12 hours)
       const orderTime = order.createdAt?.toMillis ? order.createdAt.toMillis() : Date.now();
       if (Date.now() - orderTime < 43200000) { // 12 hours
         allItems.push({
@@ -256,16 +282,17 @@ export const AdminDashboard = () => {
           time: order.createdAt
         });
       }
-      // 2. Support Message alerts
-      if (order.type === 'support') {
-        allItems.push({
-          id: `support-${order.id}`,
-          type: 'Support',
-          order,
-          message: `CHAT DE SUPORTE: ${order.playerNick} iniciou uma conversa de suporte.`,
-          time: order.createdAt
-        });
-      }
+    });
+    
+    // 2. Support Message alerts (From separate collection)
+    supportChats.forEach(chat => {
+      allItems.push({
+        id: `support-${chat.id}`,
+        type: 'Support',
+        order: chat, // pass the chat object as 'order' for the Chat component
+        message: `CHAT DE SUPORTE: ${chat.playerNick} iniciou uma conversa de suporte.`,
+        time: chat.createdAt
+      });
     });
 
     // 3. Low Stock alerts (Automatic)
@@ -291,7 +318,7 @@ export const AdminDashboard = () => {
       });
 
     setNotifications(uniqueNotifications);
-  }, [orders, isAuthenticated, dismissedNotifIds]);
+  }, [orders, supportChats, inventory, isAuthenticated, dismissedNotifIds]);
 
   if (!isAuthenticated) {
     return (
@@ -341,7 +368,7 @@ export const AdminDashboard = () => {
                           (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
     if (activeTab !== 'pedidos') return matchesSearch;
-    if (o.type === 'support') return false; 
+    if (o.type === 'support' || o.pokemon === 'SUPORTE GERAL') return false; 
     
     const matchesIvs = filterIvs ? (o.ivs || '').includes(filterIvs) : true;
     const matchesGender = filterGender ? o.gender === filterGender : true;
@@ -362,11 +389,16 @@ export const AdminDashboard = () => {
     }
   };
 
-  const uniqueTrainers = new Set(orders.map(o => o.playerNick || 'Desconhecido')).size;
-  const totalEconomy = orders.reduce((acc, o) => acc + (o.totalPrice || 0), 0) / 1000;
+  const validEconomyOrders = orders.filter(o => {
+    const nick = (o.playerNick || '').toLowerCase();
+    return nick !== 'reskalla';
+  });
+
+  const uniqueTrainers = new Set(validEconomyOrders.map(o => o.playerNick || 'Desconhecido')).size;
+  const totalEconomy = validEconomyOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0) / 1000;
 
   const trainersData = Array.from(
-    orders.reduce((acc, o) => {
+    validEconomyOrders.reduce((acc, o) => {
       const nick = o.playerNick || 'Veterano Anônimo';
       if (!acc.has(nick)) {
         acc.set(nick, { nick, totalSpent: 0, orderCount: 0, lastOrder: o.createdAt?.toMillis ? o.createdAt.toMillis() : 0 });
@@ -383,7 +415,7 @@ export const AdminDashboard = () => {
    .sort((a: any, b: any) => b.totalSpent - a.totalSpent);
 
   const salesRanking = Array.from(
-    orders.reduce((acc, o) => {
+    validEconomyOrders.reduce((acc, o) => {
       if (o.pokemon === 'SUPORTE GERAL') return acc;
       const name = o.pokemon;
       if (!acc.has(name)) {
@@ -401,7 +433,7 @@ export const AdminDashboard = () => {
           <aside className="space-y-4">
             <div className="glow-card p-6 space-y-2">
               <button onClick={() => setActiveTab('pedidos')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'pedidos' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                <ShoppingBag size={18} /> Pedidos ({orders.length})
+                <ShoppingBag size={18} /> Pedidos ({filteredOrders.length})
               </button>
               <button onClick={() => setActiveTab('treinadores')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'treinadores' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
                 <Users size={18} /> Treinadores ({uniqueTrainers})
@@ -423,10 +455,10 @@ export const AdminDashboard = () => {
                 <PieChart size={18} /> Analytics
               </button>
               <button 
-                onClick={() => setActiveTab('calculator')} 
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'calculator' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                onClick={() => setActiveTab('stock_rooms')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'stock_rooms' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
               >
-                <Calculator size={18} /> Calculadora
+                <Warehouse size={18} /> Salas do Estoque
               </button>
               <button 
                 onClick={() => setActiveTab('feedbacks')} 
@@ -443,7 +475,7 @@ export const AdminDashboard = () => {
           <main className="lg:col-span-3 space-y-8">
             <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
               <div className="flex justify-between items-center">
-                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'calculator' ? 'Calculadora' : 'Inbox'}</span></h2>
+                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'stock_rooms' ? 'Estoque' : 'Inbox'}</span></h2>
                 <div className="flex gap-4">
                     <div className="relative flex items-center">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
@@ -507,6 +539,7 @@ export const AdminDashboard = () => {
                     <option value="4 IVs">4 IVs</option>
                     <option value="5 IVs">5 IVs</option>
                     <option value="6 IVs">6 IVs</option>
+                    <option value="3 IVs">3 IVs</option>
                   </select>
 
                   <select 
@@ -708,8 +741,10 @@ export const AdminDashboard = () => {
                     )}
                   </div>
                 </div>
-              ) : activeTab === 'calculator' ? (
-                <BreedingCalculator />
+              ) : activeTab === 'stock_rooms' ? (
+                <div className="space-y-12 pb-20">
+                  <StockRoomsManager />
+                </div>
               ) : activeTab === 'feedbacks' ? (
                 <div className="p-8 space-y-6">
                   <div className="flex justify-between items-center mb-6">
@@ -852,13 +887,48 @@ export const AdminDashboard = () => {
                                 <p className="font-bold text-white mb-0.5">{o.playerNick || 'Veterano Anônimo'}</p>
                                 <p className="text-[10px] text-gray-600 uppercase font-black">ID: {o.id.slice(0,8)} | {o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()).toLocaleDateString('pt-BR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Agora'}</p>
                               </td>
-                              <td className="px-8 py-6">
-                                <p className="text-gray-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
-                                  {o.pokemon}
-                                  {o.gender && o.gender !== 'Aleatório' && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 rounded-full">{o.gender}</span>}
-                                </p>
-                                <p className="text-[10px] text-primary font-black uppercase tracking-tighter">{o.ivs} • {o.ability}</p>
-                              </td>
+                                <td className="px-8 py-6">
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-white font-black uppercase tracking-wider text-sm">{o.pokemon}</p>
+                                      {o.gender && o.gender !== 'Aleatório' && (
+                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${o.gender === 'Macho' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : o.gender === 'Fêmea' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/20' : o.gender === 'Qualquer' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/20' : 'bg-green-500/20 text-green-400 border border-green-500/20'}`}>
+                                          {o.gender}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 items-center">
+                                      <span className="text-[10px] text-primary font-black uppercase tracking-tighter bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                                        {o.ivs}
+                                      </span>
+                                      {getEggGroups(o.pokemon).length > 0 && (
+                                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
+                                          🥚 {getEggGroups(o.pokemon).join(' & ')}
+                                        </span>
+                                      )}
+                                      {o.ability && o.ability !== 'Qualquer Habilidade' && (
+                                         <span className="text-[10px] text-gray-300 font-bold uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
+                                           {o.ability} {o.hasHA && <span className="text-primary font-black ml-1">HA</span>}
+                                         </span>
+                                      )}
+                                      {o.ignoredIvs && o.ignoredIvs.length > 0 && (
+                                        <span className="text-[9px] px-2 py-0.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-md font-black uppercase">
+                                          Ignorar: {o.ignoredIvs.join(', ')}
+                                        </span>
+                                      )}
+                                      {o.giftNick && (
+                                        <span className="text-[9px] px-2 py-0.5 bg-secondary/20 text-secondary border border-secondary/20 rounded-md font-black uppercase flex items-center gap-1">
+                                          🎁 Para: {o.giftNick}
+                                        </span>
+                                      )}
+                                      {o.observations && (
+                                        <span className="text-[9px] px-2 py-0.5 bg-black border border-white/10 rounded-md text-gray-500 font-bold italic mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={o.observations}>
+                                          Obs: {o.observations}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
                               <td className="px-8 py-6 font-black text-primary">{o.totalPrice / 1000}k</td>
                               <td className="px-8 py-6">
                                 <div className="flex items-center gap-3">
@@ -1109,6 +1179,7 @@ export const AdminDashboard = () => {
                       isAdminView={true}
                       isFloating={true}
                       onClose={() => closeChat(chat.id)}
+                      collectionName={chat.type === 'support' ? 'support_chats' : 'orders'}
                     />
                   </div>
                 ))}
@@ -1129,376 +1200,301 @@ export const AdminDashboard = () => {
   );
 };
 
-const BreedingCalculator = () => {
-  const [showHelp, setShowHelp] = useState(false);
-  const [parentA, setParentA] = useState({ 
-    pokemon: '', gender: 'Macho', ability: '', item: 'None', 
-    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } 
+const StockRoomsManager = () => {
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [roomSearchTerm, setRoomSearchTerm] = useState('');
+  const [error, setError] = useState('');
+  const [modalState, setModalState] = useState<{isOpen: boolean, isEdit: boolean, id: string, name: string, pokemonText: string}>({
+    isOpen: false, isEdit: false, id: '', name: '', pokemonText: ''
   });
-  const [parentB, setParentB] = useState({ 
-    pokemon: '', gender: 'Fêmea', ability: '', item: 'None', 
-    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } 
-  });
-  
-  const [searchA, setSearchA] = useState('');
-  const [searchB, setSearchB] = useState('');
-  const [showDropdownA, setShowDropdownA] = useState(false);
-  const [showDropdownB, setShowDropdownB] = useState(false);
 
-  const stats = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
-  const items = [
-    { id: 'None', name: 'Nenhum' },
-    { id: 'Destiny Knot', name: 'Destiny Knot' },
-    { id: 'Everstone', name: 'Everstone' },
-    { id: 'Weight', name: 'Power Weight (HP)' },
-    { id: 'Bracer', name: 'Power Bracer (Atk)' },
-    { id: 'Belt', name: 'Power Belt (Def)' },
-    { id: 'Lens', name: 'Power Lens (SpA)' },
-    { id: 'Band', name: 'Power Band (SpD)' },
-    { id: 'Anklet', name: 'Power Anklet (Spe)' }
-  ];
+  useEffect(() => {
+    const q = query(collection(db, 'stock_rooms'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Admin stock_rooms stream error:", error);
+    });
+    return unsubscribe;
+  }, []);
 
-  const getPowerStat = (itemId: string) => {
-    switch (itemId) {
-      case 'Weight': return 'hp';
-      case 'Bracer': return 'atk';
-      case 'Belt': return 'def';
-      case 'Lens': return 'spa';
-      case 'Band': return 'spd';
-      case 'Anklet': return 'spe';
-      default: return null;
+  const handleDeleteRoom = async (id: string) => {
+    if (window.confirm("Deseja realmente excluir esta sala do estoque e remover todos os pokémons dentro dela?")) {
+      try {
+        await deleteDoc(doc(db, 'stock_rooms', id));
+      } catch (err) {
+        console.error("Erro ao excluir sala:", err);
+      }
     }
   };
 
-  const calculateProbabilities = () => {
-    const trials = 10000;
-    let counts = { p5: 0, p6: 0, abilityMatch: 0, compatible: true };
+  const handleSaveRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-    const groupsA = getEggGroups(parentA.pokemon);
-    const groupsB = getEggGroups(parentB.pokemon);
-    const isDittoA = parentA.pokemon.toLowerCase() === 'ditto';
-    const isDittoB = parentB.pokemon.toLowerCase() === 'ditto';
-    const isGenderlessA = parentA.gender === 'Neutro';
-    const isGenderlessB = parentB.gender === 'Neutro';
-
-    if (parentA.pokemon && parentB.pokemon) {
-      if (isDittoA && isDittoB) {
-        counts.compatible = false; // Ditto cannot breed with Ditto
-      } else if (isGenderlessA || isGenderlessB) {
-        // Genderless can only breed with Ditto (unless both same species, but usually Ditto is required)
-        const isCompatibleWithDitto = (isGenderlessA && isDittoB) || (isGenderlessB && isDittoA);
-        if (!isCompatibleWithDitto) counts.compatible = false;
-      } else {
-        const isCompatible = (isDittoA && !groupsB.includes('No Eggs Discovered')) || 
-                             (isDittoB && !groupsA.includes('No Eggs Discovered')) ||
-                             (groupsA.some(g => groupsB.includes(g)) && !groupsA.includes('No Eggs Discovered'));
-        if (!isCompatible) counts.compatible = false;
-      }
+    if (!modalState.name.trim()) {
+      setError("A sala precisa de um nome!");
+      return;
     }
 
-    if (!counts.compatible) return { p5: '0.00', p6: '0.00', abilityMatch: '0.00', compatible: false };
+    const duplicateRoom = rooms.find(r => r.name.toLowerCase() === modalState.name.trim().toLowerCase() && r.id !== modalState.id);
+    if (duplicateRoom) {
+      setError("Já existe uma Sala de Estoque cadastrada com este exato nome.");
+      return;
+    }
 
-    for (let i = 0; i < trials; i++) {
-      const childIVs: any = {};
-      const inheritedStats = new Set<string>();
+    const newPokemonList = modalState.pokemonText.split(',').map(p => p.trim()).filter(p => p);
+    
+    if (newPokemonList.length > 11) {
+      setError("A sala não pode ter mais que 11 Pokémon.");
+      return;
+    }
 
-      // Power Items logic
-      const statA = getPowerStat(parentA.item);
-      const statB = getPowerStat(parentB.item);
+    // Duplicate & Evolution Check
+    let duplicateError = '';
+    for (const p of newPokemonList) {
+      const pLower = p.toLowerCase();
+      const baseName = pLower.split('-mega')[0].split('-gmax')[0].split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0];
+      const pEvolutionLine = EVOLUTION_LINES[baseName] || [baseName];
 
-      if (statA && statB && statA === statB) {
-        const chosen = Math.random() < 0.5 ? 'A' : 'B';
-        inheritedStats.add(statA);
-        childIVs[statA] = chosen === 'A' ? parentA.ivs[statA] : parentB.ivs[statB];
-      } else {
-        if (statA) { inheritedStats.add(statA); childIVs[statA] = parentA.ivs[statA]; }
-        if (statB) { inheritedStats.add(statB); childIVs[statB] = parentB.ivs[statB]; }
-      }
-
-      // Destiny Knot/Regular inheritance
-      const numToInherit = (parentA.item === 'Destiny Knot' || parentB.item === 'Destiny Knot') ? 5 : 3;
-      while (inheritedStats.size < numToInherit) {
-        const stat = stats[Math.floor(Math.random() * 6)];
-        if (!inheritedStats.has(stat)) {
-          inheritedStats.add(stat);
-          childIVs[stat] = Math.random() < 0.5 ? parentA.ivs[stat] : parentB.ivs[stat];
+      for (const room of rooms) {
+        if (room.id === modalState.id) continue;
+        
+        const roomPokemonLower = room.pokemonList?.map((rp: string) => rp.toLowerCase()) || [];
+        
+        // Exact duplicate
+        if (roomPokemonLower.includes(pLower)) {
+          duplicateError = `O Pokémon '${p}' já está cadastrado na sala '${room.name}'. Remova-o de lá primeiro ou verifique se há duplicata.`;
+          break;
         }
-      }
 
-      // Random IVs
-      stats.forEach(s => {
-        if (!inheritedStats.has(s)) childIVs[s] = Math.floor(Math.random() * 32);
-      });
-
-      const ivs31 = stats.filter(s => childIVs[s] === 31).length;
-      if (ivs31 >= 5) counts.p5++;
-      if (ivs31 === 6) counts.p6++;
-
-      // Ability Inheritance (Official Mechanics)
-      let passChance = 0.8; // Default for normal abilities
-      let isHA = false;
-
-      const partner = isDittoA ? parentB : (isDittoB ? parentA : (parentA.gender === 'Fêmea' ? parentA : parentB));
-      const partnerData = POKEMON_DATA.find(p => p.name === partner.pokemon);
-      
-      if (partnerData) {
-        isHA = partnerData.hiddenAbility === partner.ability;
-        if (isHA) {
-          passChance = 0.6; // HA passes 60% of the time (with Ditto or if Mother)
-        } else if (partner.ability === partnerData.abilities[0] || partner.ability === partnerData.abilities[1]) {
-          passChance = 0.8; // Non-HA passes 80% if it's the specific ability
+        // Evolutionary line match
+        for (const rp of roomPokemonLower) {
+          const rpBase = rp.split('-mega')[0].split('-gmax')[0].split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0];
+          if (pEvolutionLine.includes(rpBase) && rpBase !== baseName) {
+            duplicateError = `Aviso: '${p}' pertence à mesma linha evolutiva de '${rp}', que já está na sala '${room.name}'. Eles devem ficar juntos!`;
+            break;
+          }
         }
+        if (duplicateError) break;
       }
-
-      if (Math.random() < passChance) counts.abilityMatch++;
+      if (duplicateError) break;
     }
 
-    return {
-      p5: ((counts.p5 / trials) * 100).toFixed(2),
-      p6: ((counts.p6 / trials) * 100).toFixed(2),
-      abilityMatch: ((counts.abilityMatch / trials) * 100).toFixed(2),
-      compatible: true
-    };
+    if (duplicateError) {
+      setError(duplicateError);
+      return;
+    }
+
+    try {
+      if (modalState.isEdit && modalState.id) {
+        await updateDoc(doc(db, 'stock_rooms', modalState.id), {
+          name: modalState.name.trim(),
+          pokemonList: newPokemonList,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, 'stock_rooms'), {
+          name: modalState.name.trim(),
+          pokemonList: newPokemonList,
+          createdAt: serverTimestamp()
+        });
+      }
+      setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' });
+      setError('');
+    } catch (err) {
+      console.error("Erro ao salvar sala:", err);
+      setError("Ocorreu um erro ao salvar a sala no banco de dados.");
+    }
   };
 
-  const results = calculateProbabilities();
-
-  const renderParent = (parent: any, setParent: any, search: string, setSearch: (v: string) => void, show: boolean, setShow: (v: boolean) => void, label: string, theme: string) => {
-    const pokemon = POKEMON_DATA.find(p => p.name === parent.pokemon);
-    const filtered = POKEMON_DATA.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
-
-    return (
-      <div className={`glow-card p-6 border-${theme}-500/20 bg-${theme}-500/5 space-y-4`}>
-        <div className="flex justify-between items-center">
-          <h4 className={`font-black text-${theme}-400 text-xs uppercase flex items-center gap-2`}>
-            <div className={`w-2 h-2 rounded-full bg-${theme}-400`} /> {label}
-          </h4>
-          <select 
-            value={parent.gender} 
-            onChange={e => setParent({...parent, gender: e.target.value})}
-            className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 font-bold outline-none"
-          >
-            <option value="Macho">Macho</option>
-            <option value="Fêmea">Fêmea</option>
-            <option value="Neutro">Neutro (Genderless)</option>
-          </select>
-        </div>
-
-        <div className="relative">
-          <input 
-            placeholder="Buscar Pokémon..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setShow(true); }}
-            onFocus={() => setShow(true)}
-            className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:border-primary outline-none transition-all"
-          />
-          {show && search && (
-            <div className="absolute top-full left-0 right-0 z-50 bg-black border border-white/10 rounded-xl mt-2 overflow-hidden shadow-2xl">
-              {filtered.map(p => (
-                <button 
-                  key={p.id}
-                  onClick={() => {
-                    setParent({...parent, pokemon: p.name, ability: p.abilities[0]});
-                    setSearch(p.name);
-                    setShow(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-xs text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {pokemon && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-gray-500 uppercase">Habilidade</label>
-              <select 
-                value={parent.ability}
-                onChange={e => setParent({...parent, ability: e.target.value})}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white outline-none"
-              >
-                {pokemon.abilities.map(a => <option key={a} value={a}>{a}</option>)}
-                {pokemon.hiddenAbility && <option value={pokemon.hiddenAbility}>{pokemon.hiddenAbility} (HA)</option>}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-gray-500 uppercase">Item</label>
-              <select 
-                value={parent.item}
-                onChange={e => setParent({...parent, item: e.target.value})}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white outline-none"
-              >
-                {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-2">
-          {stats.map(s => (
-            <div key={s} className="space-y-1">
-              <label className="text-[8px] font-black text-gray-500 uppercase">{s}</label>
-              <input 
-                type="number" min="0" max="31" 
-                value={parent.ivs[s]} 
-                onChange={e => setParent({
-                  ...parent, 
-                  ivs: { ...parent.ivs, [s]: Math.min(31, Math.max(0, parseInt(e.target.value) || 0)) }
-                })}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white focus:border-primary outline-none"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const filteredRooms = rooms.filter(room => {
+    // Only include real rooms with a name
+    if (!room.name) return false;
+    
+    if (!roomSearchTerm) return true;
+    const nameMatch = room.name.toLowerCase().includes(roomSearchTerm.toLowerCase());
+    const pokemonMatch = room.pokemonList?.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase()));
+    return nameMatch || pokemonMatch;
+  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   return (
-    <div className="p-8 space-y-8 animate-fade-in relative">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary uppercase flex items-center gap-3">
-              Calculadora Breeding Master
-              <button 
-                onClick={() => setShowHelp(true)}
-                className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-all border border-white/5"
-              >
-                <HelpCircle size={14} />
-              </button>
-            </h3>
-            <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Análise profissional de herança genética e habilidades</p>
-          </div>
+    <div className="p-8 space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary">SALAS DO ESTOQUE</h3>
+          <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Gerenciamento e Localização de Pokémon em Estoque</p>
         </div>
+        
         <div className="flex gap-4">
-          <div className="bg-primary/10 border border-primary/20 p-3 rounded-xl flex items-center gap-3">
-            <Zap size={20} className="text-primary animate-pulse" />
-            <div className="text-right">
-              <p className="text-[8px] font-black text-primary uppercase">Chance 5IV+</p>
-              <p className="text-xl font-black text-white">{results.p5}%</p>
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
+            <input 
+              placeholder="Pesquisar sala ou pokémon..." 
+              value={roomSearchTerm}
+              onChange={e => setRoomSearchTerm(e.target.value)}
+              className="bg-black/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs outline-none focus:border-primary transition-all w-[250px]"
+            />
           </div>
-          <div className="bg-secondary/10 border border-secondary/20 p-3 rounded-xl flex items-center gap-3">
-             <Star size={20} className="text-secondary" />
-             <div className="text-right">
-                <p className="text-[8px] font-black text-secondary uppercase">Herança Habilidade</p>
-                <p className="text-xl font-black text-white">{results.abilityMatch}%</p>
-             </div>
-          </div>
+          <button 
+            onClick={() => setModalState({ isOpen: true, isEdit: false, id: '', name: '', pokemonText: '' })}
+            className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+          >
+            <Plus size={16} /> Nova Sala
+          </button>
         </div>
       </div>
 
-      {!results.compatible && (
-        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-4 animate-bounce">
-          <X size={20} className="text-red-500" />
-          <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Incompatíveis: Pokémons não pertencem ao mesmo Egg Group!</p>
-        </div>
+      {createPortal(
+        <AnimatePresence>
+          {modalState.isOpen && (
+            <div 
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' });
+              }}
+              className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="glow-card max-w-5xl w-full max-h-[90vh] p-8 md:p-12 border-primary/20 relative rounded-3xl overflow-y-auto bg-black"
+              >
+                <button 
+                  onClick={() => setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' })}
+                  className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-all bg-white/5 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/40 shadow-[0_0_20px_var(--primary-glow)]">
+                    <Warehouse size={24} className="text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="pixel-title text-xl text-white">{modalState.isEdit ? 'Editar Sala' : 'Criar Nova Sala'}</h3>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Máximo de 11 Pokémon por Sala</p>
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {error && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl mb-6 text-xs font-bold flex items-center gap-3 shadow-[0_0_15px_rgba(239,68,68,0.15)]"
+                    >
+                      <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+                      {error}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <form onSubmit={handleSaveRoom} className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Nome da Sala</label>
+                    <input 
+                      autoFocus
+                      placeholder="Ex: Gaveta 1, Box A..." 
+                      value={modalState.name}
+                      onChange={e => setModalState({...modalState, name: e.target.value})}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-all font-bold text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-end mb-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Conteúdo (Separe por vírgula)</label>
+                      <span className={`text-[10px] font-black uppercase ${modalState.pokemonText.split(',').filter(p=>p.trim()).length > 11 ? 'text-red-500' : 'text-primary'}`}>
+                         {modalState.pokemonText.split(',').filter(p=>p.trim()).length}/11 Pokémon
+                      </span>
+                    </div>
+                    <textarea 
+                      value={modalState.pokemonText}
+                      onChange={e => setModalState({...modalState, pokemonText: e.target.value})}
+                      placeholder="Ex: Pikachu, Bulbasaur, Charmander..."
+                      className="w-full bg-black/60 border border-white/10 rounded-xl p-4 text-xs font-mono text-gray-300 outline-none focus:border-primary/50 transition-all h-32 resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-4 border-t border-white/5">
+                    <button type="button" onClick={() => setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' })} className="flex-[1] py-4 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all">Cancelar</button>
+                    <button type="submit" className="flex-[2] py-4 bg-primary text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-primary/20">{modalState.isEdit ? 'Salvar Alterações' : 'Criar Sala'}</button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {renderParent(parentA, setParentA, searchA, setSearchA, showDropdownA, setShowDropdownA, "Progenitor A", "blue")}
-        {renderParent(parentB, setParentB, searchB, setSearchB, showDropdownB, setShowDropdownB, "Progenitor B", "pink")}
-      </div>
-
-      <div className="glow-card p-6 border-white/5 bg-white/[0.02]">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="text-center md:text-left">
-            <h4 className="text-[10px] font-black text-gray-500 uppercase mb-4 tracking-widest">Resultado Esperado (10k Trials)</h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Puro 6IV (31 em Tudo):</span>
-                <span className="font-black text-white">{results.p6}%</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredRooms.map(room => (
+          <div key={room.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group flex flex-col h-full justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-black/40 border border-white/10 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-primary group-hover:border-primary/30 transition-all">
+                    <Warehouse size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white uppercase tracking-tighter text-lg">{room.name}</h4>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${(room.pokemonList?.length || 0) >= 11 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                      {room.pokemonList?.length || 0}/11 Ocupados
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setError('');
+                      setModalState({ isOpen: true, isEdit: true, id: room.id, name: room.name, pokemonText: room.pokemonList?.join(', ') || '' });
+                    }}
+                    className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg opacity-0 group-hover:opacity-100"
+                    title="Editar Sala"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteRoom(room.id)}
+                    className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover:opacity-100"
+                    title="Deletar Sala"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-secondary shadow-lg shadow-secondary/50" style={{ width: `${results.p6}%` }} />
+
+              <div className="flex flex-wrap gap-2 mb-6">
+                 {(room.pokemonList || []).length > 0 ? (
+                    room.pokemonList.map((p: string, i: number) => (
+                      <span key={i} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${roomSearchTerm && p.toLowerCase().includes(roomSearchTerm.toLowerCase()) ? 'bg-primary border-primary text-black shadow-[0_0_10px_var(--primary-glow)]' : 'bg-black/60 border-white/5 text-gray-400'}`}>
+                        {p}
+                      </span>
+                    ))
+                 ) : (
+                    <span className="text-[10px] text-gray-600 font-bold italic uppercase">Sala Vazia</span>
+                 )}
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-col justify-center gap-4">
-             <div className="flex items-center gap-3 p-3 bg-black/40 rounded-xl border border-white/5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><ShoppingBag size={14} /></div>
-                <div>
-                   <p className="text-[8px] font-black text-gray-600 uppercase">Eficiência de Breeding</p>
-                   <p className="text-xs font-bold text-white uppercase">{parseFloat(results.p5) > 5 ? 'Alta Eficiência' : 'Baixa Eficiência'}</p>
-                </div>
-             </div>
-          </div>
-
-          <div className="flex flex-col justify-center items-end text-right">
-             <p className="text-[8px] font-black text-gray-500 uppercase mb-1">Dica de Breeding</p>
-             <p className="text-[10px] text-gray-400 font-bold italic max-w-[200px]">
-               {parentA.item === 'None' && parentB.item === 'None' ? 'Use um Destiny Knot para aumentar a herança de 3 para 5 IVs.' : 
-                !results.compatible ? 'Ditto ajuda se o outro não for de um grupo legendário.' :
-                'Power Items garantem o IV exato de um dos pais.'}
-             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Help Modal */}
-      <AnimatePresence>
-        {showHelp && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md pointer-events-auto"
-            onClick={() => setShowHelp(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glow-card max-w-2xl w-full p-8 space-y-6 relative overflow-visible max-h-[80vh] overflow-y-auto custom-scrollbar cursor-default border-primary/20 bg-black"
-              onClick={e => e.stopPropagation()}
-            >
-              <button onClick={() => setShowHelp(false)} className="absolute -top-4 -right-4 w-10 h-10 bg-black border border-white/10 rounded-full flex items-center justify-center text-gray-500 hover:text-white transition-all shadow-xl z-10"><X size={20} /></button>
-              <div className="space-y-6">
-                <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary"><HelpCircle size={24} /></div>
-                  <div>
-                    <h4 className="pixel-title text-white uppercase tracking-tighter">Como Funciona o Breeding?</h4>
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Guia de Mecânicas Genéticas</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h5 className="text-xs font-black text-primary uppercase">Herança de IVs</h5>
-                    <ul className="space-y-2 text-[10px] text-gray-400 font-bold uppercase leading-relaxed">
-                      <li>• <span className="text-white">Padrão:</span> 3 IVs aleatórios dos pais são herdados.</li>
-                      <li>• <span className="text-white">Destiny Knot:</span> faz com que 5 IVs sejam herdados dos pais (escolhidos aleatoriamente entre os dois).</li>
-                      <li>• <span className="text-white">Power Items:</span> Garante o IV específico do pai que segura o item.</li>
-                      <li>• <span className="text-white">Simulação:</span> Realizamos 10.000 cruzamentos para calcular a chance real de 5IV e 6IV.</li>
-                    </ul>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h5 className="text-xs font-black text-secondary uppercase">Herança de Habilidades</h5>
-                    <ul className="space-y-2 text-[10px] text-gray-400 font-bold uppercase leading-relaxed">
-                      <li>• <span className="text-white">Fêmea:</span> 80% de chance de passar sua habilidade (60% se for Hidden).</li>
-                      <li>• <span className="text-white">Com Ditto:</span> O parceiro (independente do gênero) tem 60% de chance de passar HA ou 80% para normal.</li>
-                      <li>• <span className="text-white">Genderless:</span> Podem cruzar apenas com Ditto para gerar ovos.</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl">
-                  <p className="text-[10px] text-primary/80 font-bold uppercase italic leading-loose">
-                    "A eficiência de breeding é calculada com base na probabilidade de nascer um Pokémon com 5 ou mais IVs perfeitos (31). Quanto maior a porcentagem, menos ovos você precisará para o Pokémon ideal."
-                  </p>
-                </div>
+            
+            {roomSearchTerm && room.pokemonList?.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase())) && (
+              <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl flex items-center gap-3 mt-4">
+                <Search size={14} className="text-primary" />
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Pokémon correspondente nesta sala!</p>
               </div>
-            </motion.div>
-          </motion.div>
+            )}
+          </div>
+        ))}
+        {filteredRooms.length === 0 && (
+          <div className="col-span-full py-20 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
+            <Warehouse size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
+            <p className="text-gray-500 italic font-bold">Nenhuma sala encontrada ou nenhum pokémon corresponde à busca.</p>
+          </div>
         )}
-
-      </AnimatePresence>
+      </div>
     </div>
   );
 };
+

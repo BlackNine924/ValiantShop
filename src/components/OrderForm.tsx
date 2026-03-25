@@ -36,7 +36,7 @@ const MALE_ONLY_POKEMON = [
   'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
   'Volbeat', 'Latios', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
   'Tornadus', 'Thundurus', 'Landorus', 'Impidimp', 'Morgrem', 'Grimmsnarl', 
-  'Indeedee', 'Indeedee Male', 'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
+  'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
 ];
 
 
@@ -65,7 +65,8 @@ export const OrderForm = () => {
     isCastrated: false, 
     hasHA: false,
     ignoredIvs: [] as string[],
-    giftNick: ''
+    giftNick: '',
+    observations: ''
   };
 
   const [form, setForm] = useState(initialForm);
@@ -79,8 +80,12 @@ export const OrderForm = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const counts: Record<string, number> = {};
       snapshot.docs.forEach(doc => {
-        const name = doc.data().pokemon;
-        if (name) counts[name] = (counts[name] || 0) + 1;
+        const data = doc.data();
+        const name = data.pokemon;
+        const nick = (data.playerNick || '').toLowerCase();
+        // Exclude ghost support entries and test accounts
+        if (!name || name === 'SUPORTE GERAL' || data.type === 'support' || nick === 'reskalla') return;
+        counts[name] = (counts[name] || 0) + 1;
       });
       const sorted = Object.entries(counts)
         .map(([name, count]) => ({ name, count }))
@@ -143,7 +148,8 @@ export const OrderForm = () => {
         isCastrated: isCastrated,
         hasHA: s.hasHA || false,
         ignoredIvs: s.ignoredIvs || [],
-        giftNick: ''
+        giftNick: '',
+        observations: ''
       });
       setSearch(s.pokemon);
       // Limpar o state para não reaplicar ao recarregar
@@ -171,6 +177,9 @@ export const OrderForm = () => {
   const calculateItemPrice = (item: any) => {
     let base = IV_DETAILS[item.ivs as IVOption].price;
     if (GENDERLESS_POKEMON.includes(item.pokemon) || MALE_ONLY_POKEMON.includes(item.pokemon)) base *= 2; // Preço Genderless / Male-Only é o dobro
+    
+    // Indeedee Macho só pode breedar com Ditto, então recebe taxa de Genderless
+    if (item.pokemon === 'Indeedee' && item.gender === 'Macho') base *= 2;
 
     if (item.isCastrated && item.ivs !== '4') base -= CASTRATED_DISCOUNT;
     if (item.hasHA) base += HA_FEE;
@@ -443,6 +452,17 @@ export const OrderForm = () => {
                       placeholder="Insira o Nick"
                       value={form.giftNick}
                       onChange={e => setForm({...form, giftNick: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-3 md:col-span-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Observações (Opcional)</label>
+                    <textarea 
+                      className="w-full bg-black/60 border-2 border-white/5 rounded-2xl px-6 py-5 text-white font-bold transition-all outline-none focus:border-secondary resize-none" 
+                      placeholder="Quero que tenha 0 no IV de Speed, por favor."
+                      rows={2}
+                      value={form.observations}
+                      onChange={e => setForm({...form, observations: e.target.value})}
                     />
                   </div>
                 </div>

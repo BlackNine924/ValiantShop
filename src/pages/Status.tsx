@@ -77,7 +77,7 @@ export const Status = () => {
       // Fix: Use setDoc to ensure the document exists so it appears for Admin
       const createSupportDoc = async () => {
         try {
-          await setDoc(doc(db, 'orders', supportId), {
+          await setDoc(doc(db, 'support_chats', supportId), {
             id: supportId,
             playerNick: user.displayName || 'Treinador',
             pokemon: 'SUPORTE GERAL',
@@ -85,7 +85,7 @@ export const Status = () => {
             status: 'Suporte',
             createdAt: serverTimestamp()
           }, { merge: true });
-          setActiveChat({ id: supportId, pokemon: 'SUPORTE GERAL' });
+          setActiveChat({ id: supportId, pokemon: 'SUPORTE GERAL', type: 'support', playerNick: user.displayName || 'Treinador' });
         } catch (err) {
           console.error("Erro ao criar chat de suporte:", err);
         }
@@ -164,7 +164,7 @@ export const Status = () => {
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="pixel-title text-3xl mb-2">Painel de <span className="text-secondary">Acompanhamento</span></h2>
-          <div className="flex gap-4 mt-2">
+          <div className="flex flex-wrap gap-4 mt-2">
             <button 
               onClick={() => setActiveSubTab('history')}
               className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'history' ? 'border-secondary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
@@ -176,6 +176,12 @@ export const Status = () => {
               className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'wishlist' ? 'border-primary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
             >
               Minha Wishlist ({wishlist.length})
+            </button>
+            <button 
+              onClick={() => navigate('/status?chat=support')}
+              className="text-[10px] flex items-center gap-1 font-black uppercase tracking-widest pb-1 border-b-2 border-transparent text-green-400 hover:text-green-300 transition-all ml-2"
+            >
+              <MessageSquare size={12} /> Atendimento de Suporte
             </button>
           </div>
         </div>
@@ -331,10 +337,13 @@ export const Status = () => {
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs || `${order.ivs} IVs`} • {order.nature || 'Aleatória'}</span>
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs || `${order.ivs} IVs`}</span>
                             <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
                             {order.ignoredIvs && order.ignoredIvs.length > 0 && (
                               <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
+                            )}
+                            {order.observations && (
+                              <span className="text-[9px] text-gray-400 font-bold uppercase italic mt-1 bg-white/5 py-0.5 px-2 rounded w-fit">OBS: {order.observations}</span>
                             )}
                           </div>
                         </td>
@@ -382,6 +391,20 @@ export const Status = () => {
                                   >
                                     <MessageSquare size={12} /> Abrir Chat
                                   </button>
+                                  {order.status === 'Pendente' && (
+                                    <button 
+                                      onClick={async (e) => { 
+                                        e.stopPropagation(); 
+                                        if (window.confirm('Tem certeza que deseja cancelar esta encomenda? Esta ação não pode ser desfeita.')) {
+                                          const { deleteDoc, doc } = await import('firebase/firestore');
+                                          await deleteDoc(doc(db, 'orders', order.id));
+                                        }
+                                      }}
+                                      className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
+                                    >
+                                      <X size={12} /> Cancelar Encomenda
+                                    </button>
+                                  )}
                               </div>
                             </div>
                           </td>
@@ -495,9 +518,10 @@ export const Status = () => {
         <OrderChat 
           orderId={activeChat.id}
           orderPokemon={activeChat.pokemon}
-          orderPlayerNick={user?.displayName || 'Treinador'}
+          orderPlayerNick={activeChat.playerNick}
           currentUser={user}
           onClose={() => setActiveChat(null)}
+          collectionName={activeChat.type === 'support' ? 'support_chats' : 'orders'}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, History, Table, Shield, LogOut, Grid3X3, Smartphone, Trophy, Star, Quote, X, Gamepad2, Bell, Trash2, HelpCircle } from 'lucide-react';
+import { ShoppingBag, X, Shield, Star, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
@@ -19,6 +19,8 @@ import { collection, query, onSnapshot, limit, orderBy } from 'firebase/firestor
 import logoUrl from './assets/hero.png';
 import { safeStorage } from './utils/storageUtils';
 import { ReviewModal } from './components/ReviewModal';
+import { SettingsModal } from './components/SettingsModal';
+import { TOS_CONTENT } from './data/tosData';
 
 const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
   return (
@@ -116,7 +118,18 @@ const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number
     }
     const q = query(collection(db, 'orders'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const trainersMap = snapshot.docs.reduce((acc, doc) => {
+      // Filter out ghost support orders and test accounts before building the ranking
+      const cleanDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        const nick = (data.playerNick || '').toLowerCase();
+        return (
+          data.pokemon !== 'SUPORTE GERAL' &&
+          data.type !== 'support' &&
+          nick !== 'reskalla'
+        );
+      });
+
+      const trainersMap = cleanDocs.reduce((acc, doc) => {
         const data = doc.data();
         const nick = data.playerNick || 'Veterano Anônimo';
         if (!acc[nick]) acc[nick] = 0;
@@ -293,10 +306,10 @@ const CategoryCard = ({ to, icon, title, desc, color }: any) => {
   );
 };
 
-const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowReviewsModal, notifications, setNotifications, removeNotification, onLogoClick, streak }: any) => {
+const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowReviewsModal, notifications, setNotifications, removeNotification, onLogoClick, streak, setIsSettingsOpen }: any) => {
    const location = useLocation();
    const navigate = useNavigate();
-   const { user, logout } = useAuth();
+   const { user } = useAuth();
    const isActive = (path: string) => location.pathname === path;
    const { cart, setIsCartOpen } = useCart();
    const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -434,8 +447,9 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowRevie
                   <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Conectado</span>
                   <span className="text-xs font-bold text-white truncate max-w-[120px]">{user.displayName}</span>
                 </div>
-                <button onClick={logout} className="p-2 text-gray-500 hover:text-primary transition-colors">
-                  <LogOut size={20} />
+                <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-400 hover:text-primary transition-all hover:bg-white/5 rounded-xl group relative">
+                  <User size={20} className="group-hover:scale-110 transition-transform" />
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full border border-black group-hover:animate-ping"></div>
                 </button>
               </div>
             ) : (
@@ -479,6 +493,7 @@ const ProtectedOrderRoute = ({ children, setIsLoginOpen }: any) => {
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showRankingModal, setShowRankingModal] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [showAdminConfirm, setShowAdminConfirm] = useState(false);
@@ -632,6 +647,12 @@ function App() {
         setNotifications={setNotifications}
         removeNotification={removeNotification}
         onLogoClick={handleLogoClick}
+        streak={streak}
+        setIsSettingsOpen={setIsSettingsOpen}
+      />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
         streak={streak}
       />
       <main className="py-12 relative z-10 flex-1">
@@ -887,32 +908,41 @@ function App() {
         )}
       </AnimatePresence>
 
-      <footer className="py-6 border-t border-white/5 bg-black/80 text-center relative z-10 mt-auto">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
-          <div className="flex items-center gap-6 mb-4">
-            <button 
-              onClick={() => setShowTOS(true)}
-              className="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-widest transition-all"
-            >
-              Termos de Serviço
-            </button>
-            <button 
-              onClick={() => navigate('/status?chat=support')}
-              className="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-widest transition-all"
-            >
-              Ajuda & Suporte
-            </button>
+      <footer className="mt-auto border-t border-white/5 bg-black/50 backdrop-blur-md">
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-6">
+                <button 
+                  onClick={() => setShowTOS(true)}
+                  className="w-10 h-10 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-white/10 shadow-lg"
+                  title="Termos de Serviço"
+                >
+                  <FileText size={18} />
+                </button>
+                <button 
+                  onClick={() => navigate('/admin')}
+                  className="w-12 h-12 bg-primary/10 hover:bg-primary/20 text-primary hover:text-white rounded-xl flex items-center justify-center transition-all border border-primary/20 shadow-[0_0_15px_var(--primary-glow)] group"
+                  title="Painel Admin"
+                >
+                  <Shield size={20} className="group-hover:scale-110 transition-transform" />
+                </button>
+                <button 
+                  onClick={() => navigate('/status?chat=support')}
+                  className="w-10 h-10 bg-secondary/10 hover:bg-secondary/20 text-secondary hover:text-white rounded-xl flex items-center justify-center transition-all border border-secondary/20 shadow-lg"
+                  title="Ajuda & Suporte"
+                >
+                  <HelpCircle size={18} />
+                </button>
+              </div>
+
+              <div className="text-center">
+                <h3 className="pixel-title text-sm text-white/50 tracking-widest hover:text-white transition-colors">
+                  VALIANT SHOP &copy; 2026
+                </h3>
+              </div>
+            </div>
           </div>
-          <button 
-            onClick={() => setShowAdminConfirm(true)} 
-            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-primary transition-all rounded-full hover:bg-primary/10 mb-2 group"
-            title="Acesso Administrador"
-          >
-            <Shield size={18} className="group-hover:rotate-12 transition-transform" />
-          </button>
-          <p className="pixel-title text-[10px] text-gray-600">VALIANT SHOP &copy; 2026</p>
-        </div>
-      </footer>
+        </footer>
 
       {/* Easter Egg Modal */}
       <AnimatePresence>
@@ -947,17 +977,12 @@ function App() {
                 <button onClick={() => setShowTOS(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
               </div>
               <div className="space-y-4 text-xs text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
-                <p className="text-white">1. NATUREZA DO SERVIÇO</p>
-                <p>A Valiant Shop presta serviços de criação e treinamento de Pokémon customizados para o Pokémon MMO. Não temos vínculo oficial com a Pokémon Company ou GameFreak.</p>
-                
-                <p className="text-white">2. PAGAMENTOS E ENTREGAS</p>
-                <p>O pagamento deve ser efetuado via PokeYen (Dinheiro do jogo). A entrega ocorre em até 48h após a confirmação do pedido na fila de produção.</p>
-                
-                <p className="text-white">3. POLÍTICA DE REEMBOLSO</p>
-                <p>Caso o Pokémon entregue não corresponda às especificações solicitadas no Painel de Pedidos, faremos a correção imediata ou reembolso total.</p>
-                
-                <p className="text-white">4. CONDUTA DIRETA</p>
-                <p>Respeite nossa equipe no chat. Comportamentos abusivos resultarão em bloqueio permanente de novos pedidos.</p>
+                {TOS_CONTENT.map((section, idx) => (
+                  <div key={idx}>
+                    <p className="text-white">{section.title}</p>
+                    <p>{section.content}</p>
+                  </div>
+                ))}
               </div>
               <button 
                 onClick={() => setShowTOS(false)}

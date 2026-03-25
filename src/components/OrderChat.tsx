@@ -22,6 +22,7 @@ interface OrderChatProps {
   isAdminView?: boolean;
   onClose: () => void;
   isFloating?: boolean;
+  collectionName?: 'orders' | 'support_chats';
 }
 
 export const OrderChat = ({ 
@@ -31,7 +32,8 @@ export const OrderChat = ({
   currentUser, 
   isAdminView = false, 
   onClose, 
-  isFloating = false 
+  isFloating = false,
+  collectionName = 'orders'
 }: OrderChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -45,7 +47,7 @@ export const OrderChat = ({
     }
 
     const q = query(
-      collection(db, 'orders', orderId, 'messages'),
+      collection(db, collectionName, orderId, 'messages'),
       orderBy('createdAt', 'asc')
     );
 
@@ -62,7 +64,7 @@ export const OrderChat = ({
     });
 
     return unsubscribe;
-  }, [orderId]);
+  }, [orderId, collectionName]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -91,7 +93,7 @@ export const OrderChat = ({
     };
 
     try {
-      await addDoc(collection(db, 'orders', orderId, 'messages'), messageData);
+      await addDoc(collection(db, collectionName, orderId, 'messages'), messageData);
       setNewMessage('');
     } catch (error: any) {
       console.error("Error sending message:", error);

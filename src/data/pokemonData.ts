@@ -6818,7 +6818,7 @@ export const POKEMON_DATA = [
   },
   {
     "id": 876,
-    "name": "Indeedee Male",
+    "name": "Indeedee",
     "abilities": [
       "Inner Focus",
       "Synchronize"
