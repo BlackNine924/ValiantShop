@@ -6,7 +6,7 @@ import type { GameGrid, Criterion } from '../data/pokeGridLogic';
 import type { PokemonEntry } from '../data/pokemonTypes';
 import { getSpriteUrl } from '../data/pokemonTypes';
 import { PokemonSearchModal } from './PokemonSearchModal';
-import { SettingsModal } from './SettingsModal';
+import { PokeGridSettingsModal } from './PokeGridSettingsModal';
 import { RotateCcw, Trophy, Zap, XCircle, Settings, Timer as TimerIcon, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -599,7 +599,7 @@ export const PokeGrid: React.FC = () => {
       )}
 
       {/* Settings Modal */}
-      <SettingsModal
+      <PokeGridSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         enabledCriteriaIds={enabledCriteriaIds}
