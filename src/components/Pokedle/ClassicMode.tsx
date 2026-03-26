@@ -60,9 +60,13 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
 
       const saved = await loadPokedleState(user?.displayName || null, 'classic', dateStr);
       if (saved) {
-        setGuesses(saved.guesses || []);
-        setGameOver(saved.gameOver || false);
-        setIsSurrendered(saved.isSurrendered || false);
+        // Only restore state if it's from today (isSurrendered should NOT carry over to new days)
+        const savedDate = saved.date || saved.dateStr || dateStr;
+        if (savedDate === dateStr) {
+          setGuesses(saved.guesses || []);
+          setGameOver(saved.gameOver || false);
+          setIsSurrendered(saved.isSurrendered || false);
+        }
       }
     };
     init();

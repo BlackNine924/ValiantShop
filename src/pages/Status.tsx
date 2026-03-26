@@ -115,7 +115,7 @@ export const Status = () => {
 
     let matchesStatus = true;
     if (statusFilter === 'Pendentes') matchesStatus = (o.status === 'Pendente' || o.status === 'Breeding');
-    if (statusFilter === 'Concluídos') matchesStatus = o.status === 'Finalizado';
+    if (statusFilter === 'Concluídos') matchesStatus = (o.status === 'Finalizado' || o.status === 'Entregue');
     
     return matchesSearch && matchesMonth && matchesPrice && matchesStatus;
   });
@@ -134,13 +134,14 @@ export const Status = () => {
       case 'Pendente': return 'text-orange-400 bg-orange-400/10 border-orange-400/30';
       case 'Breeding': return 'text-secondary bg-secondary/10 border-secondary/30';
       case 'Finalizado': return 'text-green-400 bg-green-400/10 border-green-400/30';
+      case 'Entregue': return 'text-blue-400 bg-blue-400/10 border-blue-400/30';
       default: return 'text-primary bg-primary/10 border-primary/30';
     }
   };
 
   const totalSpent = filteredOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
   const pendingCount = filteredOrders.filter(o => o.status === 'Pendente' || o.status === 'Breeding').length;
-  const completedCount = filteredOrders.filter(o => o.status === 'Finalizado').length;
+  const completedCount = filteredOrders.filter(o => o.status === 'Finalizado' || o.status === 'Entregue').length;
 
   if (authLoading) {
     return (
@@ -541,6 +542,7 @@ const OrderTimeline = ({ status }: { status: string }) => {
     { id: 'Breeding', label: 'Forjando', icon: <RefreshCw size={14} />, description: 'Em processo de breed' },
     { id: 'Testing', label: 'Testando', icon: <Star size={14} />, description: 'Validando IVs e EVs' },
     { id: 'Finalizado', label: 'Pronto', icon: <CheckCircle2 size={14} />, description: 'Disponível para entrega' },
+    { id: 'Entregue', label: 'Entregue', icon: <Package size={14} />, description: 'Pedido recebido' },
   ];
 
   const currentIdx = stages.findIndex(s => s.id === status);

@@ -212,10 +212,7 @@ export function getSpriteUrl(id: number, shiny: boolean = false): string {
     return `/assets/artwork/mega/${id}${shiny ? '-shiny' : ''}.png`;
   }
 
-  // 4b. Form variations (10000-19999) → local sprites folder
-  if (id >= 10000 && id < 20000) {
-    return `/assets/sprites/variations/${id}${shiny ? '-shiny' : ''}.png`;
-  }
+  // The form variations (10000-19999) are now handled directly by the official PokeAPI fallback below.
 
   // 5. Official PokeAPI for base Pokémon
   const shinyPath = shiny ? 'shiny/' : '';
@@ -1448,4 +1445,62 @@ export const POKEMON_TYPE_DATA: PokemonEntry[] = [
   { id: 30892, name: "G-Max Urshifu (Single)", types: ["Fighting", "Dark"] },
   { id: 31311, name: "G-Max Urshifu (Rapid)", types: ["Fighting", "Water"] },
   { id: 30091, name: "G-Max Cloyster", types: ["Water", "Ice"] },
+  { id: 10091, name: "Rattata de Alola", types: ["Dark", "Normal"] },
+  { id: 10092, name: "Raticate de Alola", types: ["Dark", "Normal"] },
+  { id: 10100, name: "Raichu de Alola", types: ["Electric", "Psychic"] },
+  { id: 10101, name: "Sandshrew de Alola", types: ["Ice", "Steel"] },
+  { id: 10102, name: "Sandslash de Alola", types: ["Ice", "Steel"] },
+  { id: 10103, name: "Vulpix de Alola", types: ["Ice"] },
+  { id: 10104, name: "Ninetales de Alola", types: ["Ice", "Fairy"] },
+  { id: 10105, name: "Diglett de Alola", types: ["Ground", "Steel"] },
+  { id: 10106, name: "Dugtrio de Alola", types: ["Ground", "Steel"] },
+  { id: 10107, name: "Meowth de Alola", types: ["Dark"] },
+  { id: 10108, name: "Persian de Alola", types: ["Dark"] },
+  { id: 10109, name: "Geodude de Alola", types: ["Rock", "Electric"] },
+  { id: 10110, name: "Graveler de Alola", types: ["Rock", "Electric"] },
+  { id: 10111, name: "Golem de Alola", types: ["Rock", "Electric"] },
+  { id: 10112, name: "Grimer de Alola", types: ["Poison", "Dark"] },
+  { id: 10113, name: "Muk de Alola", types: ["Poison", "Dark"] },
+  { id: 10114, name: "Exeggutor de Alola", types: ["Grass", "Dragon"] },
+  { id: 10115, name: "Marowak de Alola", types: ["Fire", "Ghost"] },
+  { id: 10161, name: "Meowth de Galar", types: ["Steel"] },
+  { id: 10162, name: "Ponyta de Galar", types: ["Psychic"] },
+  { id: 10163, name: "Rapidash de Galar", types: ["Psychic", "Fairy"] },
+  { id: 10164, name: "Slowpoke de Galar", types: ["Psychic"] },
+  { id: 10165, name: "Slowbro de Galar", types: ["Poison", "Psychic"] },
+  { id: 10166, name: "Farfetchd de Galar", types: ["Fighting"] },
+  { id: 10167, name: "Weezing de Galar", types: ["Poison", "Fairy"] },
+  { id: 10168, name: "Mr de Galar", types: ["Ice", "Psychic"] },
+  { id: 10169, name: "Articuno de Galar", types: ["Psychic", "Flying"] },
+  { id: 10170, name: "Zapdos de Galar", types: ["Fighting", "Flying"] },
+  { id: 10171, name: "Moltres de Galar", types: ["Dark", "Flying"] },
+  { id: 10172, name: "Slowking de Galar", types: ["Poison", "Psychic"] },
+  { id: 10173, name: "Corsola de Galar", types: ["Ghost"] },
+  { id: 10174, name: "Zigzagoon de Galar", types: ["Dark", "Normal"] },
+  { id: 10175, name: "Linoone de Galar", types: ["Dark", "Normal"] },
+  { id: 10176, name: "Darumaka de Galar", types: ["Ice"] },
+  { id: 10177, name: "Darmanitan de Galar", types: ["Ice"] },
+  { id: 10178, name: "Darmanitan de Galar", types: ["Ice", "Fire"] },
+  { id: 10179, name: "Yamask de Galar", types: ["Ground", "Ghost"] },
+  { id: 10180, name: "Stunfisk de Galar", types: ["Ground", "Steel"] },
+  { id: 10229, name: "Growlithe de Hisui", types: ["Fire", "Rock"] },
+  { id: 10230, name: "Arcanine de Hisui", types: ["Fire", "Rock"] },
+  { id: 10231, name: "Voltorb de Hisui", types: ["Electric", "Grass"] },
+  { id: 10232, name: "Electrode de Hisui", types: ["Electric", "Grass"] },
+  { id: 10233, name: "Typhlosion de Hisui", types: ["Fire", "Ghost"] },
+  { id: 10234, name: "Qwilfish de Hisui", types: ["Dark", "Poison"] },
+  { id: 10235, name: "Sneasel de Hisui", types: ["Fighting", "Poison"] },
+  { id: 10236, name: "Samurott de Hisui", types: ["Water", "Dark"] },
+  { id: 10237, name: "Lilligant de Hisui", types: ["Grass", "Fighting"] },
+  { id: 10238, name: "Zorua de Hisui", types: ["Normal", "Ghost"] },
+  { id: 10239, name: "Zoroark de Hisui", types: ["Normal", "Ghost"] },
+  { id: 10240, name: "Braviary de Hisui", types: ["Psychic", "Flying"] },
+  { id: 10241, name: "Sliggoo de Hisui", types: ["Steel", "Dragon"] },
+  { id: 10242, name: "Goodra de Hisui", types: ["Steel", "Dragon"] },
+  { id: 10243, name: "Avalugg de Hisui", types: ["Ice", "Rock"] },
+  { id: 10244, name: "Decidueye de Hisui", types: ["Grass", "Fighting"] },
+  { id: 10250, name: "Tauros de Paldea", types: ["Fighting"] },
+  { id: 10251, name: "Tauros de Paldea", types: ["Fighting", "Fire"] },
+  { id: 10252, name: "Tauros de Paldea", types: ["Fighting", "Water"] },
+  { id: 10253, name: "Wooper de Paldea", types: ["Poison", "Ground"] }
 ];

@@ -7728,7 +7728,508 @@ export const POKEMON_DATA = [
       "Limber"
     ],
     "hiddenAbility": "Imposter"
-  }
+  },
+{
+  "id": 10091,
+  "name": "Rattata de Alola",
+  "abilities": [
+    "Gluttony",
+    "Hustle"
+  ],
+  "hiddenAbility": "Thick Fat"
+},
+{
+  "id": 10092,
+  "name": "Raticate de Alola",
+  "abilities": [
+    "Gluttony",
+    "Hustle"
+  ],
+  "hiddenAbility": "Thick Fat"
+},
+{
+  "id": 10100,
+  "name": "Raichu de Alola",
+  "abilities": [
+    "Surge Surfer"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10101,
+  "name": "Sandshrew de Alola",
+  "abilities": [
+    "Snow Cloak"
+  ],
+  "hiddenAbility": "Slush Rush"
+},
+{
+  "id": 10102,
+  "name": "Sandslash de Alola",
+  "abilities": [
+    "Snow Cloak"
+  ],
+  "hiddenAbility": "Slush Rush"
+},
+{
+  "id": 10103,
+  "name": "Vulpix de Alola",
+  "abilities": [
+    "Snow Cloak"
+  ],
+  "hiddenAbility": "Snow Warning"
+},
+{
+  "id": 10104,
+  "name": "Ninetales de Alola",
+  "abilities": [
+    "Snow Cloak"
+  ],
+  "hiddenAbility": "Snow Warning"
+},
+{
+  "id": 10105,
+  "name": "Diglett de Alola",
+  "abilities": [
+    "Sand Veil",
+    "Tangling Hair"
+  ],
+  "hiddenAbility": "Sand Force"
+},
+{
+  "id": 10106,
+  "name": "Dugtrio de Alola",
+  "abilities": [
+    "Sand Veil",
+    "Tangling Hair"
+  ],
+  "hiddenAbility": "Sand Force"
+},
+{
+  "id": 10107,
+  "name": "Meowth de Alola",
+  "abilities": [
+    "Pickup",
+    "Technician"
+  ],
+  "hiddenAbility": "Rattled"
+},
+{
+  "id": 10108,
+  "name": "Persian de Alola",
+  "abilities": [
+    "Fur Coat",
+    "Technician"
+  ],
+  "hiddenAbility": "Rattled"
+},
+{
+  "id": 10109,
+  "name": "Geodude de Alola",
+  "abilities": [
+    "Magnet Pull",
+    "Sturdy"
+  ],
+  "hiddenAbility": "Galvanize"
+},
+{
+  "id": 10110,
+  "name": "Graveler de Alola",
+  "abilities": [
+    "Magnet Pull",
+    "Sturdy"
+  ],
+  "hiddenAbility": "Galvanize"
+},
+{
+  "id": 10111,
+  "name": "Golem de Alola",
+  "abilities": [
+    "Magnet Pull",
+    "Sturdy"
+  ],
+  "hiddenAbility": "Galvanize"
+},
+{
+  "id": 10112,
+  "name": "Grimer de Alola",
+  "abilities": [
+    "Poison Touch",
+    "Gluttony"
+  ],
+  "hiddenAbility": "Power Of Alchemy"
+},
+{
+  "id": 10113,
+  "name": "Muk de Alola",
+  "abilities": [
+    "Poison Touch",
+    "Gluttony"
+  ],
+  "hiddenAbility": "Power Of Alchemy"
+},
+{
+  "id": 10114,
+  "name": "Exeggutor de Alola",
+  "abilities": [
+    "Frisk"
+  ],
+  "hiddenAbility": "Harvest"
+},
+{
+  "id": 10115,
+  "name": "Marowak de Alola",
+  "abilities": [
+    "Cursed Body",
+    "Lightning Rod"
+  ],
+  "hiddenAbility": "Rock Head"
+},
+{
+  "id": 10161,
+  "name": "Meowth de Galar",
+  "abilities": [
+    "Pickup",
+    "Tough Claws"
+  ],
+  "hiddenAbility": "Unnerve"
+},
+{
+  "id": 10162,
+  "name": "Ponyta de Galar",
+  "abilities": [
+    "Run Away",
+    "Pastel Veil"
+  ],
+  "hiddenAbility": "Anticipation"
+},
+{
+  "id": 10163,
+  "name": "Rapidash de Galar",
+  "abilities": [
+    "Run Away",
+    "Pastel Veil"
+  ],
+  "hiddenAbility": "Anticipation"
+},
+{
+  "id": 10164,
+  "name": "Slowpoke de Galar",
+  "abilities": [
+    "Gluttony",
+    "Own Tempo"
+  ],
+  "hiddenAbility": "Regenerator"
+},
+{
+  "id": 10165,
+  "name": "Slowbro de Galar",
+  "abilities": [
+    "Quick Draw",
+    "Own Tempo"
+  ],
+  "hiddenAbility": "Regenerator"
+},
+{
+  "id": 10166,
+  "name": "Farfetchd de Galar",
+  "abilities": [
+    "Steadfast"
+  ],
+  "hiddenAbility": "Scrappy"
+},
+{
+  "id": 10167,
+  "name": "Weezing de Galar",
+  "abilities": [
+    "Levitate",
+    "Neutralizing Gas"
+  ],
+  "hiddenAbility": "Misty Surge"
+},
+{
+  "id": 10168,
+  "name": "Mr de Galar",
+  "abilities": [
+    "Vital Spirit",
+    "Screen Cleaner"
+  ],
+  "hiddenAbility": "Ice Body"
+},
+{
+  "id": 10169,
+  "name": "Articuno de Galar",
+  "abilities": [
+    "Competitive"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10170,
+  "name": "Zapdos de Galar",
+  "abilities": [
+    "Defiant"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10171,
+  "name": "Moltres de Galar",
+  "abilities": [
+    "Berserk"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10172,
+  "name": "Slowking de Galar",
+  "abilities": [
+    "Curious Medicine",
+    "Own Tempo"
+  ],
+  "hiddenAbility": "Regenerator"
+},
+{
+  "id": 10173,
+  "name": "Corsola de Galar",
+  "abilities": [
+    "Weak Armor"
+  ],
+  "hiddenAbility": "Cursed Body"
+},
+{
+  "id": 10174,
+  "name": "Zigzagoon de Galar",
+  "abilities": [
+    "Pickup",
+    "Gluttony"
+  ],
+  "hiddenAbility": "Quick Feet"
+},
+{
+  "id": 10175,
+  "name": "Linoone de Galar",
+  "abilities": [
+    "Pickup",
+    "Gluttony"
+  ],
+  "hiddenAbility": "Quick Feet"
+},
+{
+  "id": 10176,
+  "name": "Darumaka de Galar",
+  "abilities": [
+    "Hustle"
+  ],
+  "hiddenAbility": "Inner Focus"
+},
+{
+  "id": 10177,
+  "name": "Darmanitan de Galar",
+  "abilities": [
+    "Gorilla Tactics"
+  ],
+  "hiddenAbility": "Zen Mode"
+},
+{
+  "id": 10178,
+  "name": "Darmanitan de Galar",
+  "abilities": [
+    "Gorilla Tactics"
+  ],
+  "hiddenAbility": "Zen Mode"
+},
+{
+  "id": 10179,
+  "name": "Yamask de Galar",
+  "abilities": [
+    "Wandering Spirit"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10180,
+  "name": "Stunfisk de Galar",
+  "abilities": [
+    "Mimicry"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10229,
+  "name": "Growlithe de Hisui",
+  "abilities": [
+    "Intimidate",
+    "Flash Fire"
+  ],
+  "hiddenAbility": "Rock Head"
+},
+{
+  "id": 10230,
+  "name": "Arcanine de Hisui",
+  "abilities": [
+    "Intimidate",
+    "Flash Fire"
+  ],
+  "hiddenAbility": "Rock Head"
+},
+{
+  "id": 10231,
+  "name": "Voltorb de Hisui",
+  "abilities": [
+    "Soundproof",
+    "Static"
+  ],
+  "hiddenAbility": "Aftermath"
+},
+{
+  "id": 10232,
+  "name": "Electrode de Hisui",
+  "abilities": [
+    "Soundproof",
+    "Static"
+  ],
+  "hiddenAbility": "Aftermath"
+},
+{
+  "id": 10233,
+  "name": "Typhlosion de Hisui",
+  "abilities": [
+    "Blaze"
+  ],
+  "hiddenAbility": "Frisk"
+},
+{
+  "id": 10234,
+  "name": "Qwilfish de Hisui",
+  "abilities": [
+    "Poison Point",
+    "Swift Swim"
+  ],
+  "hiddenAbility": "Intimidate"
+},
+{
+  "id": 10235,
+  "name": "Sneasel de Hisui",
+  "abilities": [
+    "Inner Focus",
+    "Keen Eye"
+  ],
+  "hiddenAbility": "Pickpocket"
+},
+{
+  "id": 10236,
+  "name": "Samurott de Hisui",
+  "abilities": [
+    "Torrent"
+  ],
+  "hiddenAbility": "Sharpness"
+},
+{
+  "id": 10237,
+  "name": "Lilligant de Hisui",
+  "abilities": [
+    "Chlorophyll",
+    "Hustle"
+  ],
+  "hiddenAbility": "Leaf Guard"
+},
+{
+  "id": 10238,
+  "name": "Zorua de Hisui",
+  "abilities": [
+    "Illusion"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10239,
+  "name": "Zoroark de Hisui",
+  "abilities": [
+    "Illusion"
+  ],
+  "hiddenAbility": null
+},
+{
+  "id": 10240,
+  "name": "Braviary de Hisui",
+  "abilities": [
+    "Keen Eye",
+    "Sheer Force"
+  ],
+  "hiddenAbility": "Tinted Lens"
+},
+{
+  "id": 10241,
+  "name": "Sliggoo de Hisui",
+  "abilities": [
+    "Sap Sipper",
+    "Shell Armor"
+  ],
+  "hiddenAbility": "Gooey"
+},
+{
+  "id": 10242,
+  "name": "Goodra de Hisui",
+  "abilities": [
+    "Sap Sipper",
+    "Shell Armor"
+  ],
+  "hiddenAbility": "Gooey"
+},
+{
+  "id": 10243,
+  "name": "Avalugg de Hisui",
+  "abilities": [
+    "Strong Jaw",
+    "Ice Body"
+  ],
+  "hiddenAbility": "Sturdy"
+},
+{
+  "id": 10244,
+  "name": "Decidueye de Hisui",
+  "abilities": [
+    "Overgrow"
+  ],
+  "hiddenAbility": "Scrappy"
+},
+{
+  "id": 10250,
+  "name": "Tauros de Paldea",
+  "abilities": [
+    "Intimidate",
+    "Anger Point"
+  ],
+  "hiddenAbility": "Cud Chew"
+},
+{
+  "id": 10251,
+  "name": "Tauros de Paldea",
+  "abilities": [
+    "Intimidate",
+    "Anger Point"
+  ],
+  "hiddenAbility": "Cud Chew"
+},
+{
+  "id": 10252,
+  "name": "Tauros de Paldea",
+  "abilities": [
+    "Intimidate",
+    "Anger Point"
+  ],
+  "hiddenAbility": "Cud Chew"
+},
+{
+  "id": 10253,
+  "name": "Wooper de Paldea",
+  "abilities": [
+    "Poison Point",
+    "Water Absorb"
+  ],
+  "hiddenAbility": "Unaware"
+}
 ];
 
 export const NATURES = [

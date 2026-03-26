@@ -1,13 +1,14 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, X, Shield, Star, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User } from 'lucide-react';
+import { ShoppingBag, X, Shield, Star, BookOpen, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User, Brain } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PokeGridPage } from './pages/PokeGridPage';
-import { PokedexPage } from './pages/PokedexPage';
 import { PokedlePage } from './pages/PokedlePage';
+import { PokedexPage } from './pages/PokedexPage';
+import { PokeQuizPage } from './pages/PokeQuizPage';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
@@ -86,8 +87,15 @@ const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
           color="secondary"
         />
         <CategoryCard 
+          to="/pokequiz" 
+          icon={<Brain size={32} />} 
+          title="POKÉQUIZ" 
+          desc="Teste sua velocidade e conhecimento!"
+          color="primary"
+        />
+        <CategoryCard 
           to="/faq" 
-          icon={<HelpCircle size={32} />} 
+          icon={<BookOpen size={32} />} 
           title="FAQ / AJUDA" 
           desc="Dúvidas frequentes e suporte."
           color="primary"
@@ -306,7 +314,7 @@ const CategoryCard = ({ to, icon, title, desc, color }: any) => {
   );
 };
 
-const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowReviewsModal, notifications, setNotifications, removeNotification, onLogoClick, streak, setIsSettingsOpen }: any) => {
+const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, removeNotification, onLogoClick, streak, setIsSettingsOpen }: any) => {
    const location = useLocation();
    const navigate = useNavigate();
    const { user } = useAuth();
@@ -331,8 +339,8 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowRevie
   return (
     <>
       <nav className="sticky top-0 w-full z-50 bg-black/90 backdrop-blur-md border-b border-primary/20 px-6 py-4">
-        <div className="w-full grid grid-cols-3 items-center">
-          <div className="flex items-center gap-4 justify-self-start">
+        <div className="w-full flex items-center justify-between relative">
+          <div className="flex items-center gap-4 z-10">
             <div 
               className="flex items-center gap-3 group cursor-pointer" 
               onClick={() => { navigate('/'); onLogoClick?.(); }}
@@ -414,20 +422,29 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, setShowRankingModal, setShowRevie
             </div>
           </div>
           
-          <div className="hidden lg:flex gap-6 items-center justify-center">
-            <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokéGrid</Link>
-            <Link to="/order" className={`nav-link-manda ${isActive('/order') ? 'active' : ''}`}>Encomendas</Link>
-            <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
-            {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
-            <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
-            <button onClick={() => { setShowRankingModal(true); setShowReviewsModal(false); }} className="nav-link-manda">Placar</button>
-            <button onClick={() => { setShowReviewsModal(true); setShowRankingModal(false); }} className="nav-link-manda">Feedbacks</button>
-            <Link to="/pokedex" className={`nav-link-manda ${isActive('/pokedex') ? 'active' : ''}`}>Pokédex</Link>
-            <Link to="/pokedle" className={`nav-link-manda ${isActive('/pokedle') ? 'active' : ''}`}>PokéDLE</Link>
-            <Link to="/faq" className={`nav-link-manda ${isActive('/faq') ? 'active' : ''}`}>FAQ</Link>
+          <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl items-center pointer-events-none z-0">
+             
+             <div className="flex-1 flex justify-end gap-6 pr-6 pointer-events-auto">
+                <Link to="/faq" className={`nav-link-manda ${isActive('/faq') ? 'active' : ''}`}>FAQ</Link>
+                <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
+                {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
+                <Link to="/order" className={`nav-link-manda ${isActive('/order') ? 'active' : ''}`}>Encomendas</Link>
+             </div>
+             
+             <div className="pointer-events-auto shrink-0 px-2">
+                <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
+             </div>
+             
+             <div className="flex-1 flex justify-start gap-6 pl-6 pointer-events-auto">
+                <Link to="/pokedex" className={`nav-link-manda ${isActive('/pokedex') ? 'active' : ''}`}>Pokédex</Link>
+                <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokéGrid</Link>
+                <Link to="/pokedle" className={`nav-link-manda ${isActive('/pokedle') ? 'active' : ''}`}>PokéDLE</Link>
+                <Link to="/pokequiz" className={`nav-link-manda ${isActive('/pokequiz') ? 'active' : ''}`}>PokéQuiz</Link>
+             </div>
+
           </div>
 
-          <div className="flex items-center gap-6 justify-self-end">
+          <div className="flex items-center gap-6 z-10">
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-white hover:text-primary transition-colors">
               <ShoppingBag size={24} />
               {cart.length > 0 && (
@@ -640,9 +657,7 @@ function App() {
       <div className="bg-overlay"></div>
       <Navbar 
         isLoginOpen={isLoginOpen} 
-        setIsLoginOpen={setIsLoginOpen} 
-        setShowRankingModal={setShowRankingModal}
-        setShowReviewsModal={setShowReviewsModal}
+        setIsLoginOpen={setIsLoginOpen}
         notifications={notifications}
         setNotifications={setNotifications}
         removeNotification={removeNotification}
@@ -694,6 +709,7 @@ function App() {
             } 
           />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="/pokequiz" element={<PokeQuizPage />} />
         </Routes>
       </main>
 
@@ -948,15 +964,19 @@ function App() {
       <AnimatePresence>
         {showEasterEgg && (
           <motion.div 
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            exit={{ scale: 0, rotate: 180 }}
+            initial={{ scale: 0, y: 100 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0, y: 100 }}
             className="fixed inset-0 z-[2000] flex items-center justify-center pointer-events-none"
           >
-            <div className="bg-primary p-12 rounded-full shadow-[0_0_100px_var(--primary-glow)] flex flex-col items-center">
-              <Star size={80} className="text-black animate-spin" />
-              <h2 className="pixel-title text-black text-4xl mt-4">SHINY FOUND!</h2>
-              <p className="font-black text-black">Você descobriu um segredo...</p>
+            <div className="bg-emerald-900/50 backdrop-blur-md p-12 rounded-[3rem] border-2 border-emerald-400 shadow-[0_0_100px_rgba(52,211,153,0.5)] flex flex-col items-center">
+              <img 
+                src="https://play.pokemonshowdown.com/sprites/gen5ani-shiny/ironvaliant.gif" 
+                alt="Iron Valiant Shiny" 
+                className="w-32 h-32 object-contain filter drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]"
+              />
+              <h2 className="pixel-title text-emerald-300 text-4xl mt-6 drop-shadow-md">SHINY FOUND!</h2>
+              <p className="font-black text-emerald-100 uppercase tracking-widest mt-2 drop-shadow-sm">A lenda renasce no futuro...</p>
             </div>
           </motion.div>
         )}

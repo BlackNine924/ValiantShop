@@ -70,7 +70,8 @@ export const PokeGrid: React.FC = () => {
             setGuesses(parsed.guesses || 0);
             setUsedPokemon(new Set(parsed.usedPokemon || []));
             setGameComplete(parsed.gameComplete || false);
-            setIsSurrendered(parsed.isSurrendered || false);
+            // Only restore surrender for daily mode
+            setIsSurrendered(!unlimitedMode ? (parsed.isSurrendered || false) : false);
             setTime(parsed.time || 0);
           } else {
             handleRestartToDaily();
@@ -148,7 +149,8 @@ export const PokeGrid: React.FC = () => {
           setGuesses(savedState.guesses || 0);
           setUsedPokemon(new Set(savedState.usedPokemon || []));
           setGameComplete(savedState.gameComplete || false);
-          setIsSurrendered(savedState.isSurrendered || false);
+          // Only restore surrender for daily mode; unlimited mode always starts fresh
+          setIsSurrendered(!unlimitedMode ? (savedState.isSurrendered || false) : false);
           setTime(savedState.time || 0);
         } else {
           console.log('🌅 [Pokégrid] Novo dia detectado. Resetando grid diário.');

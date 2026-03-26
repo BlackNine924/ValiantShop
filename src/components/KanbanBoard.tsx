@@ -104,13 +104,21 @@ export const KanbanBoard = ({ orders, onStatusChange, onClose }: KanbanBoardProp
                             <ChevronRight size={14} className="rotate-180" />
                           </button>
                         )}
-                        {col.id !== 'Finalizado' && (
+                        {col.id !== 'Finalizado' ? (
                           <button 
                             onClick={() => onStatusChange(o.id, col.id === 'Pendente' ? 'Breeding' : 'Finalizado')}
                             className="p-1.5 bg-secondary/10 hover:bg-secondary/20 rounded-lg text-secondary transition-all"
                             title="Mover para frente"
                           >
                             <ChevronRight size={14} />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => onStatusChange(o.id, 'Entregue')}
+                            className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-all border border-blue-500/20"
+                            title="Marcar como Entregue"
+                          >
+                            <CheckCircle2 size={14} />
                           </button>
                         )}
                       </div>

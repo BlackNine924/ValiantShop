@@ -20,9 +20,12 @@ export const SilhouetteMode = ({ target }: { target: PokemonEntry }) => {
   useEffect(() => {
     loadPokedleState(user?.displayName || null, 'silhouette', dateStr).then(saved => {
       if (saved) {
-        setGuesses(saved.guesses || []);
-        setGameOver(saved.gameOver || false);
-        setIsSurrendered(saved.isSurrendered || false);
+        const savedDate = saved.date || saved.dateStr || dateStr;
+        if (savedDate === dateStr) {
+          setGuesses(saved.guesses || []);
+          setGameOver(saved.gameOver || false);
+          setIsSurrendered(saved.isSurrendered || false);
+        }
       }
     });
   }, [user, dateStr]);

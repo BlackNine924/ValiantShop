@@ -5,14 +5,10 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut,
-  updateProfile,
-  signInAnonymously,
-  signInWithPopup,
-  linkWithPopup,
-  unlink
+  updateProfile
 } from 'firebase/auth';
-import { auth, googleProvider, db } from '../firebase';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
 
 interface UserProfile {
@@ -29,10 +25,6 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   authenticate: (nick: string, discord: string) => Promise<void>;
-  loginWithDiscord: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  linkDiscord: () => Promise<void>;
-  linkGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
 }
@@ -79,57 +71,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
 
-    // 3. Discord OAuth Hash Handler
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get('access_token');
-      
-      if (accessToken) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        
-        fetch('https://discord.com/api/users/@me', {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        })
-        .then(res => res.json())
-        .then(async (discordUser) => {
-          if (!discordUser.id) throw new Error("Falha ao obter dados do Discord.");
-          
-          const avatarUrl = discordUser.avatar 
-            ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-            : null;
+    // 3. Removed Discord OAuth Hash Handler
 
-          const discordTag = `${discordUser.username}${discordUser.discriminator !== '0' ? '#' + discordUser.discriminator : ''}`;
-
-          // If user is already logged in, we are LINKING
-          if (auth.currentUser) {
-            try {
-              await registerSocialLink('discord', discordUser.id);
-              await updateProfileData({ 
-                discordId: discordUser.id, 
-                discordTag: discordTag,
-                avatarUrl: avatarUrl || undefined
-              });
-              alert("Discord vinculado com sucesso!");
-            } catch (err: any) {
-              alert(err.message);
-            }
-          } else {
-            // New Login flow
-            const credential = await signInAnonymously(auth);
-            await updateProfile(credential.user, {
-              displayName: discordUser.username,
-              photoURL: avatarUrl
-            });
-            setUser({ ...credential.user, displayName: discordUser.username, photoURL: avatarUrl } as User);
-          }
-        })
-        .catch(err => {
-          console.error("Failed to authenticate with Discord", err);
-          alert("Erro ao conectar com o Discord.");
-        });
-      }
-    }
 
     return () => {
       unsubscribeAuth();
@@ -187,63 +130,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const loginWithDiscord = async () => {
-    const clientId = '1484668729165086881'; 
-    const redirectUri = encodeURIComponent(window.location.origin);
-    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=identify`;
-    window.location.href = discordAuthUrl;
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      console.error("Failed to authenticate with Google", err);
-      throw err;
-    }
-  };
-
-  const registerSocialLink = async (type: 'google' | 'discord', socialId: string) => {
-    if (!user) return;
-    const linkId = `${type}_${socialId}`;
-    const linkRef = doc(db, 'social_links', linkId);
-    const linkSnap = await getDoc(linkRef);
-
-    if (linkSnap.exists() && linkSnap.data().ownerUid !== user.uid) {
-      throw new Error(`Esta conta ${type === 'google' ? 'Google' : 'Discord'} já está vinculada a outro perfil!`);
-    }
-
-    await setDoc(linkRef, { ownerUid: user.uid, type, updatedAt: new Date() });
-  };
-
-  const linkGoogle = async () => {
-    if (!user) return;
-    try {
-      const result = await linkWithPopup(user, googleProvider);
-      const googleId = result.user.providerData.find(p => p.providerId === 'google.com')?.uid;
-      
-      if (googleId) {
-        try {
-          await registerSocialLink('google', googleId);
-          await updateProfileData({ googleId });
-        } catch (linkErr) {
-          // If already linked, unlink from current Firebase session to avoid phantom links
-          await unlink(user, 'google.com');
-          throw linkErr;
-        }
-      }
-    } catch (err: any) {
-      if (err.code === 'auth/credential-already-in-use') {
-        throw new Error("Esta conta Google já está em uso por outro Treinador.");
-      }
-      throw err;
-    }
-  };
-
-  const linkDiscord = async () => {
-    // Para simplificar, usamos o mesmo fluxo de Implicit Grant
-    loginWithDiscord(); 
-  };
 
   const logout = () => signOut(auth);
 
@@ -253,10 +139,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         profile, 
         loading, 
         authenticate, 
-        loginWithDiscord, 
-        loginWithGoogle, 
-        linkDiscord,
-        linkGoogle,
         logout,
         updateProfileData
     }}>

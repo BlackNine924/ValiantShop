@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2 } from 'lucide-react';
+import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
@@ -19,7 +19,7 @@ export const AdminDashboard = () => {
   const [supportChats, setSupportChats] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'treinadores' | 'inbox' | 'analytics' | 'stock_rooms' | 'feedbacks'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'inbox' | 'analytics' | 'stock_rooms' | 'feedbacks'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
@@ -367,7 +367,10 @@ export const AdminDashboard = () => {
                           (o.playerNick?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                           (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
-    if (activeTab !== 'pedidos') return matchesSearch;
+    if (activeTab === 'pedidos' && o.status === 'Entregue') return false;
+    if (activeTab === 'entregues' && o.status !== 'Entregue') return false;
+
+    if (activeTab !== 'pedidos' && activeTab !== 'entregues') return matchesSearch;
     if (o.type === 'support' || o.pokemon === 'SUPORTE GERAL') return false; 
     
     const matchesIvs = filterIvs ? (o.ivs || '').includes(filterIvs) : true;
@@ -385,6 +388,7 @@ export const AdminDashboard = () => {
     switch(status) {
       case 'Finalizado': return 'bg-green-500/20 text-green-400 border-green-500/50';
       case 'Breeding': return 'bg-secondary/20 text-secondary border-secondary/50';
+      case 'Entregue': return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
       default: return 'bg-orange-400/20 text-orange-400 border-orange-400/50';
     }
   };
@@ -433,7 +437,13 @@ export const AdminDashboard = () => {
           <aside className="space-y-4">
             <div className="glow-card p-6 space-y-2">
               <button onClick={() => setActiveTab('pedidos')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'pedidos' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                <ShoppingBag size={18} /> Pedidos ({filteredOrders.length})
+                <ShoppingBag size={18} /> Pedidos ({orders.filter(o => o.status !== 'Entregue' && (o.pokemon !== 'SUPORTE GERAL' && o.type !== 'support' && o.type !== 'Support')).length})
+              </button>
+              <button 
+                onClick={() => setActiveTab('entregues')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'entregues' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
+                <Package size={18} /> Entregues ({orders.filter(o => o.status === 'Entregue').length})
               </button>
               <button onClick={() => setActiveTab('treinadores')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'treinadores' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
                 <Users size={18} /> Treinadores ({uniqueTrainers})
@@ -475,7 +485,7 @@ export const AdminDashboard = () => {
           <main className="lg:col-span-3 space-y-8">
             <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
               <div className="flex justify-between items-center">
-                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'stock_rooms' ? 'Estoque' : 'Inbox'}</span></h2>
+                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'entregues' ? 'Entregues' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'stock_rooms' ? 'Estoque' : 'Inbox'}</span></h2>
                 <div className="flex gap-4">
                     <div className="relative flex items-center">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
@@ -490,7 +500,7 @@ export const AdminDashboard = () => {
                        className="bg-black/50 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs outline-none focus:border-primary transition-colors w-[200px]"
                      />
                    </div>
-                   {activeTab === 'pedidos' ? (
+                   {(activeTab === 'pedidos' || activeTab === 'entregues') ? (
                      <>
                        <button 
                          onClick={() => setShowFilters(!showFilters)} 
@@ -529,7 +539,7 @@ export const AdminDashboard = () => {
                 </div>
               </div>
 
-              {showFilters && activeTab === 'pedidos' && (
+              {showFilters && (activeTab === 'pedidos' || activeTab === 'entregues') && (
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-4 border-t border-white/10 animate-fade-in">
                   <select 
                     value={filterIvs} onChange={e => setFilterIvs(e.target.value)} 
@@ -838,7 +848,7 @@ export const AdminDashboard = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    {activeTab === 'pedidos' && (
+                    {(activeTab === 'pedidos' || activeTab === 'entregues') && (
                       <>
                         <thead>
                           <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
@@ -941,6 +951,7 @@ export const AdminDashboard = () => {
                                       <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
                                       <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
                                       <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
+                                      <option value="Entregue" className="bg-black text-blue-400 font-bold">📦 Entregue</option>
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
                                   </div>
