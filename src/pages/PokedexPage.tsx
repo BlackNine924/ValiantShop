@@ -4,7 +4,7 @@ import { PokedexCard } from '../components/PokedexCard';
 import { PokedexDetail } from '../components/PokedexDetail';
 import { PokedexFilterModal } from '../components/PokedexFilterModal';
 import { Search, ArrowLeft, Filter } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { LEGENDARY_IDS, MYTHICAL_IDS, HAS_MEGA_IDS, HAS_GMAX_IDS, PARADOX_IDS, ULTRABEAST_IDS, HAS_ALOLA_IDS, HAS_GALAR_IDS, HAS_HISUI_IDS, HAS_PALDEA_IDS } from '../data/categoryMappings';
 
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,9 @@ import { loadPokedexState, savePokedexState } from '../services/persistenceServi
 
 export const PokedexPage: React.FC = () => {
   const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     types: [] as string[],

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, MessageSquare } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ADMIN_CONFIG } from '../config/adminConfig';
 
 interface Message {
@@ -39,6 +40,9 @@ export const OrderChat = ({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [teamRocketInvasion, setTeamRocketInvasion] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<any[]>([]);
+  const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     if (!orderId) {
@@ -66,6 +70,52 @@ export const OrderChat = ({
     return unsubscribe;
   }, [orderId, collectionName]);
 
+  // Typing Indicators Listener
+  useEffect(() => {
+    if (!orderId) return;
+
+    const q = query(collection(db, collectionName, orderId, 'typing'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const activeTyping = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
+        .filter(t => t.isTyping && t.id !== (currentUser.uid || currentUser.id));
+      setTypingUsers(activeTyping);
+    });
+
+    return unsubscribe;
+  }, [orderId, collectionName, currentUser]);
+
+  const updateTypingStatus = async (isTyping: boolean) => {
+    if (!orderId) return;
+    const myUid = currentUser.uid || currentUser.id;
+    const typingRef = doc(db, collectionName, orderId, 'typing', myUid);
+
+    try {
+      if (isTyping) {
+        await setDoc(typingRef, {
+          isTyping: true,
+          userName: currentUser.displayName || 'Admin',
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await deleteDoc(typingRef);
+      }
+    } catch (e) {
+      console.error("Error updating typing status:", e);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    
+    // Typing logic
+    updateTypingStatus(true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(false);
+    }, 2000);
+  };
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -75,6 +125,19 @@ export const OrderChat = ({
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+
+    // Team Rocket Easter Egg Trigger
+    if (newMessage.trim().toUpperCase() === 'EQUIPE ROCKET') {
+      setTeamRocketInvasion(true);
+      setNewMessage('');
+      try {
+        const audio = new Audio('https://freesound.org/data/previews/270/270402_5123851-lq.mp3'); // Epic sound (placeholder)
+        audio.volume = 0.4;
+        audio.play().catch(() => {});
+      } catch (e) {}
+      setTimeout(() => setTeamRocketInvasion(false), 5000);
+      return;
+    }
 
     if (!orderId) {
       console.error("No orderId provided to OrderChat");
@@ -95,6 +158,8 @@ export const OrderChat = ({
     try {
       await addDoc(collection(db, collectionName, orderId, 'messages'), messageData);
       setNewMessage('');
+      updateTypingStatus(false); // Stop typing immediately after send
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     } catch (error: any) {
       console.error("Error sending message:", error);
       alert(`Erro ao enviar mensagem: ${error.message || 'Erro desconhecido'}`);
@@ -102,6 +167,7 @@ export const OrderChat = ({
   };
 
   return (
+    <>
     <div 
       className={isFloating 
         ? "w-80 h-[450px] flex flex-col pointer-events-auto" 
@@ -173,6 +239,41 @@ export const OrderChat = ({
               );
             })
           )}
+          
+          {/* Typing Indicator */}
+          <AnimatePresence>
+            {typingUsers.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-start gap-2 mb-2"
+              >
+                <div className="bg-white/5 border border-white/5 rounded-2xl px-4 py-2 flex items-center gap-3">
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ 
+                          y: [0, -4, 0],
+                        }}
+                        transition={{
+                          duration: 0.6,
+                          repeat: Infinity,
+                          delay: i * 0.15,
+                          ease: "easeInOut"
+                        }}
+                        className="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_5px_var(--primary-glow)]"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-black text-primary uppercase tracking-widest italic">
+                    {typingUsers[0].userName} está digitando...
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Input area */}
@@ -182,7 +283,7 @@ export const OrderChat = ({
             className="flex-1 bg-black/60 border-2 border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:border-secondary transition-all"
             placeholder="Mensagem..."
             value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
+            onChange={handleInputChange}
           />
           <button 
             type="submit"
@@ -198,5 +299,84 @@ export const OrderChat = ({
         </form>
       </motion.div>
     </div>
+    
+    {typeof document !== 'undefined' && createPortal(
+      <AnimatePresence>
+        {/* Team Rocket Invasion Overlay (FULL SCREEN via Portal) */}
+        {teamRocketInvasion && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 overflow-hidden pointer-events-auto"
+          >
+            {/* Giant R watermark */}
+            <motion.div 
+              className="absolute -bottom-10 -right-10 text-[300px] font-sans font-black text-red-600/10 italic select-none pointer-events-none"
+            >
+              R
+            </motion.div>
+            
+            <motion.div 
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', damping: 15 }}
+              className="relative w-full max-w-lg bg-[#0a0a0a] border-4 border-red-600 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_80px_rgba(220,38,38,0.5)]"
+            >
+              {/* Wanted Badge */}
+              <div className="absolute -top-4 bg-red-600 text-white font-pixel text-xs px-6 py-1 tracking-widest uppercase rounded-full shadow-lg border border-red-400">
+                WANTED
+              </div>
+
+              <h2 className="pixel-title text-4xl md:text-5xl text-red-600 mt-6 mb-8 tracking-[0.2em] text-center drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]">
+                EQUIPE ROCKET!
+              </h2>
+
+              <div className="flex w-full items-end justify-center gap-6 mb-10">
+                <div className="flex flex-col items-center gap-2">
+                  <img 
+                    src="/assets/easter-eggs/jessie.png" 
+                    alt="Jessie" 
+                    className="h-32 object-contain drop-shadow-xl" 
+                    onError={e => e.currentTarget.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/56.png"}
+                  />
+                  <span className="text-white font-pixel text-xs md:text-sm tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">Jessie</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <img 
+                    src="/assets/easter-eggs/meowth.png" 
+                    alt="Meowth" 
+                    className="h-20 object-contain drop-shadow-xl" 
+                    onError={e => e.currentTarget.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/52.png"}
+                  />
+                  <span className="text-white font-pixel text-xs md:text-sm tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">Meowth</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <img 
+                    src="/assets/easter-eggs/james.png" 
+                    alt="James" 
+                    className="h-32 object-contain drop-shadow-xl" 
+                    onError={e => e.currentTarget.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/55.png"}
+                  />
+                  <span className="text-white font-pixel text-xs md:text-sm tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">James</span>
+                </div>
+              </div>
+
+              <p className="font-sans font-black italic text-white text-center text-sm md:text-lg leading-relaxed tracking-wide px-4">
+                "PARA PROTEGER O MUNDO DA DEVASTAÇÃO...<br/> E DENUNCIAR OS ERROS EM NOSSA LOJA!"
+              </p>
+
+              <div className="flex gap-2 mt-10">
+                <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse" />
+                <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 };

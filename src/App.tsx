@@ -14,14 +14,16 @@ import { useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
 import { LoginModal } from './components/LoginModal';
 import { FAQ } from './pages/FAQ';
+import { FloatingSupport } from './components/FloatingSupport';
 import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { collection, query, onSnapshot, limit, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import logoUrl from './assets/hero.png';
 import { safeStorage } from './utils/storageUtils';
 import { ReviewModal } from './components/ReviewModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TOS_CONTENT } from './data/tosData';
+import { useAllMinigameStreaks } from './hooks/useMinigameStreak';
 
 const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
   return (
@@ -193,9 +195,20 @@ const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
       setReviews([]);
       return;
     }
-    const q = query(collection(db, 'ClientReviews'), orderBy('rating', 'desc'), orderBy('createdAt', 'desc'), limit(isModal ? 20 : 10));
+    const q = query(collection(db, 'ClientReviews'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setReviews(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => {
+          const starsA = a.rating || 0;
+          const starsB = b.rating || 0;
+          if (starsB !== starsA) return starsB - starsA;
+          
+          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+          return timeB - timeA;
+        })
+        .slice(0, isModal ? 20 : 10);
+      setReviews(data);
     }, (error) => {
       console.error("Firestore error in ClientReviews:", error);
     });
@@ -314,10 +327,12 @@ const CategoryCard = ({ to, icon, title, desc, color }: any) => {
   );
 };
 
-const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, removeNotification, onLogoClick, streak, setIsSettingsOpen }: any) => {
+const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, removeNotification, onLogoClick, setIsSettingsOpen }: any) => {
    const location = useLocation();
    const navigate = useNavigate();
    const { user } = useAuth();
+   const { pokegrid, pokedle, pokequiz } = useAllMinigameStreaks(user?.uid);
+   const bestStreak = Math.max(pokegrid.streak, pokedle.streak, pokequiz.streak);
    const isActive = (path: string) => location.pathname === path;
    const { cart, setIsCartOpen } = useCart();
    const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -455,9 +470,9 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, 
             </button>
             {user ? (
               <div className="flex items-center gap-4">
-                {streak > 0 && (
-                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full" title="Sua sequência de dias!">
-                    <span className="text-[10px] font-black text-orange-400 font-mono">🔥 {streak}</span>
+                {bestStreak > 0 && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full" title="Melhor streak de minigames!">
+                    <span className="text-[10px] font-black text-orange-400 font-mono">🔥 {bestStreak}</span>
                   </div>
                 )}
                 <div className="hidden lg:flex flex-col items-end">
@@ -517,7 +532,6 @@ function App() {
   const [, setLogoClicks] = useState(0);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [showTOS, setShowTOS] = useState(false);
-  const [streak, setStreak] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFinishedNotification, setShowFinishedNotification] = useState<any>(null);
   const { user } = useAuth();
@@ -557,27 +571,6 @@ function App() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (user) {
-      const today = new Date().toDateString();
-      const lastLogin = safeStorage.getItem(`last_login_${user.uid}`, '');
-      const currentStreak = parseInt(safeStorage.getItem(`streak_${user.uid}`, '0'));
-
-      if (lastLogin !== today) {
-        if (lastLogin === new Date(Date.now() - 86400000).toDateString()) {
-          const newStreak = currentStreak + 1;
-          setStreak(newStreak);
-          safeStorage.setItem(`streak_${user.uid}`, newStreak.toString());
-        } else {
-          setStreak(1);
-          safeStorage.setItem(`streak_${user.uid}`, '1');
-        }
-        safeStorage.setItem(`last_login_${user.uid}`, today);
-      } else {
-        setStreak(currentStreak);
-      }
-    }
-  }, [user]);
 
   const handleLogoClick = () => {
     setLogoClicks(prev => {
@@ -662,13 +655,11 @@ function App() {
         setNotifications={setNotifications}
         removeNotification={removeNotification}
         onLogoClick={handleLogoClick}
-        streak={streak}
         setIsSettingsOpen={setIsSettingsOpen}
       />
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
-        streak={streak}
       />
       <main className="py-12 relative z-10 flex-1">
         <Routes>
@@ -712,6 +703,8 @@ function App() {
           <Route path="/pokequiz" element={<PokeQuizPage />} />
         </Routes>
       </main>
+      
+      <FloatingSupport />
 
       {/* Global Modals */}
       <AnimatePresence>

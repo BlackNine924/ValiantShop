@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import React, { useState, useEffect, useRef, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package } from 'lucide-react';
+import { 
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset
+} from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
 import { EVOLUTION_LINES } from '../data/evolutionLines';
 import { POKEMON_DATA } from '../data/pokemonData';
@@ -10,6 +13,28 @@ import { ADMIN_CONFIG } from '../config/adminConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrderChat } from '../components/OrderChat';
 import { KanbanBoard } from '../components/KanbanBoard';
+
+// Arrays de Regras (Genderless e Male Only)
+const GENDERLESS_POKEMON = [
+  'Magnemite', 'Magneton', 'Magnezone', 'Voltorb', 'Electrode', 'Staryu', 'Starmie', 'Porygon', 'Porygon2', 'Porygon-Z',
+  'Shedinja', 'Lunatone', 'Solrock', 'Baltoy', 'Claydol', 'Beldum', 'Metang', 'Metagross', 'Bronzor', 'Bronzong',
+  'Rotom', 'Phione', 'Manaphy', 'Darkrai', 'Shaymin', 'Arceus', 'Victini', 'Klink', 'Klang', 'Klinklang', 'Cryogonal',
+  'Golett', 'Golurk', 'Ditto', 'Mew', 'Celebi', 'Jirachi', 'Deoxys', 'Regirock', 'Regice', 'Registeel',
+  'Latias', 'Latios', 'Kyogre', 'Groudon', 'Rayquaza', 'Azelf', 'Mesprit', 'Uxie', 'Dialga', 'Palkia', 'Heatran', 'Regigigas',
+  'Giratina', 'Cresselia', 'Cobalion', 'Terrakion', 'Virizion', 'Tornadus', 'Thundurus', 'Reshiram', 'Zekrom', 'Landorus',
+  'Kyurem', 'Keldeo', 'Meloetta', 'Genesect', 'Xerneas', 'Yveltal', 'Zygarde', 'Diancie', 'Hoopa', 'Volcanion', 'Type: Null',
+  'Silvally', 'Minior', 'Dhelmise', 'Tapu Koko', 'Tapu Lele', 'Tapu Bulu', 'Tapu Fini', 'Cosmog', 'Cosmoem', 'Solgaleo',
+  'Lunala', 'Nihilego', 'Buzzwole', 'Pheromosa', 'Xurkitree', 'Celesteela', 'Kartana', 'Guzzlord', 'Necrozma', 'Magearna',
+  'Marshadow', 'Poipole', 'Naganadel', 'Stakataka', 'Blacephalon', 'Zeraora', 'Meltan', 'Melmetal', 'Sinistea', 'Poltchageist', 'Polteageist',
+  'Falinks', 'Calyrex', 'Regieleki', 'Regidrago', 'Glastrier', 'Spectrier', 'Pecharunt', 'Terapagos', 'Tandemaus', 'Maushold'
+];
+
+const MALE_ONLY_POKEMON = [
+  'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
+  'Volbeat', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
+  'Impidimp', 'Morgrem', 'Grimmsnarl', 
+  'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
+];
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,21 +48,22 @@ export const AdminDashboard = () => {
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+
   const [notifications, setNotifications] = useState<any[]>([]);
   const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Match' | 'Pedido' | 'Support'>('Todos');
   const [expandedTrainerNick, setExpandedTrainerNick] = useState<string | null>(null);
   const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set());
-  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ 
     isOpen: boolean, 
-    type: 'order' | 'notification' | 'feedback', 
+    type: 'order' | 'notification' | 'feedback' | 'mass-notification' | 'mass-order' | 'stock_room', 
     id: string, 
     name: string 
   } | null>(null);
   const [filterStars, setFilterStars] = useState<number | null>(null);
   const [showFeedbackFilters, setShowFeedbackFilters] = useState(false);
+  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const deleteModalRef = useRef<HTMLDivElement>(null);
 
   // Advanced Filters
@@ -49,6 +75,16 @@ export const AdminDashboard = () => {
   const [filterEggGroup, setFilterEggGroup] = useState('');
   const [filterTrainer, setFilterTrainer] = useState('');
   const [filterAbility, setFilterAbility] = useState('');
+  const [isAutoOrderModalOpen, setIsAutoOrderModalOpen] = useState(false);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 15;
+
+  // Reset page when tab or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, filterIvs, filterGender, filterHA, filterIsCastrated, filterEggGroup, filterTrainer, filterAbility]);
 
   const toggleChat = (order: any) => {
     setActiveChats(prev => {
@@ -78,35 +114,12 @@ export const AdminDashboard = () => {
     setFilterTrainer('');
     setSearchTerm('');
     setTrainersSearch('');
-    setSelectedOrders([]);
-    setIsBulkDeleteMode(false);
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedOrders.length === 0) return;
-    
-    if (window.confirm(`Deseja realmente excluir ${selectedOrders.length} encomendas permanentemente?`)) {
-      try {
-        const batch = writeBatch(db);
-        selectedOrders.forEach(id => {
-          batch.delete(doc(db, 'orders', id));
-          // Also cleanup any notifications related to these orders
-          notifications.filter(n => n.order?.id === id).forEach(notif => {
-            // If notifications were in a collection, we would delete them here.
-            // For now, let's assume they are derived and we just need to satisfy the lint.
-            if (notif.id) {
-              // batch.delete(doc(db, 'notifications', notif.id));
-            }
-          });
-        });
-        await batch.commit();
-        setSelectedOrders([]);
-        alert(`${selectedOrders.length} encomendas removidas com sucesso!`);
-      } catch (err) {
-        console.error("Erro na exclusão em massa:", err);
-        alert("Erro ao excluir encomendas.");
-      }
-    }
+    setFilterIvs('');
+    setFilterGender('');
+    setFilterHA(null);
+    setFilterIsCastrated(null);
+    setFilterEggGroup('');
+    setFilterAbility('');
   };
 
   const updateStock = async (pokemon: string, ivs: string, gender: string, nature: string) => {
@@ -155,10 +168,13 @@ export const AdminDashboard = () => {
       await deleteDoc(doc(db, 'orders', orderId));
       setDeleteConfirm(null);
     } catch (e) {
-      console.error('Erro ao deletar:', e);
-      alert('Falha ao deletar no banco de dados.');
+      console.error('Erro ao deletar encomenda:', e);
+      alert('Falha ao deletar encomenda.');
     }
   };
+
+
+
 
 
   useEffect(() => {
@@ -204,10 +220,13 @@ export const AdminDashboard = () => {
     };
   }, [isAuthenticated]);
 
+
+
   useEffect(() => {
     if (!isAuthenticated) return;
     
     const q = query(collection(db, 'ClientReviews'));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -377,12 +396,19 @@ export const AdminDashboard = () => {
     const matchesGender = filterGender ? o.gender === filterGender : true;
     const matchesHA = filterHA !== null ? !!o.hasHA === filterHA : true;
     const matchesCastrated = filterIsCastrated !== null ? !!o.isCastrated === filterIsCastrated : true;
-    const matchesEggGroup = filterEggGroup ? getEggGroups(o.pokemon).includes(filterEggGroup) : true;
+    const matchesEggGroup = filterEggGroup 
+      ? (filterEggGroup === 'Ditto' 
+          ? (GENDERLESS_POKEMON.includes(o.pokemon) || MALE_ONLY_POKEMON.includes(o.pokemon)) 
+          : getEggGroups(o.pokemon).includes(filterEggGroup))
+      : true;
     const matchesTrainer = filterTrainer ? (o.playerNick?.toLowerCase() || '').includes(filterTrainer.toLowerCase()) : true;
     const matchesAbility = filterAbility ? (o.ability?.toLowerCase() || '').includes(filterAbility.toLowerCase()) : true;
 
     return matchesSearch && matchesIvs && matchesGender && matchesHA && matchesCastrated && matchesEggGroup && matchesTrainer && matchesAbility;
   });
+
+  const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const getStatusStyle = (status: string) => {
     switch(status) {
@@ -476,6 +502,7 @@ export const AdminDashboard = () => {
               >
                 <Star size={18} /> Feedbacks ({feedbacks.length})
               </button>
+
               <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
                 <ShieldCheck size={18} /> Caixa: {totalEconomy}k
               </button>
@@ -483,19 +510,27 @@ export const AdminDashboard = () => {
           </aside>
 
           <main className="lg:col-span-3 space-y-8">
-            <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
+            {activeTab !== 'stock_rooms' && (
+              <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
+
               <div className="flex justify-between items-center">
-                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'entregues' ? 'Entregues' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : activeTab === 'stock_rooms' ? 'Estoque' : 'Inbox'}</span></h2>
+                <h2 className="pixel-title text-xl">Gestão de <span className="text-primary">{activeTab === 'pedidos' ? 'Encomendas' : activeTab === 'entregues' ? 'Entregues' : activeTab === 'treinadores' ? 'Treinadores' : activeTab === 'analytics' ? 'Analytics' : 'Inbox'}</span></h2>
                 <div className="flex gap-4">
                     <div className="relative flex items-center">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
                      <input 
-                       placeholder={activeTab === 'pedidos' ? "Geral (ID/Pokemon/Nick)..." : "Filtrar treinadores..."} 
-                       value={activeTab === 'pedidos' ? searchTerm : trainersSearch}
+                       placeholder={
+                         (activeTab === 'pedidos' || activeTab === 'entregues') ? "Geral (ID/Pokemon/Nick)..." : 
+                         activeTab === 'treinadores' ? "Filtrar treinadores..." : 
+                         activeTab === 'analytics' ? "Buscar pokémon..." :
+                         activeTab === 'inbox' ? "Buscar mensagens..." :
+                         "Pesquisar..."
+                       } 
+                       value={activeTab === 'treinadores' ? trainersSearch : searchTerm}
                        onChange={e => {
                          const val = e.target.value;
-                         if (activeTab === 'pedidos') setSearchTerm(val);
-                         else if (activeTab === 'treinadores') setTrainersSearch(val);
+                         if (activeTab === 'treinadores') setTrainersSearch(val);
+                         else setSearchTerm(val);
                        }}
                        className="bg-black/50 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs outline-none focus:border-primary transition-colors w-[200px]"
                      />
@@ -508,32 +543,62 @@ export const AdminDashboard = () => {
                        >
                          <Filter size={14} /> Filtros
                        </button>
+                       {activeTab === 'pedidos' && (
+                         <button 
+                           onClick={() => setIsAutoOrderModalOpen(true)}
+                           className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20"
+                         >
+                           <Plus size={14} /> Gerador
+                         </button>
+                       )}
                        <button 
                          onClick={() => setShowKanbanBoard(true)} 
                          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20"
                        >
-                         <PieChart size={14} /> Fila de Produção
+                         <PieChart size={14} /> Fila
                        </button>
-
-                       <button 
-                         onClick={() => {
-                           setIsBulkDeleteMode(!isBulkDeleteMode);
-                           if (isBulkDeleteMode) setSelectedOrders([]);
-                         }} 
-                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${isBulkDeleteMode ? 'bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-black/50 text-gray-400 border-white/10 hover:border-white/30'}`}
-                         title={isBulkDeleteMode ? "Sair do Modo de Exclusão" : "Excluir em Massa"}
-                       >
-                         <Trash2 size={14} /> {isBulkDeleteMode ? "Sair" : "Bulk Delete"}
-                       </button>
-
-                       {isBulkDeleteMode && selectedOrders.length > 0 && (
-                         <button 
-                           onClick={handleBulkDelete}
-                           className="flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest bg-red-600 text-white shadow-lg shadow-red-900/40 hover:bg-red-500 transition-all animate-in zoom-in-95"
-                         >
-                           <Trash2 size={14} /> Deletar ({selectedOrders.length})
-                         </button>
-                       )}
+                        {filteredOrders.length > 0 && (
+                          isBulkDeleteMode ? (
+                            <button 
+                              onClick={() => {
+                                if (selectedOrders.length === 0) {
+                                  alert("Selecione pelo menos uma encomenda para apagar.");
+                                  return;
+                                }
+                                setDeleteConfirm({
+                                  isOpen: true,
+                                  type: 'mass-order',
+                                  id: 'mass',
+                                  name: `Excluir as ${selectedOrders.length} Encomendas selecionadas`
+                                });
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-all"
+                            >
+                              <Trash2 size={14} /> Excluir ({selectedOrders.length})
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                setIsBulkDeleteMode(true);
+                                setSelectedOrders([]);
+                              }}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-500/5 text-red-500 border border-red-500/10 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-all"
+                            >
+                              <Trash2 size={14} /> Apagar em Massa
+                            </button>
+                          )
+                        )}
+                        {isBulkDeleteMode && (
+                          <button 
+                            onClick={() => {
+                              setIsBulkDeleteMode(false);
+                              setSelectedOrders([]);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-xs font-bold hover:text-white transition-all"
+                          >
+                            <X size={14} /> Cancelar
+                          </button>
+                        )}
                      </>
                    ) : null}
                 </div>
@@ -587,6 +652,7 @@ export const AdminDashboard = () => {
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="">Todos Egg Groups</option>
+                    <option value="Ditto">Ditto</option>
                     <option value="Fairy">Fairy</option>
                     <option value="Dragon">Dragon</option>
                     <option value="Monster">Monster</option>
@@ -617,7 +683,6 @@ export const AdminDashboard = () => {
                     onChange={e => setFilterAbility(e.target.value)}
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary"
                   />
-
                   <button 
                     onClick={clearFilters}
                     className="flex items-center justify-center gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg px-3 py-2 text-xs font-bold transition-all"
@@ -627,78 +692,98 @@ export const AdminDashboard = () => {
                 </div>
               )}
             </div>
+          )}
 
             <div className="glow-card overflow-hidden !rounded-2xl">
               {activeTab === 'inbox' ? (
-                <div className="p-8 space-y-4">
-                  <div className="flex gap-2 mb-6">
-                    {(['Todos', 'Match', 'Pedido', 'Support'] as const).map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setInboxFilter(type)}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${inboxFilter === type ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-black/50 text-gray-500 border-white/10 hover:border-white/20'}`}
-                      >
-                        {type === 'Todos' ? 'Todas Notificações' : type === 'Match' ? 'Matches de Estoque' : type === 'Support' ? 'Suporte em Aberto' : 'Pedidos Recentes'}
-                      </button>
-                    ))}
+                <div className="p-8 space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                    <div>
+                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary flex items-center gap-3">
+                        TERMINAL DE COMUNICAÇÃO <span className="text-secondary">[{inboxFilter.toUpperCase()}]</span>
+                      </h3>
+                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Gerencie conversas de pedidos e suporte geral</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                      {(['Todos', 'Pedido', 'Support'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setInboxFilter(f)}
+                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inboxFilter === f ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {notifications.filter(n => inboxFilter === 'Todos' || n.type === inboxFilter).length === 0 ? (
-                    <div className="text-center py-20">
-                      <MessageSquare size={48} className="mx-auto text-gray-700 mb-4 opacity-20" />
-                      <p className="text-gray-500 italic font-bold">Nenhuma notificação {inboxFilter !== 'Todos' ? `de ${inboxFilter}` : ''} no momento...</p>
-                    </div>
-                  ) : (
-                    notifications
-                      .filter(n => inboxFilter === 'Todos' || n.type === inboxFilter)
-                      .map(notif => (
-                      <div key={notif.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 flex items-start gap-4 hover:border-primary/30 transition-all group/notif">
-                        <div className="flex flex-col items-center gap-2 flex-shrink-0">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${notif.type === 'Match' ? 'bg-primary/20 border-primary/40 text-primary group-hover/notif:shadow-[0_0_15px_var(--primary-glow)]' : 'bg-blue-500/20 border-blue-500/40 text-blue-400 group-hover/notif:shadow-[0_0_15px_rgba(59,130,246,0.5)]'}`}>
-                             {notif.type === 'Match' ? <Bell size={18} /> : <ShoppingBag size={18} />}
+                  <div className="grid grid-cols-1 gap-4">
+                    {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' }))]
+                      .filter(chat => {
+                        if (inboxFilter === 'Pedido') return chat.type === 'order';
+                        if (inboxFilter === 'Support') return chat.type === 'support';
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+                        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+                        return timeB - timeA;
+                      })
+                      .map(chat => (
+                        <div key={chat.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group flex items-center justify-between gap-6">
+                          <div className="flex items-center gap-6">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                              {chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
+                            </div>
+                            
+                            <div>
+                               <div className="flex items-center gap-3 mb-1">
+                                 <h4 className="font-black text-white text-lg uppercase tracking-tight">{chat.playerNick || 'Treinador'}</h4>
+                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${chat.type === 'support' ? 'text-secondary border-secondary/30 bg-secondary/5' : 'text-primary border-primary/30 bg-primary/5'}`}>
+                                   {chat.type === 'support' ? 'Suporte Geral' : `Pedido #${chat.id.slice(0,6)}`}
+                                 </span>
+                               </div>
+                               <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                                 <span className="flex items-center gap-1.5"><Bell size={10} /> {chat.status || 'Ativo'}</span>
+                                 <span className="flex items-center gap-1.5 italic opacity-60">
+                                   Iniciado em: {chat.createdAt?.toMillis ? new Date(chat.createdAt.toMillis()).toLocaleString() : 'Recentemente'}
+                                 </span>
+                               </div>
+                            </div>
                           </div>
-                          <span className="text-[8px] text-gray-600 font-black uppercase text-center">{notif.time?.toMillis ? new Date(notif.time.toMillis()).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}) : 'Recent'}</span>
+
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => toggleChat(chat)}
+                              className="px-8 py-3 bg-primary text-black rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group/btn"
+                            >
+                              ABRIR CHAT <MessageSquare size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirm({
+                                isOpen: true,
+                                type: chat.type === 'order' ? 'order' : 'notification',
+                                id: chat.id,
+                                name: `Conversa de ${chat.playerNick || 'Treinador'}`
+                              })}
+                              className="p-3 text-gray-500 hover:text-red-500 transition-colors bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100"
+                            >
+                              <X size={20} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                           <div className="flex justify-between items-start mb-1">
-                              <h4 className="font-bold text-white text-sm">
-                                {notif.type === 'Match' ? `Match Found: ${notif.order.pokemon}` : `Nova Encomenda: ${notif.order.pokemon}`}
-                              </h4>
-                              <button 
-                                onClick={() => setDeleteConfirm({ 
-                                  isOpen: true, 
-                                  type: 'notification', 
-                                  id: notif.id, 
-                                  name: notif.type === 'Match' ? `Match: ${notif.order.pokemon}` : `Notif: ${notif.order.pokemon}` 
-                                })}
-                                className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover/notif:opacity-100"
-                                title="Remover Notificação"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                           </div>
-                           <p className="text-xs text-gray-400 mb-3 leading-relaxed">{notif.message}</p>
-                           <div className="flex gap-2">
-                              {notif.type === 'Support' ? (
-                                <button 
-                                  onClick={() => toggleChat(notif.order)}
-                                  className="px-4 py-2 bg-secondary/20 text-secondary border border-secondary/30 rounded-lg text-[10px] font-black uppercase hover:bg-secondary hover:text-white transition-all shadow-[0_0_15px_rgba(var(--secondary-rgb),0.2)]"
-                                >
-                                  Responder Suporte
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => { setActiveTab('pedidos'); setSearchTerm(notif.order.id); }}
-                                  className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all shadow-[0_0_15px_var(--primary-glow)]"
-                                >
-                                  {notif.type === 'Match' ? 'Ver Pedido' : 'Gerenciar Pedido'}
-                                </button>
-                              )}
-                           </div>
-                        </div>
+                      ))
+                    }
+
+                    {[...orders, ...supportChats].length === 0 && (
+                      <div className="py-20 text-center opacity-30">
+                        <MessageSquare size={80} className="mx-auto text-gray-700 mb-6" />
+                        <p className="text-lg font-black text-gray-600 uppercase tracking-[0.3em]">O silêncio é ensurdecedor...</p>
+                        <p className="text-[10px] text-gray-700 font-bold uppercase mt-2">Nenhuma conversa ativa no radar.</p>
                       </div>
-                    ))
-                  )}
+                    )}
+                  </div>
                 </div>
               ) : activeTab === 'analytics' ? (
                 <div className="p-8 space-y-8">
@@ -714,12 +799,11 @@ export const AdminDashboard = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {salesRanking.map((p: any, idx: number) => (
+                    {salesRanking
+                      .filter((p:any) => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((p: any) => (
                       <div key={p.name} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl flex items-center gap-4 transition-all hover:border-primary/30 group">
                         <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5 relative">
-                          <span className="absolute -top-2 -left-2 w-6 h-6 bg-secondary text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-black group-hover:scale-110 transition-transform">
-                            {idx + 1}
-                          </span>
                           <img 
                             src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(pd => pd.name === p.name)?.id}.png`} 
                             alt={p.name}
@@ -743,7 +827,7 @@ export const AdminDashboard = () => {
                         </div>
                       </div>
                     ))}
-                    {salesRanking.length === 0 && (
+                    {salesRanking.filter((p:any) => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
                       <div className="col-span-full py-20 text-center">
                         <PieChart size={48} className="mx-auto text-gray-700 opacity-20 mb-4" />
                         <p className="text-gray-500 font-bold italic">Nenhum dado de vendas ainda...</p>
@@ -845,6 +929,96 @@ export const AdminDashboard = () => {
                     </div>
                   )}
                 </div>
+              ) : activeTab === 'inbox' ? (
+                <div className="p-8 space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                    <div>
+                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary flex items-center gap-3">
+                        TERMINAL DE COMUNICAÇÃO <span className="text-secondary">[{inboxFilter.toUpperCase()}]</span>
+                      </h3>
+                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Gerencie conversas de pedidos e suporte geral</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                      {(['Todos', 'Pedido', 'Support'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setInboxFilter(f)}
+                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inboxFilter === f ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' }))]
+                      .filter(chat => {
+                        if (inboxFilter === 'Pedido') return chat.type === 'order';
+                        if (inboxFilter === 'Support') return chat.type === 'support';
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+                        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+                        return timeB - timeA;
+                      })
+                      .map(chat => (
+                        <div key={chat.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group flex items-center justify-between gap-6">
+                          <div className="flex items-center gap-6">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                              {chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
+                            </div>
+                            
+                            <div>
+                               <div className="flex items-center gap-3 mb-1">
+                                 <h4 className="font-black text-white text-lg uppercase tracking-tight">{chat.playerNick || 'Treinador'}</h4>
+                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${chat.type === 'support' ? 'text-secondary border-secondary/30 bg-secondary/5' : 'text-primary border-primary/30 bg-primary/5'}`}>
+                                   {chat.type === 'support' ? 'Suporte Geral' : `Pedido #${chat.id.slice(0,6)}`}
+                                 </span>
+                               </div>
+                               <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                                 <span className="flex items-center gap-1.5"><Bell size={10} /> {chat.status || 'Ativo'}</span>
+                                 <span className="flex items-center gap-1.5 italic opacity-60">
+                                   Iniciado em: {chat.createdAt?.toMillis ? new Date(chat.createdAt.toMillis()).toLocaleString() : 'Recentemente'}
+                                 </span>
+                               </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => toggleChat(chat)}
+                              className="px-8 py-3 bg-primary text-black rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group/btn"
+                            >
+                              ABRIR CHAT <MessageSquare size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirm({
+                                isOpen: true,
+                                type: chat.type === 'order' ? 'order' : 'notification',
+                                id: chat.id,
+                                name: `Conversa de ${chat.playerNick || 'Treinador'}`
+                              })}
+                              className="p-3 text-gray-500 hover:text-red-500 transition-colors bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100"
+                            >
+                              <X size={20} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    }
+
+                    {[...orders, ...supportChats].length === 0 && (
+                      <div className="py-20 text-center opacity-30">
+                        <MessageSquare size={80} className="mx-auto text-gray-700 mb-6" />
+                        <p className="text-lg font-black text-gray-600 uppercase tracking-[0.3em]">O silêncio é ensurdecedor...</p>
+                        <p className="text-[10px] text-gray-700 font-bold uppercase mt-2">Nenhuma conversa ativa no radar.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -854,43 +1028,48 @@ export const AdminDashboard = () => {
                           <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
                             {isBulkDeleteMode && (
                               <th className="px-8 py-5 w-10">
-                                <div 
-                                  onClick={() => {
-                                    if (selectedOrders.length === filteredOrders.length) setSelectedOrders([]);
-                                    else setSelectedOrders(filteredOrders.map(o => o.id));
+                                <input 
+                                  type="checkbox" 
+                                  checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedOrders.includes(o.id))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      // Additive: add all visible orders that are not already in selectedOrders
+                                      const newIds = paginatedOrders.map(o => o.id).filter(id => !selectedOrders.includes(id));
+                                      setSelectedOrders(prev => [...prev, ...newIds]);
+                                    } else {
+                                      // Subtractive: remove only the currently visible orders
+                                      const visibleIds = paginatedOrders.map(o => o.id);
+                                      setSelectedOrders(prev => prev.filter(id => !visibleIds.includes(id)));
+                                    }
                                   }}
-                                  className={`w-5 h-5 border-2 rounded flex items-center justify-center cursor-pointer transition-all ${selectedOrders.length === filteredOrders.length ? 'bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'border-white/20 hover:border-white/40 bg-black/40'}`}
-                                >
-                                  {selectedOrders.length === filteredOrders.length && <X size={12} className="text-white" />}
-                                </div>
+                                  className="w-4 h-4 rounded appearance-none border-2 border-white/20 checked:bg-primary checked:border-primary checked:after:content-['✓'] checked:after:text-white checked:after:text-[10px] checked:after:flex checked:after:items-center checked:after:justify-center transition-all cursor-pointer"
+                                />
                               </th>
                             )}
-                            <th className="px-8 py-5">Identificador</th>
-                            <th className="px-8 py-5">Pokémon</th>
-                            <th className="px-8 py-5">Preço</th>
-                            <th className="px-8 py-5">Status</th>
+                            <th className="px-8 py-5 text-left">Identificador</th>
+                            <th className="px-8 py-5 text-left">Pokémon</th>
+                            <th className="px-8 py-5 text-left">Preço ($)</th>
+                            <th className="px-8 py-5 text-left">Status</th>
+                            <th className="px-8 py-5 text-left">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {filteredOrders.length === 0 && (
-                            <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum registro encontrado no servidor...</td></tr>
+                            <tr><td colSpan={isBulkDeleteMode ? 6 : 5} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum registro encontrado no servidor...</td></tr>
                           )}
-                          {filteredOrders.map(o => (
-                            <tr key={o.id} className={`hover:bg-white/[0.01] transition-colors ${selectedOrders.includes(o.id) ? 'bg-red-500/5' : ''}`}>
+                          {paginatedOrders.map(o => (
+                            <tr key={o.id} className="hover:bg-white/[0.01] transition-colors divider-b border-white/5">
                               {isBulkDeleteMode && (
                                 <td className="px-8 py-6">
-                                  <div 
-                                    onClick={() => {
-                                      setSelectedOrders(prev => 
-                                        prev.includes(o.id) 
-                                          ? prev.filter(id => id !== o.id) 
-                                          : [...prev, o.id]
-                                      );
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedOrders.includes(o.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setSelectedOrders(prev => [...prev, o.id]);
+                                      else setSelectedOrders(prev => prev.filter(id => id !== o.id));
                                     }}
-                                    className={`w-5 h-5 border-2 rounded flex items-center justify-center cursor-pointer transition-all ${selectedOrders.includes(o.id) ? 'bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'border-white/20 hover:border-white/40 bg-black/40'}`}
-                                  >
-                                    {selectedOrders.includes(o.id) && <Trash2 size={10} className="text-white" />}
-                                  </div>
+                                    className="w-4 h-4 rounded appearance-none border-2 border-white/20 checked:bg-primary checked:border-primary checked:after:content-['✓'] checked:after:text-white checked:after:text-[10px] checked:after:flex checked:after:items-center checked:after:justify-center transition-all cursor-pointer"
+                                  />
                                 </td>
                               )}
                               <td className="px-8 py-6">
@@ -913,7 +1092,7 @@ export const AdminDashboard = () => {
                                       </span>
                                       {getEggGroups(o.pokemon).length > 0 && (
                                         <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
-                                          🥚 {getEggGroups(o.pokemon).join(' & ')}
+                                          🥚 {GENDERLESS_POKEMON.includes(o.pokemon) || MALE_ONLY_POKEMON.includes(o.pokemon) ? 'Ditto' : getEggGroups(o.pokemon).join(' & ')}
                                         </span>
                                       )}
                                       {o.ability && o.ability !== 'Qualquer Habilidade' && (
@@ -941,39 +1120,41 @@ export const AdminDashboard = () => {
                                 </td>
                               <td className="px-8 py-6 font-black text-primary">{o.totalPrice / 1000}k</td>
                               <td className="px-8 py-6">
+                                <div className="relative group/status">
+                                  <select 
+                                    value={o.status}
+                                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                                    className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusStyle(o.status)}`}
+                                  >
+                                    <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
+                                    <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
+                                    <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
+                                    <option value="Entregue" className="bg-black text-blue-400 font-bold">📦 Entregue</option>
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                                </div>
+                              </td>
+                              <td className="px-8 py-6">
                                 <div className="flex items-center gap-3">
-                                  <div className="relative group/status">
-                                    <select 
-                                      value={o.status}
-                                      onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                                      className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusStyle(o.status)}`}
-                                    >
-                                      <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
-                                      <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
-                                      <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
-                                      <option value="Entregue" className="bg-black text-blue-400 font-bold">📦 Entregue</option>
-                                    </select>
-                                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
-                                  </div>
-                                    <button 
-                                      onClick={() => toggleChat(o)}
-                                      className="text-gray-500 hover:text-primary transition-all p-1"
-                                      title="Chat com Cliente"
-                                    >
-                                      <MessageSquare size={18} />
-                                    </button>
-                                    <button 
-                                      onClick={() => setDeleteConfirm({ 
-                                        isOpen: true, 
-                                        type: 'order', 
-                                        id: o.id, 
-                                        name: `${o.playerNick} - ${o.pokemon}` 
-                                      })} 
-                                      className="text-gray-500 hover:text-red-500 transition-colors p-1" 
-                                      title="Deletar Encomenda"
-                                    >
-                                      <X size={20} />
-                                    </button>
+                                  <button 
+                                    onClick={() => toggleChat(o)}
+                                    className="text-gray-500 hover:text-primary transition-all p-1"
+                                    title="Chat com Cliente"
+                                  >
+                                    <MessageSquare size={18} />
+                                  </button>
+                                  <button 
+                                    onClick={() => setDeleteConfirm({ 
+                                      isOpen: true, 
+                                      type: 'order', 
+                                      id: o.id, 
+                                      name: `${o.playerNick} - ${o.pokemon}` 
+                                    })} 
+                                    className="text-gray-500 hover:text-red-500 transition-colors p-1" 
+                                    title="Deletar Encomenda"
+                                  >
+                                    <X size={20} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1076,6 +1257,56 @@ export const AdminDashboard = () => {
                   </table>
                 </div>
               )}
+
+              {/* Pagination Controls */}
+              {(activeTab === 'pedidos' || activeTab === 'entregues') && filteredOrders.length > PAGE_SIZE && (
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-8 py-6 bg-white/[0.02] border border-white/5 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    Mostrando <span className="text-white">{(currentPage - 1) * PAGE_SIZE + 1}</span>-
+                    <span className="text-white">{Math.min(currentPage * PAGE_SIZE, filteredOrders.length)}</span> de 
+                    <span className="text-white"> {filteredOrders.length}</span> encomendas
+                  </p>
+                  
+                  <div className="flex items-center gap-2">
+                    <button 
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${currentPage === 1 ? 'border-white/5 text-gray-700 cursor-not-allowed' : 'border-white/10 text-white hover:bg-white/5 hover:border-white/20'}`}
+                    >
+                      Anterior
+                    </button>
+                    
+                    <div className="flex items-center gap-1">
+                      {[...Array(totalPages)].map((_, i) => {
+                        const pageNum = i + 1;
+                        // Mostrar apenas algumas páginas se houver muitas
+                        if (totalPages > 7 && (pageNum > 1 && pageNum < totalPages && Math.abs(pageNum - currentPage) > 1)) {
+                          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="text-gray-700">...</span>;
+                          return null;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${currentPage === pageNum ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button 
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${currentPage === totalPages ? 'border-white/5 text-gray-700 cursor-not-allowed' : 'border-white/10 text-white hover:bg-white/5 hover:border-white/20'}`}
+                    >
+                      Próximo
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </main>
         </div>
@@ -1114,16 +1345,49 @@ export const AdminDashboard = () => {
                   CANCELAR
                 </button>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     if (deleteConfirm.type === 'order') handleDeleteOrder(deleteConfirm.id);
                     else if (deleteConfirm.type === 'notification') handleDeleteNotification(deleteConfirm.id);
+                    else if (deleteConfirm.type === 'mass-order') {
+                        // Hard-delete em massa
+                        try {
+                            const batch = writeBatch(db);
+                            selectedOrders.forEach(id => {
+                                batch.delete(doc(db, 'orders', id));
+                            });
+                            await batch.commit();
+                            setIsBulkDeleteMode(false);
+                            setSelectedOrders([]);
+                            setDeleteConfirm(null);
+                        } catch (err) {
+                            console.error("Erro ao deletar em massa:", err);
+                        }
+                    } else if (deleteConfirm.type === 'stock_room') {
+                      try {
+                        await deleteDoc(doc(db, 'stock_rooms', deleteConfirm.id));
+                        setDeleteConfirm(null);
+                      } catch (err) {
+                        console.error("Erro ao deletar sala:", err);
+                        alert("Erro ao deletar: " + err);
+                      }
+                    } else if (deleteConfirm.type === 'mass-notification') {
+                      try {
+                        const batch = writeBatch(db);
+                        notifications.forEach(n => {
+                          const docRef = doc(db, 'admin_dismissed_notifications', n.id);
+                          batch.set(docRef, { notificationId: n.id, dismissedAt: serverTimestamp() });
+                        });
+                        await batch.commit();
+                        setDeleteConfirm(null);
+                      } catch (err) { console.error("Erro ao limpar inbox:", err); }
+                    }
                     else {
                       deleteDoc(doc(db, 'ClientReviews', deleteConfirm.id)).catch(err => {
                         console.error("Erro ao deletar feedback:", err);
                         alert("Erro ao deletar: " + err.message);
                       });
+                      setDeleteConfirm(null);
                     }
-                    setDeleteConfirm(null);
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
                 >
@@ -1134,6 +1398,14 @@ export const AdminDashboard = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {isAutoOrderModalOpen && (
+          <AutoOrderGenerator onClose={() => setIsAutoOrderModalOpen(false)} />
+        )}
+      </AnimatePresence>
+
+
 
       {/* TABBED CHAT CONTAINER */}
       <div className="fixed bottom-0 right-10 z-[300] w-[400px] pointer-events-none">
@@ -1199,8 +1471,7 @@ export const AdminDashboard = () => {
           )}
         </AnimatePresence>
       </div>
-
-      {showKanbanBoard && (
+                      {showKanbanBoard && (
         <KanbanBoard 
           orders={orders} 
           onStatusChange={handleStatusChange} 
@@ -1212,12 +1483,19 @@ export const AdminDashboard = () => {
 };
 
 const StockRoomsManager = () => {
+  const navigate = useNavigate();
   const [rooms, setRooms] = useState<any[]>([]);
   const [roomSearchTerm, setRoomSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [modalState, setModalState] = useState<{isOpen: boolean, isEdit: boolean, id: string, name: string, pokemonText: string}>({
-    isOpen: false, isEdit: false, id: '', name: '', pokemonText: ''
+    isOpen: false,
+    isEdit: false,
+    id: '',
+    name: '',
+    pokemonText: ''
   });
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'stock_rooms'));
@@ -1229,75 +1507,81 @@ const StockRoomsManager = () => {
     return unsubscribe;
   }, []);
 
-  const handleDeleteRoom = async (id: string) => {
-    if (window.confirm("Deseja realmente excluir esta sala do estoque e remover todos os pokémons dentro dela?")) {
-      try {
-        await deleteDoc(doc(db, 'stock_rooms', id));
-      } catch (err) {
-        console.error("Erro ao excluir sala:", err);
-      }
-    }
+  const handleDeleteRoom = async (id: string, name: string) => {
+    setDeleteConfirm({ isOpen: true, id, name: `Excluir a sala "${name}" e todos os Pokémon nela?` });
   };
 
   const handleSaveRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (!modalState.name.trim()) {
-      setError("A sala precisa de um nome!");
-      return;
-    }
-
-    const duplicateRoom = rooms.find(r => r.name.toLowerCase() === modalState.name.trim().toLowerCase() && r.id !== modalState.id);
-    if (duplicateRoom) {
-      setError("Já existe uma Sala de Estoque cadastrada com este exato nome.");
-      return;
-    }
-
     const newPokemonList = modalState.pokemonText.split(',').map(p => p.trim()).filter(p => p);
     
-    if (newPokemonList.length > 11) {
-      setError("A sala não pode ter mais que 11 Pokémon.");
-      return;
-    }
+    console.log("Iniciando salvamento da sala...", { name: modalState.name, pokemon: modalState.pokemonText });
+    setIsSaving(true);
+    setError('');
+    try {
+      if (!modalState.name.trim()) {
+        setError("A sala precisa de um nome!");
+        setIsSaving(false);
+        return;
+      }
 
-    // Duplicate & Evolution Check
-    let duplicateError = '';
-    for (const p of newPokemonList) {
-      const pLower = p.toLowerCase();
-      const baseName = pLower.split('-mega')[0].split('-gmax')[0].split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0];
-      const pEvolutionLine = EVOLUTION_LINES[baseName] || [baseName];
+      const duplicateRoomName = rooms.find(r => (r.name || '').toLowerCase() === modalState.name.trim().toLowerCase() && r.id !== modalState.id);
+      if (duplicateRoomName) {
+        setError("Já existe uma Sala de Estoque cadastrada com este exato nome.");
+        setIsSaving(false);
+        return;
+      }
 
-      for (const room of rooms) {
-        if (room.id === modalState.id) continue;
-        
-        const roomPokemonLower = room.pokemonList?.map((rp: string) => rp.toLowerCase()) || [];
-        
-        // Exact duplicate
-        if (roomPokemonLower.includes(pLower)) {
-          duplicateError = `O Pokémon '${p}' já está cadastrado na sala '${room.name}'. Remova-o de lá primeiro ou verifique se há duplicata.`;
-          break;
-        }
+      if (newPokemonList.length > 11) {
+        setError("A sala não pode ter mais que 11 Pokémon.");
+        setIsSaving(false);
+        return;
+      }
 
-        // Evolutionary line match
-        for (const rp of roomPokemonLower) {
-          const rpBase = rp.split('-mega')[0].split('-gmax')[0].split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0];
-          if (pEvolutionLine.includes(rpBase) && rpBase !== baseName) {
-            duplicateError = `Aviso: '${p}' pertence à mesma linha evolutiva de '${rp}', que já está na sala '${room.name}'. Eles devem ficar juntos!`;
+      // Duplicate & Evolution Check
+      let duplicateError = '';
+      for (const p of newPokemonList) {
+        const pLower = p.toLowerCase();
+        const baseName = pLower
+          .split('-mega')[0].split('-gmax')[0]
+          .split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0]
+          .split(' de alola')[0].split(' de galar')[0].split(' de hisui')[0].split(' de paldea')[0]
+          .trim();
+          
+        const pEvolutionLine = EVOLUTION_LINES[baseName] || [baseName];
+
+        for (const room of rooms) {
+          if (room.id === modalState.id) continue;
+          
+          const roomPokemonArray = Array.isArray(room.pokemonList) ? room.pokemonList : [];
+          const roomPokemonLower = roomPokemonArray.map((rp: string) => rp.toLowerCase());
+          
+          if (roomPokemonLower.includes(pLower)) {
+            duplicateError = `O Pokémon '${p}' já está cadastrado na sala '${room.name}'. Remova-o de lá primeiro ou verifique se há duplicata.`;
             break;
           }
+
+          for (const rp of roomPokemonLower) {
+            const rpBase = rp
+              .split('-mega')[0].split('-gmax')[0].split('-alola')[0].split('-galar')[0].split('-hisui')[0].split('-paldea')[0]
+              .split(' de alola')[0].split(' de galar')[0].split(' de hisui')[0].split(' de paldea')[0]
+              .trim();
+              
+            if (pEvolutionLine.includes(rpBase) && rpBase !== baseName) {
+              duplicateError = `Aviso: '${p}' pertence à mesma linha evolutiva de '${rp}', que já está na sala '${room.name}'. Eles devem ficar juntos!`;
+              break;
+            }
+          }
+          if (duplicateError) break;
         }
         if (duplicateError) break;
       }
-      if (duplicateError) break;
-    }
 
-    if (duplicateError) {
-      setError(duplicateError);
-      return;
-    }
+      if (duplicateError) {
+        setError(duplicateError);
+        return;
+      }
 
-    try {
       if (modalState.isEdit && modalState.id) {
         await updateDoc(doc(db, 'stock_rooms', modalState.id), {
           name: modalState.name.trim(),
@@ -1315,12 +1599,13 @@ const StockRoomsManager = () => {
       setError('');
     } catch (err) {
       console.error("Erro ao salvar sala:", err);
-      setError("Ocorreu um erro ao salvar a sala no banco de dados.");
+      setError("Erro ao salvar no banco: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const filteredRooms = rooms.filter(room => {
-    // Only include real rooms with a name
     if (!room.name) return false;
     
     if (!roomSearchTerm) return true;
@@ -1429,8 +1714,28 @@ const StockRoomsManager = () => {
                   </div>
 
                   <div className="flex gap-4 pt-4 border-t border-white/5">
-                    <button type="button" onClick={() => setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' })} className="flex-[1] py-4 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all">Cancelar</button>
-                    <button type="submit" className="flex-[2] py-4 bg-primary text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-primary/20">{modalState.isEdit ? 'Salvar Alterações' : 'Criar Sala'}</button>
+                    <button 
+                      type="button" 
+                      disabled={isSaving}
+                      onClick={() => setModalState({ isOpen: false, isEdit: false, id: '', name: '', pokemonText: '' })} 
+                      className="flex-[1] py-4 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={isSaving}
+                      className="flex-[2] py-4 bg-primary text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        modalState.isEdit ? 'Salvar Alterações' : 'Criar Sala'
+                      )}
+                    </button>
                   </div>
                 </form>
               </motion.div>
@@ -1460,16 +1765,16 @@ const StockRoomsManager = () => {
                   <button 
                     onClick={() => {
                       setError('');
-                      setModalState({ isOpen: true, isEdit: true, id: room.id, name: room.name, pokemonText: room.pokemonList?.join(', ') || '' });
+                      setModalState({ isOpen: true, isEdit: true, id: room.id, name: room.name, pokemonText: (room.pokemonList || []).join(', ') });
                     }}
-                    className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg opacity-0 group-hover:opacity-100"
+                    className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg sm:opacity-0 group-hover:opacity-100 flex items-center justify-center"
                     title="Editar Sala"
                   >
                     <Edit2 size={14} />
                   </button>
                   <button 
-                    onClick={() => handleDeleteRoom(room.id)}
-                    className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover:opacity-100"
+                    onClick={() => handleDeleteRoom(room.id, room.name)}
+                    className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg sm:opacity-0 group-hover:opacity-100 flex items-center justify-center"
                     title="Deletar Sala"
                   >
                     <Trash2 size={14} />
@@ -1480,7 +1785,12 @@ const StockRoomsManager = () => {
               <div className="flex flex-wrap gap-2 mb-6">
                  {(room.pokemonList || []).length > 0 ? (
                     room.pokemonList.map((p: string, i: number) => (
-                      <span key={i} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${roomSearchTerm && p.toLowerCase().includes(roomSearchTerm.toLowerCase()) ? 'bg-primary border-primary text-black shadow-[0_0_10px_var(--primary-glow)]' : 'bg-black/60 border-white/5 text-gray-400'}`}>
+                      <span 
+                        key={i} 
+                        onClick={() => navigate(`/pokedex?search=${p}`)}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border cursor-pointer hover:scale-105 transition-all active:scale-95 ${roomSearchTerm && p.toLowerCase().includes(roomSearchTerm.toLowerCase()) ? 'bg-primary border-primary text-black shadow-[0_0_10px_var(--primary-glow)]' : 'bg-black/60 border-white/5 text-gray-400 hover:text-primary hover:border-primary/20'}`}
+                        title={`Ver ${p} na Pokédex`}
+                      >
                         {p}
                       </span>
                     ))
@@ -1505,7 +1815,392 @@ const StockRoomsManager = () => {
           </div>
         )}
       </div>
+      
+      {createPortal(
+        <AnimatePresence>
+          {deleteConfirm?.isOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm shadow-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                className="glow-card max-w-md w-full p-8 text-center space-y-6 bg-black border border-white/10"
+              >
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                  <Trash2 size={32} className="text-red-500" />
+                </div>
+                <div>
+                  <h3 className="pixel-title text-xl text-white mb-2">Excluir Sala?</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+                    {deleteConfirm.name}
+                    <br/>Esta ação é irreversível.
+                  </p>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    onClick={() => setDeleteConfirm(null)}
+                    className="flex-1 py-3 px-6 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await deleteDoc(doc(db, 'stock_rooms', deleteConfirm.id));
+                        setDeleteConfirm(null);
+                      } catch (err) {
+                        console.error("Erro ao deletar sala:", err);
+                        alert("Erro ao remover do banco de dados.");
+                      }
+                    }}
+                    className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
+                  >
+                    Confirmar Exclusão
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
+  );
+};
+
+const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
+  const [text, setText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [parsedData, setParsedData] = useState<any>(null);
+
+  const parseText = () => {
+    const lines = text.split('\n');
+    let orders: any[] = [];
+    
+    // Check if it's the table format by looking for pipes
+    const isTableFormat = lines.some(l => l.includes('|') && l.split('|').length >= 6);
+
+    if (isTableFormat) {
+      lines.forEach(line => {
+        if (line.includes('---') || line.toLowerCase().includes('cliente') || line.trim() === '') return;
+        
+        const parts = line.split('|').map(p => p.trim());
+        if (parts.length < 8) return;
+
+        const [client, pokemonRaw, qtdStr, gen, abilityRaw, ivsRaw, bc] = parts;
+        const qtd = parseInt(qtdStr) || 1;
+
+        // Helper para normalizar sufixos para o DB e Ability lookup
+        const expandTitle = (raw: string) => {
+            let n = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+            n = n.replace(/\s+A\.?$/i, ' de Alola');
+            n = n.replace(/\s+H\.?$/i, ' de Hisui');
+            n = n.replace(/\s+G\.?$/i, ' de Galar');
+            n = n.replace(/\s+P\.?$/i, ' de Paldea');
+            return n.trim();
+        };
+
+        const normalizedPokemonName = expandTitle(pokemonRaw);
+        
+        // Auto-detect GENDERLESS and MALE ONLY to enforce rules
+        const isActuallyGenderless = GENDERLESS_POKEMON.includes(normalizedPokemonName) || GENDERLESS_POKEMON.includes(pokemonRaw);
+        const isActuallyMaleOnly = MALE_ONLY_POKEMON.includes(normalizedPokemonName) || MALE_ONLY_POKEMON.includes(pokemonRaw);
+
+        let gender = 'Aleatório';
+        if (isActuallyGenderless) {
+          gender = 'Genderless';
+        } else if (isActuallyMaleOnly) {
+          gender = 'Genderless'; // Forçando visualmente para Genderless, já que MALE_ONLY só cruza com Ditto no sistema deles
+        } else {
+          if (gen === 'M') gender = 'Macho';
+          else if (gen === 'F') gender = 'Fêmea';
+          else if (gen === 'F/M') gender = 'F/M'; // Tratado no loop
+          else if (gen === 'R') gender = 'Aleatório';
+          else if (gen === 'Ø') gender = 'Genderless';
+        }
+
+        let ivValue = ivsRaw.includes('6') ? '6' : ivsRaw.includes('4') ? '4' : '5';
+        let isCastrado = bc.toUpperCase() === 'C';
+        let ivsLabel = `${ivValue} IVs (${isCastrado ? 'Castrado' : 'Breedable'})`;
+
+        let hasHA = false;
+        let ability = abilityRaw;
+        
+        // Real Hidden Ability Extractor based on DB
+        const baseNameData = normalizedPokemonName.split(' de ')[0];
+        const pokemonDBMatch = POKEMON_DATA.find(p => p.name.toLowerCase() === baseNameData.toLowerCase() || p.name.toLowerCase() === normalizedPokemonName.toLowerCase());
+        const realHA = pokemonDBMatch?.hiddenAbility || 'Hidden Ability';
+
+        if (abilityRaw.toUpperCase() === 'HA') {
+           hasHA = true;
+           ability = realHA;
+        } else if (abilityRaw.toLowerCase().includes('(-ha)')) {
+           hasHA = false;
+           ability = abilityRaw.replace(/\(-HA\)/i, '').trim();
+           if (ability.toLowerCase() === 'random') ability = 'Qualquer Habilidade';
+        } else if (abilityRaw.toLowerCase().includes('random')) {
+           ability = 'Qualquer Habilidade';
+           hasHA = false;
+        } else {
+           hasHA = false;
+           ability = abilityRaw; // Habilidade fixa como Hospitality
+        }
+
+        let basePrice = 80000;
+        if (ivValue === '4') basePrice = 40000;
+        if (ivValue === '6') basePrice = 100000;
+        
+        // Taxa Genderless (Ditto breeding tax)
+        if (isActuallyGenderless || isActuallyMaleOnly || gender === 'Genderless' || gen === 'Ø') {
+          basePrice *= 2;
+          gender = 'Genderless'; // Always enforce as Genderless logically for them if forced
+        }
+        
+        // Taxa Castrado: o usuário disse que castrado SEMPRE remove 10k!
+        if (isCastrado) basePrice -= 10000;
+        
+        // Taxa HA
+        if (hasHA) basePrice += 15000;
+
+        for (let i = 0; i < qtd; i++) {
+          let currentGender = gender;
+          if (gender === 'F/M') {
+             // Intercalar machos e fêmeas
+             currentGender = (i % 2 === 0) ? 'Macho' : 'Fêmea';
+          }
+
+          orders.push({
+            pokemon: normalizedPokemonName,
+            playerNick: client,
+            gender: currentGender,
+            ivs: ivsLabel,
+            isCastrated: isCastrado,
+            ability,
+            nature: 'Aleatória',
+            hasHA,
+            totalPrice: basePrice,
+            status: 'Pendente',
+            giftNick: null,
+            observations: ''
+          });
+        }
+      });
+    } else {
+      // Busca regex flexível (Free-Text)
+      const nickMatch = text.match(/(?:(?:player|treinador|nick)[\s:]*|para[\s:]*)([a-zA-Z0-9_\-\s]+?)(?:[\n,]|$)/i);
+      const pokemonMatch = text.match(/(?:(?:pokemon|pokémon|espécie|especie|quero um|pedido)[\s:]*)([a-zA-Z\s\-]+?)(?:[\n,]|$)/i) || text.match(/^([a-zA-Z\s\-]+)$/m);
+      const genderMatch = text.match(/(?:gender|gênero|genero)[\s:]*(macho|fêmea|femea|qualquer|genderless)/i) || text.match(/\b(macho|fêmea|femea|genderless)\b/i);
+      const ivsMatch = text.match(/(?:ivs|iv)[\s:]*(4|5|6)/i) || text.match(/\b(4|5|6)\s*ivs?\b/i);
+      const castratedMatch = text.match(/\b(castrado|o castrado|c)\b/i);
+      const abilityMatch = text.match(/(?:ability|habilidade)[\s:]*([a-zA-Z\s\-]+?)(?:[\n,]|$)/i) || text.match(/ha/i);
+      const natureMatch = text.match(/(?:nature|natureza)[\s:]*([a-zA-Z]+?)(?:[\n,]|$)/i);
+      const giftMatch = text.match(/(?:presente|gift)[\s:]*(sim|não|nao|.*)(?:[\n,]|$)/i);
+      
+      let pokemonName = pokemonMatch ? pokemonMatch[1].trim() : '';
+
+      let ivValue = ivsMatch ? ivsMatch[1] : '5';
+      let isCastrado = castratedMatch ? true : false;
+      let ivsLabel = `${ivValue} IVs (${isCastrado ? 'Castrado' : 'Breedable'})`;
+
+      let gender = 'Aleatório';
+      if (genderMatch) {
+        const g = genderMatch[1].toLowerCase();
+        if (g === 'macho') gender = 'Macho';
+        else if (g === 'fêmea' || g === 'femea') gender = 'Fêmea';
+        else if (g === 'genderless') gender = 'Genderless';
+        else if (g === 'qualquer') gender = 'Qualquer';
+      }
+
+      let ability = 'Qualquer Habilidade';
+      let hasHA = false;
+      if (abilityMatch) {
+        if (abilityMatch[0].toLowerCase() === 'ha' || (abilityMatch[1] && abilityMatch[1].toLowerCase().includes('ha'))) {
+          hasHA = true;
+          ability = abilityMatch[1] ? abilityMatch[1].replace(/\bha\b/ig, '').trim() || 'Hidden Ability' : 'Hidden Ability';
+        } else {
+          ability = abilityMatch[1].trim();
+        }
+      } else if (text.toLowerCase().includes('ha')) {
+        hasHA = true;
+      }
+
+      let basePrice = 80000;
+      if (ivValue === '4') basePrice = 40000;
+      if (ivValue === '6') basePrice = 100000;
+      
+      const isActuallyGenderless = GENDERLESS_POKEMON.includes(pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1).toLowerCase());
+      const isActuallyMaleOnly = MALE_ONLY_POKEMON.includes(pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1).toLowerCase());
+
+      if (isActuallyGenderless || isActuallyMaleOnly || gender === 'Genderless') {
+         basePrice *= 2;
+         gender = 'Genderless';
+      }
+
+      if (isCastrado) basePrice -= 10000;
+      if (hasHA) basePrice += 15000;
+
+      orders.push({
+        pokemon: pokemonName.charAt(0).toUpperCase() + pokemonName.slice(1).toLowerCase(),
+        playerNick: nickMatch ? nickMatch[1].trim() : 'Veterano Anônimo',
+        gender,
+        ivs: ivsLabel,
+        isCastrated: isCastrado,
+        ability,
+        nature: natureMatch ? natureMatch[1].trim() : 'Aleatória',
+        hasHA,
+        totalPrice: basePrice,
+        observations: '',
+        status: 'Pendente',
+        giftNick: giftMatch && !giftMatch[1].toLowerCase().match(/n[ãa]o/) ? giftMatch[1].trim() : null
+      });
+    }
+
+    setParsedData(orders);
+  };
+
+  const submitOrder = async () => {
+    if (!parsedData || parsedData.length === 0) {
+      alert("Nenhum pedido analisado para gerar.");
+      return;
+    }
+    
+    // Basic validation
+    const invalid = parsedData.find((o: any) => !o.pokemon || !o.playerNick);
+    if (invalid) {
+      alert("Alguns pedidos estão sem nome do Pokémon ou Treinador. Revise os campos!");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(db);
+      parsedData.forEach((orderData: any) => {
+        const orderRef = doc(collection(db, 'orders'));
+        batch.set(orderRef, {
+          ...orderData,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+      
+      alert(parsedData.length > 1 ? `${parsedData.length} encomendas geradas com sucesso!` : 'Encomenda gerada com sucesso e enviada à fila de produção!');
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao criar as encomendas automáticas.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+    >
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+        className="glow-card max-w-2xl w-full p-8 relative border-secondary/50 max-h-[90vh] overflow-y-auto custom-scrollbar"
+      >
+        <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 bg-secondary/20 rounded-xl flex items-center justify-center border border-secondary/30 shadow-[0_0_15px_var(--secondary-glow)]">
+            <Plus size={24} className="text-secondary" />
+          </div>
+          <div>
+            <h3 className="pixel-title text-xl text-secondary">Auto-Gerador</h3>
+            <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Extraia dados de texto e crie encomendas instantâneas</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {!parsedData ? (
+             <div className="space-y-4">
+               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Insira o texto do pedido (Discord, Tabela, Chat):</label>
+               <textarea 
+                 value={text} onChange={(e) => setText(e.target.value)}
+                 className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-xs font-mono text-gray-300 outline-none focus:border-secondary transition-all h-48 resize-none"
+                 placeholder="Ex: Treinador: Ash&#10;Pokémon: Pikachu&#10;Gênero: Macho&#10;IVs: 5 IVs&#10;Natureza: Hasty&#10;HA: Sim"
+               />
+               <button 
+                 onClick={parseText}
+                 disabled={!text.trim()}
+                 className="w-full btn-manda !bg-secondary !shadow-[0_0_20px_var(--secondary-glow)] disabled:opacity-50"
+               >
+                 Analisar Texto e Prever Dados
+               </button>
+             </div>
+          ) : (
+             <div className="space-y-4 animate-fade-in">
+               <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                   <AlertCircle size={16} className="text-primary flex-shrink-0" />
+                   <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Revisão de Pedidos ({parsedData.length})</p>
+                 </div>
+                 <div className="flex bg-black/40 px-2 py-1 rounded-md">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase"><span className="text-secondary">{parsedData.reduce((acc: number, o: any) => acc + o.totalPrice, 0) / 1000}k</span> Total</p>
+                 </div>
+               </div>
+               
+               <div className="flex flex-col gap-4 max-h-[40vh] overflow-y-auto no-scrollbar pb-2">
+                 {parsedData.map((o: any, idx: number) => (
+                   <div key={idx} className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl relative group">
+                     <button 
+                       onClick={() => setParsedData(parsedData.filter((_: any, i: number) => i !== idx))} 
+                       className="absolute top-2 right-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                     >
+                       <X size={14} />
+                     </button>
+                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black text-gray-500 uppercase">Espécie</label>
+                         <input value={o.pokemon} onChange={e => {
+                           const n = [...parsedData]; n[idx].pokemon = e.target.value; setParsedData(n);
+                         }} className="w-full bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white outline-none focus:border-secondary" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black text-gray-500 uppercase">Destino</label>
+                         <input value={o.playerNick} onChange={e => {
+                           const n = [...parsedData]; n[idx].playerNick = e.target.value; setParsedData(n);
+                         }} className="w-full bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white outline-none focus:border-secondary" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black text-gray-500 uppercase">IVs</label>
+                         <input value={o.ivs} onChange={e => {
+                           const n = [...parsedData]; n[idx].ivs = e.target.value; setParsedData(n);
+                         }} className="w-full bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white outline-none focus:border-secondary" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black text-gray-500 uppercase">Preço ($)</label>
+                         <input type="number" value={o.totalPrice} onChange={e => {
+                           const n = [...parsedData]; n[idx].totalPrice = Number(e.target.value); setParsedData(n);
+                         }} className="w-full bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-black text-primary outline-none focus:border-secondary" />
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+                 {parsedData.length === 0 && (
+                   <p className="text-center text-gray-500 italic text-[10px] uppercase font-bold py-4">Todos os pedidos foram removidos.</p>
+                 )}
+               </div>
+
+               <div className="flex gap-4 pt-4 border-t border-white/5">
+                 <button onClick={() => setParsedData(null)} className="flex-[1] py-3 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all">
+                   Editar Original
+                 </button>
+                 <button onClick={submitOrder} disabled={isSubmitting || parsedData.length === 0} className="flex-[2] py-3 bg-secondary text-black rounded-xl font-black text-[12px] uppercase transition-all shadow-lg shadow-secondary/20 hover:scale-[1.02] disabled:opacity-50">
+                   {isSubmitting ? 'Injetando no BD...' : `Gerar Pedidos (${parsedData.length})`}
+                 </button>
+               </div>
+             </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

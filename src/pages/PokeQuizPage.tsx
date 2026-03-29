@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, RefreshCw, XCircle, ChevronLeft, Search } from 'lucide-react';
 import { getSpriteUrl, POKEMON_TYPE_DATA, ALL_TYPES } from '../data/pokemonTypes';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useMinigameStreak } from '../hooks/useMinigameStreak';
 
 const TYPE_PT: Record<string, string> = {
   Normal: 'Normal', Fire: 'Fogo', Water: 'Água', Electric: 'Elétrico', Grass: 'Planta', Ice: 'Gelo', Fighting: 'Lutador', Poison: 'Venenoso', Ground: 'Terrestre', Flying: 'Voador', Psychic: 'Psíquico', Bug: 'Inseto', Rock: 'Pedra', Ghost: 'Fantasma', Dragon: 'Dragão', Dark: 'Sombrio', Steel: 'Metálico', Fairy: 'Fada'
@@ -12,35 +14,15 @@ const TYPE_EMOJIS: Record<string, string> = {
   Normal: '⚪', Fire: '🔥', Water: '💧', Electric: '⚡', Grass: '🌿', Ice: '❄️', Fighting: '🥊', Poison: '☠️', Ground: '⛰️', Flying: '🦅', Psychic: '🔮', Bug: '🐛', Rock: '🪨', Ghost: '👻', Dragon: '🐉', Dark: '🌙', Steel: '⚙️', Fairy: '✨'
 };
 
-// Grass, Fire, Water starters per gen (IDs)
-const GEN_STARTER_TRIOS: Record<string, [number, number, number]> = {
-  'Kanto':  [1,   4,   7],
-  'Johto':  [152, 155, 158],
-  'Hoenn':  [252, 255, 258],
-  'Sinnoh': [387, 390, 393],
-  'Unova':  [495, 498, 501],
-  'Kalos':  [650, 653, 656],
-  'Alola':  [722, 725, 728],
-  'Galar':  [810, 813, 816],
-  'Paldea': [906, 909, 912],
-};
+
 
 const GEN_STARTERS: Record<string, number> = {
   'Kanto': 1, 'Johto': 152, 'Hoenn': 252, 'Sinnoh': 387, 'Unova': 495, 'Kalos': 650, 'Alola': 722, 'Galar': 810, 'Paldea': 906
 };
 
-/** Carousel of the 3 starters (grass→fire→water→...) for a single generation button */
+/** Single starter for a single generation button to avoid performance lag */
 const StarterCarousel = ({ genLabel, isActive, disabled, onClick }: { genLabel: string; isActive: boolean; disabled: boolean; onClick: () => void }) => {
-  const trio = GEN_STARTER_TRIOS[genLabel];
-  const [idx, setIdx] = useState(0);
-  const intervalRef = useRef<any>(null);
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => setIdx(i => (i + 1) % 3), 3500);
-    return () => clearInterval(intervalRef.current);
-  }, []);
-
-  const spriteId = trio ? trio[idx] : (GEN_STARTERS[genLabel] || 0);
+  const spriteId = GEN_STARTERS[genLabel] || 0;
 
   return (
     <button
@@ -50,19 +32,12 @@ const StarterCarousel = ({ genLabel, isActive, disabled, onClick }: { genLabel: 
         isActive ? 'bg-primary text-black border-primary' : 'bg-black/30 text-gray-400 border-white/10 hover:border-primary/50'
       } disabled:opacity-50`}
     >
-      <AnimatePresence mode="wait">
-        <motion.img
-          key={spriteId}
-          src={getSpriteUrl(spriteId)}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          transition={{ duration: 0.35 }}
-          className="w-8 h-8 object-contain drop-shadow-md"
-          alt={genLabel}
-          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-        />
-      </AnimatePresence>
+      <img
+        src={getSpriteUrl(spriteId)}
+        className="w-8 h-8 object-contain drop-shadow-md transition-transform duration-300 hover:scale-110"
+        alt={genLabel}
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+      />
       <span>{genLabel}</span>
     </button>
   );
@@ -80,8 +55,16 @@ const GEN_RANGES = [
   { label: 'Paldea', start: 906, end: 1025 },
 ];
 
+const LEGENDARY_IDS = [144,145,146,150,243,244,245,249,250,377,378,379,380,381,382,383,384,480,481,482,483,484,485,486,487,488,638,639,640,641,642,643,644,645,646,716,717,718,772,773,785,786,787,788,789,790,791,792,800,888,889,890,891,892,894,895,896,897,898,905,1001,1002,1003,1004,1014,1015,1016,1017,1024];
+const MYTHICAL_IDS = [151,251,385,386,489,490,491,492,493,494,647,648,649,719,720,721,801,802,807,808,809,893,1025];
+const ULTRA_BEAST_IDS = [793,794,795,796,797,798,799,803,804,805,806];
+const PARADOX_IDS = [984,985,986,987,988,989,990,991,992,993,994,995,1005,1006,1009,1010,1020,1021,1022,1023];
+
+
 export const PokeQuizPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { registerWin: registerQuizWin } = useMinigameStreak(user?.uid, 'pokequiz');
   // Configurações
   const [filterMode, setFilterMode] = useState<string>('Completo');
   const [gameMode, setGameMode] = useState<'Regular' | 'Caos'>('Regular');
@@ -98,14 +81,21 @@ export const PokeQuizPage = () => {
   const [timeElapsed, setTimeElapsed] = useState(0); // em segundos
   const [guessedIds, setGuessedIds] = useState<Set<number>>(new Set());
   const [revealedMissedIds, setRevealedMissedIds] = useState<Set<number>>(new Set());
-  const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [activeList, setActiveList] = useState<any[]>([]);
+  
+
+  const [, setSettingsOpenedCount] = useState(0);
+  
   const settingsRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+
 
   // Fechar settings ao clicar fora
   useEffect(() => {
     if (!showSettings) return;
+    setSettingsOpenedCount(prev => prev + 1);
     const handler = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setShowSettings(false);
@@ -123,7 +113,7 @@ export const PokeQuizPage = () => {
     if (filterMode === 'Completo') {
       const base = POKEMON_TYPE_DATA.filter(p => p.id >= 1 && p.id <= 1025);
       const megas = POKEMON_TYPE_DATA.filter(p => p.id >= 20000 && p.id < 30000);
-      const gmax = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000);
+      const gmax = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000 && p.id !== 30090); // excluded G-Max Cloyster
       const hisui = POKEMON_TYPE_DATA.filter(p => p.name.includes(' de Hisui'));
       list = [...base, ...megas, ...gmax, ...hisui];
     } else if (GEN_RANGES.map(g => g.label).includes(filterMode)) {
@@ -150,7 +140,7 @@ export const PokeQuizPage = () => {
 
         // Galar (Gen 8): Gigantamax + Formas de Hisui
         if (filterMode === 'Galar') {
-          const gmax = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000);
+          const gmax = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000 && p.id !== 30090);
           const hisui = POKEMON_TYPE_DATA.filter(p => p.name.includes(' de Hisui'));
           list = [...list, ...gmax, ...hisui];
         }
@@ -178,7 +168,15 @@ export const PokeQuizPage = () => {
     } else if (filterMode === 'Megas') {
       list = POKEMON_TYPE_DATA.filter(p => p.id >= 20000 && p.id < 30000);
     } else if (filterMode === 'Gigantamax') {
-      list = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000);
+      list = POKEMON_TYPE_DATA.filter(p => p.id >= 30000 && p.id < 40000 && p.id !== 30090);
+    } else if (filterMode === 'Lendários') {
+      list = POKEMON_TYPE_DATA.filter(p => LEGENDARY_IDS.includes(p.id));
+    } else if (filterMode === 'Míticos') {
+      list = POKEMON_TYPE_DATA.filter(p => MYTHICAL_IDS.includes(p.id));
+    } else if (filterMode === 'Ultra Beasts') {
+      list = POKEMON_TYPE_DATA.filter(p => ULTRA_BEAST_IDS.includes(p.id));
+    } else if (filterMode === 'Paradoxos') {
+      list = POKEMON_TYPE_DATA.filter(p => PARADOX_IDS.includes(p.id));
     }
 
     if (gameMode === 'Caos') {
@@ -188,6 +186,8 @@ export const PokeQuizPage = () => {
     }
     
     setActiveList(list);
+
+
   }, [filterMode, gameMode, isPlaying]);
 
   // Timer — só começa após o primeiro chute
@@ -205,12 +205,11 @@ export const PokeQuizPage = () => {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, hasFirstGuess, hasGivenUp, hasWon, timerType, customTimerMinutes]);
+  }, [isPlaying, hasFirstGuess, hasGivenUp, hasWon, timerType, customTimerMinutes, activeList.length, guessedIds.size]);
 
-  // Validação de Input
+  // Validação de Input (Uncontrolled for performance)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setInputValue(val);
 
     if (!isPlaying || hasGivenUp || hasWon) return;
 
@@ -223,16 +222,33 @@ export const PokeQuizPage = () => {
     });
 
     if (found) {
-      setGuessedIds(prev => new Set(prev).add(found.id));
-      setInputValue('');
-      if (!hasFirstGuess) setHasFirstGuess(true); // inicia o timer no primeiro acerto
-      if (guessedIds.size + 1 === activeList.length) {
+      const newGuessedIds = new Set(guessedIds).add(found.id);
+      setGuessedIds(newGuessedIds);
+      if (inputRef.current) inputRef.current.value = '';
+      if (!hasFirstGuess) setHasFirstGuess(true);
+      if (newGuessedIds.size === activeList.length) {
         setWon(true);
+        registerQuizWin(); // Streak do PokéQuiz
       }
     }
   };
 
-  // Auto-reveal delay when given up
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const el = e.currentTarget;
+      const normalizedInput = el.value.trim().toLowerCase();
+      const found = activeList.find(p => {
+        const nameNorm = p.name.toLowerCase();
+        return !guessedIds.has(p.id) && (nameNorm === normalizedInput || nameNorm.split(' de ')[0] === normalizedInput || nameNorm.replace(/[\W_]+/g, "") === normalizedInput.replace(/[\W_]+/g, ""));
+      });
+
+      if (!found && el.value.length > 0) {
+
+      }
+    }
+  };
+
+  // Auto-reveal delay when given up - Optimized to 20 per frame to avoid super lag
   useEffect(() => {
     if (hasGivenUp && (guessedIds.size + revealedMissedIds.size) < activeList.length) {
       const interval = setInterval(() => {
@@ -240,7 +256,7 @@ export const PokeQuizPage = () => {
           const next = new Set(prev);
           const missing = activeList.filter(p => !guessedIds.has(p.id) && !next.has(p.id));
           if (missing.length > 0) {
-            for (let i = 0; i < Math.min(5, missing.length); i++) {
+            for (let i = 0; i < Math.min(20, missing.length); i++) {
               next.add(missing[i].id);
             }
           } else {
@@ -248,7 +264,7 @@ export const PokeQuizPage = () => {
           }
           return next;
         });
-      }, 50);
+      }, 30);
       return () => clearInterval(interval);
     }
   }, [hasGivenUp, activeList, guessedIds.size, revealedMissedIds.size]);
@@ -262,7 +278,9 @@ export const PokeQuizPage = () => {
     setHasFirstGuess(false);
     setIsPlaying(true);
     setShowSettings(false);
-    setInputValue('');
+    if (inputRef.current) inputRef.current.value = '';
+
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   const resetGame = () => {
@@ -273,7 +291,8 @@ export const PokeQuizPage = () => {
     setWon(false);
     setHasFirstGuess(false);
     setIsPlaying(false);
-    setInputValue('');
+    if (inputRef.current) inputRef.current.value = '';
+
   };
 
   const formatTime = (secs: number) => {
@@ -283,43 +302,49 @@ export const PokeQuizPage = () => {
   };
 
   // Renderer dos Pokémon super compacto
+  const MemoizedSprite = React.memo(({ p, isGuessed, isRevealedMiss, showSilhouettes }: any) => {
+    let stateClass = "bg-white/5 border border-white/5"; 
+    
+    if (isRevealedMiss) {
+       stateClass = "bg-red-900/40 border border-red-500/30";
+    } else if (isGuessed) {
+       stateClass = "bg-primary/10 border border-primary/30";
+    }
+
+    const showImage = isGuessed || isRevealedMiss || showSilhouettes;
+    const imgSrc = showImage ? getSpriteUrl(p.id) : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
+
+    return (
+      <div 
+        title={isGuessed || isRevealedMiss ? p.name : `??? #${p.id}`}
+        className={`relative flex items-center justify-center rounded-lg transition-all p-1 ${stateClass}`}
+        style={{ width: 'clamp(2rem, 3.5vw, 3rem)', height: 'clamp(2rem, 3.5vw, 3rem)' }}
+      >
+        {imgSrc && (
+          <img 
+            src={imgSrc}
+            alt={p.name}
+            className={`w-full h-full object-contain drop-shadow-md transition-all duration-300 ${(!isGuessed && !isRevealedMiss && showSilhouettes) ? 'brightness-0 invert opacity-90 mix-blend-difference' : ''}`}
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'; }}
+          />
+        )}
+      </div>
+    );
+  });
+
   const renderSprites = (list: any[]) => {
     return (
       <div className="flex flex-wrap gap-1 md:gap-2 p-2">
-        {list.map((p) => {
-          const isGuessed = guessedIds.has(p.id);
-          const isRevealedMiss = revealedMissedIds.has(p.id);
-          
-          let stateClass = "bg-white/5 border border-white/5"; 
-          
-          if (isRevealedMiss) {
-             stateClass = "bg-red-900/40 border border-red-500/30";
-          } else if (isGuessed) {
-             stateClass = "bg-primary/10 border border-primary/30";
-          }
-
-          const showImage = isGuessed || isRevealedMiss || showSilhouettes;
-          const imgSrc = showImage ? getSpriteUrl(p.id) : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
-
-          return (
-            <div 
-              key={p.id} 
-              title={isGuessed || isRevealedMiss ? p.name : `??? #${p.id}`}
-              className={`relative flex items-center justify-center rounded-lg transition-colors p-1 ${stateClass}`}
-              style={{ width: 'clamp(2rem, 3.5vw, 3rem)', height: 'clamp(2rem, 3.5vw, 3rem)' }}
-            >
-              {imgSrc && (
-                <img 
-                  src={imgSrc}
-                  alt={p.name}
-                  className={`w-full h-full object-contain drop-shadow-md transition-all duration-300 ${(!isGuessed && !isRevealedMiss && showSilhouettes) ? 'brightness-0 invert opacity-90 mix-blend-difference' : ''}`}
-                  loading="lazy"
-                  onError={(e) => { (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'; }}
-                />
-              )}
-            </div>
-          );
-        })}
+        {list.map((p) => (
+          <MemoizedSprite 
+            key={p.id} 
+            p={p} 
+            isGuessed={guessedIds.has(p.id)} 
+            isRevealedMiss={revealedMissedIds.has(p.id)} 
+            showSilhouettes={showSilhouettes} 
+          />
+        ))}
       </div>
     );
   };
@@ -347,7 +372,7 @@ export const PokeQuizPage = () => {
       });
       const megas = activeList.filter(p => p.id >= 20000 && p.id < 30000);
       if (megas.length > 0) groups.push({ label: 'Mega Evoluções', items: megas });
-      const gmax = activeList.filter(p => p.id >= 30000 && p.id < 40000);
+      const gmax = activeList.filter(p => p.id >= 30000 && p.id < 40000 && p.id !== 30090);
       if (gmax.length > 0) groups.push({ label: 'Gigantamax', items: gmax });
       const hisui = activeList.filter(p => p.name.includes(' de Hisui'));
       if (hisui.length > 0) groups.push({ label: 'Formas de Hisui', items: hisui });
@@ -365,7 +390,7 @@ export const PokeQuizPage = () => {
         if (megas.length > 0) groups.push({ label: 'Megas Pt.1 (XY/ORAS)', items: megas });
       }
       if (filterMode === 'Galar') {
-        const gmax = activeList.filter(p => p.id >= 30000 && p.id < 40000);
+        const gmax = activeList.filter(p => p.id >= 30000 && p.id < 40000 && p.id !== 30090);
         if (gmax.length > 0) groups.push({ label: 'Gigantamax', items: gmax });
         const hisui = activeList.filter(p => p.name.includes(' de Hisui'));
         if (hisui.length > 0) groups.push({ label: 'Formas de Hisui', items: hisui });
@@ -378,8 +403,8 @@ export const PokeQuizPage = () => {
       return groups.length > 0 ? groups : null;
     }
 
-    // For dedicated special filters (Megas, Gigantamax, Formas de Hisui) show a single card
-    if (['Megas', 'Gigantamax', 'Formas de Hisui'].includes(filterMode)) {
+    // For dedicated special filters show a single card
+    if (['Megas', 'Gigantamax', 'Formas de Hisui', 'Lendários', 'Míticos', 'Ultra Beasts', 'Paradoxos'].includes(filterMode)) {
       if (activeList.length > 0) groups.push({ label: filterMode, items: activeList });
       return groups.length > 0 ? groups : null;
     }
@@ -389,10 +414,8 @@ export const PokeQuizPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] p-2 md:p-6 flex flex-col items-center">
-      
-      {/* Top Header */}
-      <div className="w-full max-w-[1400px] mb-4 flex items-center justify-between px-2 relative z-[70]">
+    <div className="min-h-screen bg-[#0a0a1a] p-2 md:p-6 flex flex-col items-center transition-all">
+        <div className="w-full max-w-[1400px] mb-4 flex items-center justify-between px-2 relative z-[70]">
         <button onClick={() => navigate('/')} className="text-gray-400 hover:text-white flex items-center gap-1 text-sm font-bold">
           <ChevronLeft size={16} /> Voltar
         </button>
@@ -487,17 +510,22 @@ export const PokeQuizPage = () => {
                       ))}
                     </div>
 
-                    {/* Formas */}
-                    <label className="text-[10px] uppercase font-black tracking-widest text-gray-600 block mt-2">✨ Formas</label>
+                    {/* Formas e Categorias Especiais */}
+                    <label className="text-[10px] uppercase font-black tracking-widest text-gray-600 block mt-2">✨ Categorias</label>
                     <div className="flex flex-wrap gap-2">
-                      {['Megas', 'Gigantamax', 'Formas de Hisui'].map(f => {
-                        const fmoji = f === 'Megas' ? '✨' : f === 'Gigantamax' ? '🔴' : '🍃';
+                       {['Megas', 'Gigantamax', 'Formas de Hisui', 'Lendários', 'Míticos', 'Ultra Beasts', 'Paradoxos'].map(f => {
+                         const fmoji = f === 'Megas' ? '✨' : 
+                                       f === 'Gigantamax' ? '🔴' : 
+                                       f === 'Formas de Hisui' ? '🍃' :
+                                       f === 'Lendários' ? '👑' :
+                                       f === 'Míticos' ? '🌟' :
+                                       f === 'Ultra Beasts' ? '🌌' : '⏳';
                         return (
                           <button 
                             key={f} 
                             onClick={() => { if (!isPlaying) { setFilterMode(f); resetGame(); } }} 
                             disabled={isPlaying}
-                            className={`flex-1 min-w-[45%] px-3 py-2 rounded-lg text-xs font-bold border transition-colors flex items-center justify-center gap-2 ${filterMode === f ? 'bg-primary text-black border-primary' : 'bg-black/30 text-gray-400 border-white/10 hover:border-primary/50'} disabled:opacity-50`}
+                            className={`flex-[1_1_30%] px-2 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center justify-center gap-2 ${filterMode === f ? 'bg-primary text-black border-primary' : 'bg-black/30 text-gray-400 border-white/10 hover:border-primary/50'} disabled:opacity-50`}
                           >
                             <span>{fmoji}</span> {f}
                           </button>
@@ -528,15 +556,19 @@ export const PokeQuizPage = () => {
               <Search size={16} />
             </div>
           </div>
-          <input 
-            type="text" 
-            placeholder={isPlaying && !hasGivenUp && !hasWon ? "Nome do Pokémon..." : isPlaying ? "Fim de Jogo" : "Pronto para iniciar..."}
-            value={inputValue}
-            onChange={handleInputChange}
-            disabled={!isPlaying || hasGivenUp || hasWon}
-            autoFocus
-            className="w-full max-w-sm bg-black/50 border border-sky-400/30 focus:border-sky-400 focus:bg-black/80 rounded-lg py-1.5 px-3 text-white font-bold text-xs md:text-sm outline-none transition-all placeholder:text-sky-200/50 disabled:opacity-50"
-          />
+          <div className="relative flex-1 max-w-sm flex items-center">
+            <input 
+              ref={inputRef}
+              type="text" 
+              placeholder={isPlaying && !hasGivenUp && !hasWon ? "Nome do Pokémon..." : isPlaying ? "Fim de Jogo" : "Pronto para iniciar..."}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              disabled={!isPlaying || hasGivenUp || hasWon}
+              autoFocus
+              className="w-full bg-black/50 border border-sky-400/30 focus:border-sky-400 focus:bg-black/80 rounded-lg py-1.5 px-3 text-white font-bold text-xs md:text-sm outline-none transition-all placeholder:text-sky-200/50 disabled:opacity-50"
+              autoComplete="off"
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-3 md:gap-6 shrink-0">
@@ -581,7 +613,7 @@ export const PokeQuizPage = () => {
       )}
 
       {/* Grid(s) de Pokémons - Layout Super Compacto */}
-      <div className={`w-full max-w-[1400px] transition-opacity duration-500 ${!isPlaying ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+      <div className="w-full max-w-[1400px] flex-1">
         {groupedList ? (() => {
           const colClass = groupedList.length === 1
             ? 'grid-cols-1'
@@ -589,21 +621,23 @@ export const PokeQuizPage = () => {
             ? 'grid-cols-1 md:grid-cols-2'
             : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
           return (
-            <div className={`grid ${colClass} gap-3 items-start`}>
-              {groupedList.map((group: { label: string, items: any[] }) => (
-                <div key={group.label} className="bg-[#12142B] border border-blue-900/40 rounded-xl overflow-hidden shadow-lg flex flex-col">
-                  <div className="bg-blue-950/40 px-4 py-1.5 border-b border-blue-900/50 flex justify-between items-center sticky top-0 z-10 backdrop-blur-md">
-                    <h3 className="text-white font-bold text-xs md:text-sm">{group.label}</h3>
-                    <span className="text-blue-200/50 text-xs font-mono">{group.items.filter((i: any) => guessedIds.has(i.id)).length} / {group.items.length}</span>
-                  </div>
+          <div className={`w-full grid ${colClass} gap-4 md:gap-6 lg:gap-8 pb-10`}>
+            {groupedList.map((group, i) => (
+              <div key={i} className="bg-[#111326]/80 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden flex flex-col">
+                <div className="bg-black/40 px-3 md:px-5 py-2 md:py-3 border-b border-white/5 flex items-center justify-between">
+                  <h2 className="text-white font-black text-sm md:text-base">{group.label}</h2>
+                  <span className="text-gray-500 text-[10px] md:text-xs font-bold tracking-widest">{group.items.filter(p => guessedIds.has(p.id)).length} / {group.items.length}</span>
+                </div>
+                <div className="p-2 md:p-4 bg-gradient-to-b from-transparent to-black/20 flex-1">
                   {renderSprites(group.items)}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           );
         })() : (
-          <div className="bg-[#12142B] border border-blue-900/40 rounded-xl p-2 md:p-4">
-            {renderSprites(activeList)}
+          <div className="w-full bg-[#111326]/80 backdrop-blur-sm border border-white/5 rounded-2xl p-2 md:p-4 pb-10">
+             {renderSprites(activeList)}
           </div>
         )}
       </div>

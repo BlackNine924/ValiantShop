@@ -3357,6 +3357,17 @@ export const EGG_GROUPS_MAP: Record<string, string[]> = {
 };
 
 export const getEggGroups = (pokemonName: string): string[] => {
-    const cleanName = pokemonName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!pokemonName) return ['No Eggs Discovered'];
+    
+    // Tratamento para variações como "Wooper de Paldea", "Marowak de Alola", etc, e formas em inglês
+    let baseName = pokemonName.toLowerCase();
+    
+    if (baseName.includes(' de ')) {
+        baseName = baseName.split(' de ')[0].trim();
+    } else if (baseName.includes(' form')) {
+        baseName = baseName.split(' form')[0].trim();
+    }
+    
+    const cleanName = baseName.replace(/[^a-z0-9]/g, '');
     return EGG_GROUPS_MAP[cleanName] || ['No Eggs Discovered'];
 };

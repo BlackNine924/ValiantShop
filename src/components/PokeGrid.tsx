@@ -12,11 +12,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { savePokeGridState, loadPokeGridState, savePokeGridSettings, loadPokeGridSettings } from '../services/persistenceService';
 import { safeStorage } from '../utils/storageUtils';
+import { useMinigameStreak } from '../hooks/useMinigameStreak';
 
 
 export const PokeGrid: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
-  const lastLoadedGridIdRef = React.useRef<string | null>(null); // prevent double-load race condition while allowing gridId changes
+  const { registerWin: registerPokeGridWin } = useMinigameStreak(user?.uid, 'pokegrid');
+  const lastLoadedGridIdRef = React.useRef<string | null>(null);
   
   // Settings State
   const [enabledCriteriaIds, setEnabledCriteriaIds] = useState<Set<string>>(new Set(ALL_CRITERIA.map(c => c.id)));
@@ -333,6 +335,8 @@ export const PokeGrid: React.FC = () => {
       if (newScore === 9) {
         setGameComplete(true);
         setTimerActive(false);
+        // Registra streak apenas no modo diário
+        if (!unlimitedMode) registerPokeGridWin();
       }
     } else {
       setGuesses(g => g + 1);

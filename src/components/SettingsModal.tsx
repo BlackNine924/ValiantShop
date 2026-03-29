@@ -3,17 +3,19 @@ import { X, User, Settings, LogOut, Shield, Zap, Globe, Tag, Eye, EyeOff, Copy, 
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAllMinigameStreaks } from '../hooks/useMinigameStreak';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  streak: number;
+  streak?: number; // legado, não utilizado mais
 }
 
 type TabType = 'profile' | 'account';
 
-export const SettingsModal = ({ isOpen, onClose, streak }: SettingsModalProps) => {
+export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const { user, profile, logout, updateProfileData } = useAuth();
+  const { pokegrid, pokedle, pokequiz } = useAllMinigameStreaks(user?.uid);
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   
@@ -229,12 +231,34 @@ export const SettingsModal = ({ isOpen, onClose, streak }: SettingsModalProps) =
                         </div>
                         <div className="mb-2">
                             <h2 className="pixel-title text-xl text-white drop-shadow-lg">{siteNick}</h2>
-                            <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">Treinador Oficial • {streak} dias de streak</p>
+                            <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">Treinador Oficial</p>
                         </div>
                     </div>
                     </div>
 
                     <div className="p-8 space-y-8">
+                    {/* Streaks dos Minigames */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Zap size={12} className="text-orange-400 fill-orange-400" /> Streaks de Minigames
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { label: 'PokéGrid', streak: pokegrid.streak, emoji: '🟩' },
+                          { label: 'PokéDLE',  streak: pokedle.streak,  emoji: '🔮' },
+                          { label: 'PokéQuiz', streak: pokequiz.streak, emoji: '📖' },
+                        ].map(({ label, streak: s, emoji }) => (
+                          <div key={label} className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl text-center">
+                            <p className="text-[7px] font-black text-gray-500 uppercase mb-1">{emoji} {label}</p>
+                            <p className={`text-lg font-black ${s > 0 ? 'text-orange-400' : 'text-gray-600'}`}>
+                              {s > 0 ? `🔥 ${s}` : '–'}
+                            </p>
+                            <p className="text-[7px] text-gray-600 font-bold uppercase">dias seguidos</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Nick Breakdown */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl">

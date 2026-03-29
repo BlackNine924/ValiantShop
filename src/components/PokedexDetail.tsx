@@ -29,6 +29,8 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
   const [isShiny, setIsShiny] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'about' | 'stats' | 'evolution' | 'competitive'>('about');
+  const [ivs, setIvs] = useState({ hp: 31, attack: 31, defense: 31, specialAttack: 31, specialDefense: 31, speed: 31 });
+  const [evs, setEvs] = useState({ hp: 0, attack: 0, defense: 0, specialAttack: 0, specialDefense: 0, speed: 0 });
 
   useEffect(() => {
     if (isOpen) {
@@ -330,28 +332,56 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
                     </div>
                   )}
 
-                  {activeTab === 'stats' && (
-                    <div className="space-y-6 animate-fade">
-                      <div className="flex items-center gap-4 mb-4">
-                        <BarChart3 className="text-primary" size={20} />
-                        <h4 className="text-sm font-black uppercase tracking-widest">Atributos Base</h4>
-                      </div>
-                      <StatBar label="Vida (HP)" value={displayData.stats?.hp || 0} icon={<Heart size={14} />} color="#FF5959" />
-                      <StatBar label="Ataque" value={displayData.stats?.attack || 0} icon={<Sword size={14} />} color="#F08030" />
-                      <StatBar label="Defesa" value={displayData.stats?.defense || 0} icon={<Shield size={14} />} color="#F8D030" />
-                      <StatBar label="Ataque Especial" value={displayData.stats?.specialAttack || 0} icon={<Swords size={14} />} color="#6890F0" />
-                      <StatBar label="Defesa Especial" value={displayData.stats?.specialDefense || 0} icon={<Shield size={14} />} color="#78C850" />
-                      <StatBar label="Velocidade" value={displayData.stats?.speed || 0} icon={<Zap size={14} />} color="#F85888" />
-                      
-                      <div className="pt-8 border-t border-white/5">
-                        <div className="flex justify-between items-center mb-4">
-                          <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Poder Combinado</span>
-                          <span className="text-2xl font-black text-primary">{displayData.stats?.baseTotal}</span>
+                  {activeTab === 'stats' && (() => {
+                    const calcStat = (base: number, iv: number, ev: number, statName: string) => {
+                      if (!base) return 0;
+                      if (statName === 'hp') {
+                        if (base === 1) return 1;
+                        return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * 100) / 100) + 100 + 10;
+                      }
+                      return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * 100) / 100) + 5;
+                    };
+                    const hpStat = calcStat(displayData.stats?.hp || 0, ivs.hp, evs.hp, 'hp');
+                    const atkStat = calcStat(displayData.stats?.attack || 0, ivs.attack, evs.attack, 'attack');
+                    const defStat = calcStat(displayData.stats?.defense || 0, ivs.defense, evs.defense, 'defense');
+                    const spatkStat = calcStat(displayData.stats?.specialAttack || 0, ivs.specialAttack, evs.specialAttack, 'spatk');
+                    const spdefStat = calcStat(displayData.stats?.specialDefense || 0, ivs.specialDefense, evs.specialDefense, 'spdef');
+                    const speStat = calcStat(displayData.stats?.speed || 0, ivs.speed, evs.speed, 'speed');
+                    const totalStat = hpStat + atkStat + defStat + spatkStat + spdefStat + speStat;
+                    
+                    const handleEvChange = (stat: string, val: number) => {
+                      const newVal = Math.max(0, Math.min(252, val));
+                      // Calculate the total of all OTHER stats to enforce the 510 cap safely
+                      const otherTotal = Object.entries(evs).reduce((acc, [k, v]) => acc + (k === stat ? 0 : v), 0);
+                      const finalVal = otherTotal + newVal > 510 ? 510 - otherTotal : newVal;
+                      setEvs(prev => ({ ...prev, [stat]: finalVal }));
+                    };
+
+                    return (
+                      <div className="space-y-6 animate-fade">
+                        <div className="flex items-center gap-4 mb-4">
+                          <BarChart3 className="text-primary" size={20} />
+                          <div className="flex-1 flex items-center justify-between">
+                            <h4 className="text-sm font-black uppercase tracking-widest">Base Stats & Nv. 100</h4>
+                          </div>
                         </div>
-                        <StatBar label="TOTAL GERAL" value={displayData.stats?.baseTotal || 0} icon={<Trophy size={14} />} color="#FFFFFF" isTotal />
+                        <StatBar label="Vida (HP)" value={displayData.stats?.hp || 0} calculated={hpStat} iv={ivs.hp} setIv={(val: number) => setIvs(prev => ({...prev, hp: val}))} ev={evs.hp} setEv={(val: number) => handleEvChange('hp', val)} icon={<Heart size={14} />} color="#FF5959" />
+                        <StatBar label="Ataque" value={displayData.stats?.attack || 0} calculated={atkStat} iv={ivs.attack} setIv={(val: number) => setIvs(prev => ({...prev, attack: val}))} ev={evs.attack} setEv={(val: number) => handleEvChange('attack', val)} icon={<Sword size={14} />} color="#F08030" />
+                        <StatBar label="Defesa" value={displayData.stats?.defense || 0} calculated={defStat} iv={ivs.defense} setIv={(val: number) => setIvs(prev => ({...prev, defense: val}))} ev={evs.defense} setEv={(val: number) => handleEvChange('defense', val)} icon={<Shield size={14} />} color="#F8D030" />
+                        <StatBar label="Atq Especial" value={displayData.stats?.specialAttack || 0} calculated={spatkStat} iv={ivs.specialAttack} setIv={(val: number) => setIvs(prev => ({...prev, specialAttack: val}))} ev={evs.specialAttack} setEv={(val: number) => handleEvChange('specialAttack', val)} icon={<Swords size={14} />} color="#6890F0" />
+                        <StatBar label="Def Especial" value={displayData.stats?.specialDefense || 0} calculated={spdefStat} iv={ivs.specialDefense} setIv={(val: number) => setIvs(prev => ({...prev, specialDefense: val}))} ev={evs.specialDefense} setEv={(val: number) => handleEvChange('specialDefense', val)} icon={<Shield size={14} />} color="#78C850" />
+                        <StatBar label="Velocidade" value={displayData.stats?.speed || 0} calculated={speStat} iv={ivs.speed} setIv={(val: number) => setIvs(prev => ({...prev, speed: val}))} ev={evs.speed} setEv={(val: number) => handleEvChange('speed', val)} icon={<Zap size={14} />} color="#F85888" />
+                        
+                        <div className="pt-8 border-t border-white/5">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Poder Combinado (Base vs Nv. 100)</span>
+                            <span className="text-2xl font-black text-primary">{totalStat}</span>
+                          </div>
+                          <StatBar label="TOTAL GERAL" value={displayData.stats?.baseTotal || 0} calculated={totalStat} icon={<Trophy size={14} />} color="#FFFFFF" isTotal />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {activeTab === 'evolution' && (
                     <div className="space-y-12 animate-fade py-4 max-h-[500px] overflow-y-auto custom-scrollbar px-2">
@@ -458,14 +488,42 @@ const DataBox = ({ title, value, icon }: any) => (
   </div>
 );
 
-const StatBar = ({ label, value, icon, color, isTotal }: any) => (
+const StatBar = ({ label, value, calculated, icon, color, isTotal, iv, setIv, ev, setEv }: any) => (
   <div className={`space-y-2 group ${isTotal ? 'mt-4' : ''}`}>
     <div className="flex justify-between items-center px-1">
       <div className="flex items-center gap-3 text-gray-400 group-hover:text-white transition-colors">
         <span style={{ color }}>{icon}</span>
         <span className={`text-[10px] font-black uppercase tracking-wider ${isTotal ? 'text-white' : ''}`}>{label}</span>
       </div>
-      <span className={`text-xs font-black ${isTotal ? 'text-primary' : 'text-white'}`}>{value}</span>
+      <div className="flex items-center gap-2">
+        {!isTotal && (
+          <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 opacity-50 focus-within:opacity-100 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-md">
+              <span className="text-[8px] font-black uppercase text-gray-400">IV:</span>
+              <input 
+                type="number" min="0" max="31" value={iv}
+                onChange={e => setIv(Number(e.target.value))}
+                className="w-8 bg-transparent text-white text-[10px] font-bold text-center outline-none border-b border-primary/20 focus:border-primary px-0 py-0 appearance-none"
+                style={{ MozAppearance: 'textfield' }}
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-md">
+              <span className="text-[8px] font-black uppercase text-gray-400">EV:</span>
+              <input 
+                type="number" min="0" max="252" value={ev}
+                onChange={e => setEv(Number(e.target.value))}
+                className="w-9 bg-transparent text-white text-[10px] font-bold text-center outline-none border-b border-secondary/20 focus:border-secondary px-0 py-0 appearance-none"
+                style={{ MozAppearance: 'textfield' }}
+              />
+            </div>
+          </div>
+        )}
+        <div className="flex items-baseline gap-1 min-w-[50px] justify-end ml-2">
+          <span className={`text-[10px] font-black text-gray-600 ${isTotal ? 'text-sm text-gray-500' : ''}`}>{value}</span>
+          {!isTotal && <span className="text-[8px] text-gray-600 uppercase">base</span>}
+          <span className={`ml-2 text-sm font-black ${isTotal ? 'text-primary hidden' : 'text-white'}`}>{calculated}</span>
+        </div>
+      </div>
     </div>
     <div className={`h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 ${isTotal ? 'h-3 border-white/10' : ''}`}>
       <div 

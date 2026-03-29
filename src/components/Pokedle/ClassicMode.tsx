@@ -8,9 +8,11 @@ import type { ComparisonResult } from '../../data/pokedleLogic';
 import { getDetailedPokemon } from '../../services/pokedexService';
 import { useAuth } from '../../context/AuthContext';
 import { savePokedleState, loadPokedleState } from '../../services/persistenceService';
+import { useMinigameStreak } from '../../hooks/useMinigameStreak';
 
 export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
   const { user } = useAuth();
+  const { registerWin: registerPokedleWin } = useMinigameStreak(user?.uid, 'pokedle');
   const [guesses, setGuesses] = useState<any[]>([]);
   const [gameOver, setGameOver] = useState(false);
   const [isSurrendered, setIsSurrendered] = useState(false);
@@ -102,7 +104,10 @@ export const ClassicMode = ({ target }: { target: PokemonEntry }) => {
       setSuggestions([]);
 
       const isWin = p.id === target.id;
-      if (isWin) setGameOver(true);
+      if (isWin) {
+        setGameOver(true);
+        registerPokedleWin(); // Streak diário do Pokédle
+      }
 
       savePokedleState(user?.displayName || null, 'classic', dateStr, {
         guesses: newGuesses,
