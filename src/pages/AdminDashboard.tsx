@@ -5,7 +5,7 @@ import {
   Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset
 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc } from 'firebase/firestore';
 import { getEggGroups } from '../data/eggGroups';
 import { EVOLUTION_LINES } from '../data/evolutionLines';
 import { POKEMON_DATA } from '../data/pokemonData';
@@ -929,96 +929,6 @@ export const AdminDashboard = () => {
                     </div>
                   )}
                 </div>
-              ) : activeTab === 'inbox' ? (
-                <div className="p-8 space-y-8">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-                    <div>
-                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary flex items-center gap-3">
-                        TERMINAL DE COMUNICAÇÃO <span className="text-secondary">[{inboxFilter.toUpperCase()}]</span>
-                      </h3>
-                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Gerencie conversas de pedidos e suporte geral</p>
-                    </div>
-
-                    <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
-                      {(['Todos', 'Pedido', 'Support'] as const).map(f => (
-                        <button
-                          key={f}
-                          onClick={() => setInboxFilter(f)}
-                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inboxFilter === f ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' }))]
-                      .filter(chat => {
-                        if (inboxFilter === 'Pedido') return chat.type === 'order';
-                        if (inboxFilter === 'Support') return chat.type === 'support';
-                        return true;
-                      })
-                      .sort((a, b) => {
-                        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
-                        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
-                        return timeB - timeA;
-                      })
-                      .map(chat => (
-                        <div key={chat.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group flex items-center justify-between gap-6">
-                          <div className="flex items-center gap-6">
-                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
-                              {chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
-                            </div>
-                            
-                            <div>
-                               <div className="flex items-center gap-3 mb-1">
-                                 <h4 className="font-black text-white text-lg uppercase tracking-tight">{chat.playerNick || 'Treinador'}</h4>
-                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${chat.type === 'support' ? 'text-secondary border-secondary/30 bg-secondary/5' : 'text-primary border-primary/30 bg-primary/5'}`}>
-                                   {chat.type === 'support' ? 'Suporte Geral' : `Pedido #${chat.id.slice(0,6)}`}
-                                 </span>
-                               </div>
-                               <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                                 <span className="flex items-center gap-1.5"><Bell size={10} /> {chat.status || 'Ativo'}</span>
-                                 <span className="flex items-center gap-1.5 italic opacity-60">
-                                   Iniciado em: {chat.createdAt?.toMillis ? new Date(chat.createdAt.toMillis()).toLocaleString() : 'Recentemente'}
-                                 </span>
-                               </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <button 
-                              onClick={() => toggleChat(chat)}
-                              className="px-8 py-3 bg-primary text-black rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group/btn"
-                            >
-                              ABRIR CHAT <MessageSquare size={14} className="group-hover/btn:translate-x-1 transition-transform" />
-                            </button>
-                            <button 
-                              onClick={() => setDeleteConfirm({
-                                isOpen: true,
-                                type: chat.type === 'order' ? 'order' : 'notification',
-                                id: chat.id,
-                                name: `Conversa de ${chat.playerNick || 'Treinador'}`
-                              })}
-                              className="p-3 text-gray-500 hover:text-red-500 transition-colors bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100"
-                            >
-                              <X size={20} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    }
-
-                    {[...orders, ...supportChats].length === 0 && (
-                      <div className="py-20 text-center opacity-30">
-                        <MessageSquare size={80} className="mx-auto text-gray-700 mb-6" />
-                        <p className="text-lg font-black text-gray-600 uppercase tracking-[0.3em]">O silêncio é ensurdecedor...</p>
-                        <p className="text-[10px] text-gray-700 font-bold uppercase mt-2">Nenhuma conversa ativa no radar.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -1455,9 +1365,9 @@ export const AdminDashboard = () => {
                     }`}
                   >
                     <OrderChat 
-                      orderId={chat.id}
+                      orderId={chat.id || undefined}
                       orderPokemon={chat.pokemon}
-                      orderPlayerNick={chat.playerNick}
+                      orderPlayerNick={chat.playerNick || undefined}
                       currentUser={{ uid: 'admin', displayName: 'Valiant Admin' }}
                       isAdminView={true}
                       isFloating={true}

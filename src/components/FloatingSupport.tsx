@@ -72,13 +72,11 @@ export const FloatingSupport = () => {
             className="w-[350px] h-[500px] bg-black/95 border border-primary/20 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden pointer-events-auto flex flex-col relative"
           >
             {/* Ambient Background Glow */}
-            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
-            
             {chatId ? (
-              <OrderChat
-                orderId={chatId!}
+              <OrderChat 
+                orderId={chatId}
                 orderPokemon="Suporte Valiant"
-                orderPlayerNick={user.displayName}
+                orderPlayerNick={user.displayName || undefined}
                 currentUser={user}
                 onClose={() => setIsOpen(false)}
                 isFloating={true}
