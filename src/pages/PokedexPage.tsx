@@ -24,8 +24,9 @@ export const PokedexPage: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(20);
   const [selectedPokemonId, setSelectedPokemonId] = useState<number | null>(null);
   const [caughtIds, setCaughtIds] = useState<number[]>([]);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
 
-  // Load caught status from Firebase
+  // Auto-open if redirected from admin with search
   useEffect(() => {
     if (user?.displayName) {
       loadPokedexState(user.displayName).then(setCaughtIds);
@@ -101,7 +102,15 @@ export const PokedexPage: React.FC = () => {
 
       return true;
     });
-  }, [searchTerm, filters]);
+  }, [searchTerm, filters, GEN_RANGES]);
+
+  // Auto-open if redirected from admin with search
+  useEffect(() => {
+    if (initialSearch && !hasAutoOpened && filteredPokemon.length > 0) {
+      setSelectedPokemonId(filteredPokemon[0].id);
+      setHasAutoOpened(true);
+    }
+  }, [filteredPokemon, initialSearch, hasAutoOpened]);
 
   const displayedPokemon = filteredPokemon.slice(0, visibleCount);
 
@@ -212,6 +221,7 @@ export const PokedexPage: React.FC = () => {
         onClose={() => setSelectedPokemonId(null)}
         isCaught={selectedPokemonId ? caughtIds.includes(selectedPokemonId) : false}
         onToggleCaught={selectedPokemonId ? () => toggleCaught(selectedPokemonId) : () => {}}
+        preselectedForm={searchParams.get('form')}
       />
 
       <PokedexFilterModal 

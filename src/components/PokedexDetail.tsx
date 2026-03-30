@@ -13,6 +13,7 @@ interface PokedexDetailProps {
   onClose: () => void;
   isCaught?: boolean;
   onToggleCaught?: () => void;
+  preselectedForm?: string | null;
 }
 
 export const PokedexDetail: React.FC<PokedexDetailProps> = ({ 
@@ -20,12 +21,13 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
   isOpen, 
   onClose,
   isCaught,
-  onToggleCaught
+  onToggleCaught,
+  preselectedForm = null
 }) => {
   const [basePokemon, setBasePokemon] = useState<DetailedPokemon | null>(null);
   const [currentVariation, setCurrentVariation] = useState<Variation | null>(null);
   const [internalId, setInternalId] = useState(initialId);
-  const [pendingVariationName, setPendingVariationName] = useState<string | null>(null);
+  const [pendingVariationName, setPendingVariationName] = useState<string | null>(preselectedForm);
   const [isShiny, setIsShiny] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'about' | 'stats' | 'evolution' | 'competitive'>('about');
@@ -35,9 +37,9 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
   useEffect(() => {
     if (isOpen) {
       setInternalId(initialId);
-      setPendingVariationName(null);
+      setPendingVariationName(preselectedForm);
     }
-  }, [initialId, isOpen]);
+  }, [initialId, isOpen, preselectedForm]);
 
   useEffect(() => {
     if (isOpen) {

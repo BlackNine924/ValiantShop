@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, MessageSquare } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ADMIN_CONFIG } from '../config/adminConfig';
 
 interface Message {
@@ -157,6 +157,18 @@ export const OrderChat = ({
 
     try {
       await addDoc(collection(db, collectionName, orderId, 'messages'), messageData);
+      
+      // Mark parent as having chat
+      try {
+        await updateDoc(doc(db, collectionName, orderId), {
+          hasChat: true,
+          lastMessageAt: serverTimestamp()
+        });
+      } catch (e) {
+        // Silently fail if updateDoc doesn't work (e.g. support_chats doc doesn't exist yet, although it should)
+        console.error("Error marking chat as active:", e);
+      }
+
       setNewMessage('');
       updateTypingStatus(false); // Stop typing immediately after send
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);

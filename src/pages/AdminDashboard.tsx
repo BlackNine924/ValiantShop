@@ -44,7 +44,7 @@ export const AdminDashboard = () => {
   const [supportChats, setSupportChats] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'inbox' | 'analytics' | 'stock_rooms' | 'feedbacks'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
@@ -64,6 +64,12 @@ export const AdminDashboard = () => {
   const [showFeedbackFilters, setShowFeedbackFilters] = useState(false);
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [isBulkInboxMode, setIsBulkInboxMode] = useState(false);
+  const [selectedInboxIds, setSelectedInboxIds] = useState<string[]>([]);
+  const [inboxLastOpenedAt, setInboxLastOpenedAt] = useState<number>(() => {
+    const saved = localStorage.getItem('valiant_admin_inbox_seen');
+    return saved ? parseInt(saved) : Date.now();
+  });
   const deleteModalRef = useRef<HTMLDivElement>(null);
 
   // Advanced Filters
@@ -74,7 +80,6 @@ export const AdminDashboard = () => {
   const [filterIsCastrated, setFilterIsCastrated] = useState<boolean | null>(null);
   const [filterEggGroup, setFilterEggGroup] = useState('');
   const [filterTrainer, setFilterTrainer] = useState('');
-  const [filterAbility, setFilterAbility] = useState('');
   const [isAutoOrderModalOpen, setIsAutoOrderModalOpen] = useState(false);
 
   // Pagination State
@@ -84,7 +89,7 @@ export const AdminDashboard = () => {
   // Reset page when tab or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, filterIvs, filterGender, filterHA, filterIsCastrated, filterEggGroup, filterTrainer, filterAbility]);
+  }, [activeTab, searchTerm, filterIvs, filterGender, filterHA, filterIsCastrated, filterEggGroup, filterTrainer]);
 
   const toggleChat = (order: any) => {
     setActiveChats(prev => {
@@ -119,7 +124,6 @@ export const AdminDashboard = () => {
     setFilterHA(null);
     setFilterIsCastrated(null);
     setFilterEggGroup('');
-    setFilterAbility('');
   };
 
   const updateStock = async (pokemon: string, ivs: string, gender: string, nature: string) => {
@@ -402,9 +406,8 @@ export const AdminDashboard = () => {
           : getEggGroups(o.pokemon).includes(filterEggGroup))
       : true;
     const matchesTrainer = filterTrainer ? (o.playerNick?.toLowerCase() || '').includes(filterTrainer.toLowerCase()) : true;
-    const matchesAbility = filterAbility ? (o.ability?.toLowerCase() || '').includes(filterAbility.toLowerCase()) : true;
 
-    return matchesSearch && matchesIvs && matchesGender && matchesHA && matchesCastrated && matchesEggGroup && matchesTrainer && matchesAbility;
+    return matchesSearch && matchesIvs && matchesGender && matchesHA && matchesCastrated && matchesEggGroup && matchesTrainer;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
@@ -457,8 +460,9 @@ export const AdminDashboard = () => {
   ).sort((a: any, b: any) => b.count - a.count);
 
   return (
-    <div className="admin-wrapper">
-      <div className="max-w-7xl mx-auto px-4 animate-fade">
+    <>
+      <div className="admin-wrapper">
+        <div className="max-w-7xl mx-auto px-4 animate-fade">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <aside className="space-y-4">
             <div className="glow-card p-6 space-y-2">
@@ -474,13 +478,27 @@ export const AdminDashboard = () => {
               <button onClick={() => setActiveTab('treinadores')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'treinadores' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
                 <Users size={18} /> Treinadores ({uniqueTrainers})
               </button>
-              <button onClick={() => setActiveTab('inbox')} className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'inbox' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+              <button 
+                onClick={() => {
+                  setActiveTab('inbox');
+                  const now = Date.now();
+                  setInboxLastOpenedAt(now);
+                  localStorage.setItem('valiant_admin_inbox_seen', now.toString());
+                }} 
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'inbox' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
                 <div className="flex items-center gap-4">
                   <Bell size={18} /> Inbox
                 </div>
-                {notifications.length > 0 && (
+                {notifications.filter(n => {
+                  const time = n.time?.toMillis ? n.time.toMillis() : Date.now();
+                  return time > inboxLastOpenedAt;
+                }).length > 0 && (
                   <span className="bg-secondary text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse shadow-[0_0_8px_var(--secondary-glow)]">
-                    {notifications.length}
+                    {notifications.filter(n => {
+                      const time = n.time?.toMillis ? n.time.toMillis() : Date.now();
+                      return time > inboxLastOpenedAt;
+                    }).length}
                   </span>
                 )}
               </button>
@@ -611,10 +629,9 @@ export const AdminDashboard = () => {
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="">Todas IVs</option>
-                    <option value="4 IVs">4 IVs</option>
-                    <option value="5 IVs">5 IVs</option>
                     <option value="6 IVs">6 IVs</option>
-                    <option value="3 IVs">3 IVs</option>
+                    <option value="5 IVs">5 IVs</option>
+                    <option value="4 IVs">4 IVs</option>
                   </select>
 
                   <select 
@@ -652,22 +669,20 @@ export const AdminDashboard = () => {
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="">Todos Egg Groups</option>
-                    <option value="Ditto">Ditto</option>
-                    <option value="Fairy">Fairy</option>
-                    <option value="Dragon">Dragon</option>
                     <option value="Monster">Monster</option>
+                    <option value="Human-Like">Human-Like</option>
                     <option value="Water 1">Water 1</option>
                     <option value="Water 2">Water 2</option>
                     <option value="Water 3">Water 3</option>
                     <option value="Bug">Bug</option>
-                    <option value="Flying">Flying</option>
-                    <option value="Field">Field</option>
-                    <option value="Grass">Grass</option>
-                    <option value="Human-Like">Human-Like</option>
                     <option value="Mineral">Mineral</option>
+                    <option value="Flying">Flying</option>
                     <option value="Amorphous">Amorphous</option>
+                    <option value="Field">Field</option>
+                    <option value="Fairy">Fairy</option>
+                    <option value="Grass">Grass</option>
+                    <option value="Dragon">Dragon</option>
                     <option value="Ditto">Ditto</option>
-                    <option value="No Eggs Discovered">No Eggs Discovered</option>
                   </select>
 
                   <input 
@@ -677,12 +692,6 @@ export const AdminDashboard = () => {
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary"
                   />
 
-                  <input 
-                    placeholder="Habilidade..." 
-                    value={filterAbility}
-                    onChange={e => setFilterAbility(e.target.value)}
-                    className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary"
-                  />
                   <button 
                     onClick={clearFilters}
                     className="flex items-center justify-center gap-2 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 rounded-lg px-3 py-2 text-xs font-bold transition-all"
@@ -705,22 +714,78 @@ export const AdminDashboard = () => {
                       <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Gerencie conversas de pedidos e suporte geral</p>
                     </div>
 
-                    <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
-                      {(['Todos', 'Pedido', 'Support'] as const).map(f => (
-                        <button
-                          key={f}
-                          onClick={() => setInboxFilter(f)}
-                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inboxFilter === f ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                      {/* Filtros */}
+                      <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                        {(['Todos', 'Pedido', 'Support'] as const).map(f => (
+                          <button
+                            key={f}
+                            onClick={() => setInboxFilter(f)}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inboxFilter === f ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Ações de Massa */}
+                      {isBulkInboxMode ? (
+                        <div className="flex items-start gap-3 min-w-fit">
+                           <div className="flex flex-col items-start gap-1.5">
+                             <button 
+                               onClick={() => {
+                                 if (selectedInboxIds.length === 0) return alert("Selecione itens para apagar.");
+                                 setDeleteConfirm({
+                                   isOpen: true,
+                                   type: 'mass-notification',
+                                   id: 'mass-inbox',
+                                   name: `Limpar ${selectedInboxIds.length} notificações selecionadas`
+                                 });
+                               }}
+                               className="px-6 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-red-500/20 transition-all shadow-lg"
+                             >
+                               <Trash2 size={12} className="inline mr-2" /> Excluir ({selectedInboxIds.length})
+                             </button>
+                             <button 
+                               onClick={() => {
+                                 const allItems = [...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' }))]
+                                   .filter(chat => !dismissedNotifIds.has(chat.id));
+                                 const allFilteredIds = allItems
+                                   .filter(chat => {
+                                     if (inboxFilter === 'Pedido') return chat.type === 'order';
+                                     if (inboxFilter === 'Support') return chat.type === 'support';
+                                     return true;
+                                   })
+                                   .map(c => c.id);
+                                 setSelectedInboxIds(allFilteredIds);
+                               }}
+                               className="px-3 py-1 bg-white/10 text-gray-400 border border-white/10 rounded-lg text-[7px] font-black uppercase hover:text-white transition-all w-fit opacity-80 hover:opacity-100"
+                             >
+                                Selecionar Tudo
+                             </button>
+                           </div>
+                           <button 
+                             onClick={() => { setIsBulkInboxMode(false); setSelectedInboxIds([]); }}
+                             className="px-6 py-2.5 bg-white/5 text-gray-500 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all"
+                           >
+                             CANCELAR
+                           </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setIsBulkInboxMode(true)}
+                          className="px-6 py-2.5 bg-white/5 text-gray-400 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all border border-white/10"
                         >
-                          {f}
+                          <Trash2 size={12} className="inline mr-2" /> Limpar Inbox
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4">
                     {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' }))]
                       .filter(chat => {
+                        if (dismissedNotifIds.has(chat.id)) return false;
                         if (inboxFilter === 'Pedido') return chat.type === 'order';
                         if (inboxFilter === 'Support') return chat.type === 'support';
                         return true;
@@ -731,8 +796,19 @@ export const AdminDashboard = () => {
                         return timeB - timeA;
                       })
                       .map(chat => (
-                        <div key={chat.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group flex items-center justify-between gap-6">
+                        <div key={chat.id} className={`bg-white/[0.03] border rounded-3xl p-6 transition-all group flex items-center justify-between gap-6 ${selectedInboxIds.includes(chat.id) ? 'border-primary/50 bg-primary/5 shadow-lg shadow-primary/5' : 'border-white/5 hover:border-primary/30'}`}>
                           <div className="flex items-center gap-6">
+                            {isBulkInboxMode && (
+                              <input 
+                                type="checkbox"
+                                checked={selectedInboxIds.includes(chat.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedInboxIds(prev => [...prev, chat.id]);
+                                  else setSelectedInboxIds(prev => prev.filter(id => id !== chat.id));
+                                }}
+                                className="w-4 h-4 rounded appearance-none border-2 border-primary/20 checked:bg-primary checked:border-primary cursor-pointer transition-all"
+                              />
+                            )}
                             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
                               {chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
                             </div>
@@ -754,12 +830,25 @@ export const AdminDashboard = () => {
                           </div>
 
                           <div className="flex items-center gap-3">
-                            <button 
-                              onClick={() => toggleChat(chat)}
-                              className="px-8 py-3 bg-primary text-black rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group/btn"
-                            >
-                              ABRIR CHAT <MessageSquare size={14} className="group-hover/btn:translate-x-1 transition-transform" />
-                            </button>
+                            {chat.type === 'order' && !chat.hasChat ? (
+                              <button 
+                                onClick={() => {
+                                  setActiveTab('pedidos');
+                                  setSearchTerm(chat.playerNick || '');
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="px-8 py-3 bg-secondary text-white rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-secondary/20 flex items-center gap-2 group/btn"
+                              >
+                                VER ENCOMENDA <ShoppingBag size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => toggleChat(chat)}
+                                className="px-8 py-3 bg-primary text-black rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group/btn"
+                              >
+                                ABRIR CHAT <MessageSquare size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                              </button>
+                            )}
                             <button 
                               onClick={() => setDeleteConfirm({
                                 isOpen: true,
@@ -1140,7 +1229,12 @@ export const AdminDashboard = () => {
                                                 <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Status / Data</p>
                                                 <div className="flex items-center gap-2">
                                                   <span className="text-[10px] font-bold text-gray-400">{new Date(o.createdAt?.toMillis ? o.createdAt.toMillis() : Date.now()).toLocaleDateString('pt-BR')}</span>
-                                                  <span className={`w-2 h-2 rounded-full ${o.status === 'Finalizado' ? 'bg-green-500' : 'bg-primary animate-pulse'}`}></span>
+                                                  <span className={`w-2 h-2 rounded-full ${
+                                                    o.status === 'Finalizado' ? 'bg-green-500' : 
+                                                    o.status === 'Breeding' ? 'bg-secondary' :
+                                                    o.status === 'Entregue' ? 'bg-blue-500' :
+                                                    'bg-orange-400'
+                                                  }`}></span>
                                                 </div>
                                               </div>
                                               <div className="text-center md:text-left">
@@ -1256,8 +1350,14 @@ export const AdminDashboard = () => {
                 </button>
                 <button 
                   onClick={async () => {
-                    if (deleteConfirm.type === 'order') handleDeleteOrder(deleteConfirm.id);
-                    else if (deleteConfirm.type === 'notification') handleDeleteNotification(deleteConfirm.id);
+                    if (deleteConfirm.type === 'order') {
+                      await handleDeleteOrder(deleteConfirm.id);
+                      setDeleteConfirm(null);
+                    }
+                    else if (deleteConfirm.type === 'notification') {
+                      await handleDeleteNotification(deleteConfirm.id);
+                      setDeleteConfirm(null);
+                    }
                     else if (deleteConfirm.type === 'mass-order') {
                         // Hard-delete em massa
                         try {
@@ -1272,6 +1372,18 @@ export const AdminDashboard = () => {
                         } catch (err) {
                             console.error("Erro ao deletar em massa:", err);
                         }
+                    } else if (deleteConfirm.type === 'mass-notification') {
+                      try {
+                        const batch = writeBatch(db);
+                        selectedInboxIds.forEach(id => {
+                          const docRef = doc(db, 'admin_dismissed_notifications', id);
+                          batch.set(docRef, { notificationId: id, dismissedAt: serverTimestamp() });
+                        });
+                        await batch.commit();
+                        setIsBulkInboxMode(false);
+                        setSelectedInboxIds([]);
+                        setDeleteConfirm(null);
+                      } catch (err) { console.error("Erro ao limpar inbox:", err); }
                     } else if (deleteConfirm.type === 'stock_room') {
                       try {
                         await deleteDoc(doc(db, 'stock_rooms', deleteConfirm.id));
@@ -1280,16 +1392,6 @@ export const AdminDashboard = () => {
                         console.error("Erro ao deletar sala:", err);
                         alert("Erro ao deletar: " + err);
                       }
-                    } else if (deleteConfirm.type === 'mass-notification') {
-                      try {
-                        const batch = writeBatch(db);
-                        notifications.forEach(n => {
-                          const docRef = doc(db, 'admin_dismissed_notifications', n.id);
-                          batch.set(docRef, { notificationId: n.id, dismissedAt: serverTimestamp() });
-                        });
-                        await batch.commit();
-                        setDeleteConfirm(null);
-                      } catch (err) { console.error("Erro ao limpar inbox:", err); }
                     }
                     else {
                       deleteDoc(doc(db, 'ClientReviews', deleteConfirm.id)).catch(err => {
@@ -1381,14 +1483,15 @@ export const AdminDashboard = () => {
           )}
         </AnimatePresence>
       </div>
-                      {showKanbanBoard && (
+      {showKanbanBoard && (
         <KanbanBoard 
           orders={orders} 
           onStatusChange={handleStatusChange} 
           onClose={() => setShowKanbanBoard(false)} 
         />
       )}
-    </div>
+      </div>
+    </>
   );
 };
 
@@ -1694,16 +1797,33 @@ const StockRoomsManager = () => {
 
               <div className="flex flex-wrap gap-2 mb-6">
                  {(room.pokemonList || []).length > 0 ? (
-                    room.pokemonList.map((p: string, i: number) => (
-                      <span 
-                        key={i} 
-                        onClick={() => navigate(`/pokedex?search=${p}`)}
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border cursor-pointer hover:scale-105 transition-all active:scale-95 ${roomSearchTerm && p.toLowerCase().includes(roomSearchTerm.toLowerCase()) ? 'bg-primary border-primary text-black shadow-[0_0_10px_var(--primary-glow)]' : 'bg-black/60 border-white/5 text-gray-400 hover:text-primary hover:border-primary/20'}`}
-                        title={`Ver ${p} na Pokédex`}
-                      >
-                        {p}
-                      </span>
-                    ))
+                    room.pokemonList.map((p: string, i: number) => {
+                      const handlePokedexNavigation = () => {
+                        const low = p.toLowerCase();
+                        let search = p;
+                        let form = '';
+                        
+                        // Regex melhorada: aceita "Goomy Hisui" ou "Goomy de Hisui"
+                        const regionalMatch = low.match(/(.+?)(?:\s+de\s+|\s+)(paldea|alola|galar|hisui)/i);
+                        if (regionalMatch) {
+                          search = regionalMatch[1].trim();
+                          form = regionalMatch[2];
+                        }
+                        
+                        navigate(`/pokedex?search=${search}${form ? `&form=${form}` : ''}`);
+                      };
+
+                      return (
+                        <span 
+                          key={i} 
+                          onClick={handlePokedexNavigation}
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border cursor-pointer hover:scale-105 transition-all active:scale-95 ${roomSearchTerm && p.toLowerCase().includes(roomSearchTerm.toLowerCase()) ? 'bg-primary border-primary text-black shadow-[0_0_10px_var(--primary-glow)]' : 'bg-black/60 border-white/5 text-gray-400 hover:text-primary hover:border-primary/20'}`}
+                          title={`Ver ${p} na Pokédex`}
+                        >
+                          {p}
+                        </span>
+                      );
+                    })
                  ) : (
                     <span className="text-[10px] text-gray-600 font-bold italic uppercase">Sala Vazia</span>
                  )}
