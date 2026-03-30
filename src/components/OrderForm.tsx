@@ -56,6 +56,27 @@ export const OrderForm = () => {
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  const [cooldown, setCooldown] = useState(() => {
+    const saved = localStorage.getItem('valiant_order_cooldown');
+    if (!saved) return 0;
+    const diff = Math.floor((parseInt(saved) - Date.now()) / 1000);
+    return diff > 0 ? diff : 0;
+  });
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
   const initialForm = {
     pokemon: '',
     nature: '', 
@@ -225,6 +246,11 @@ export const OrderForm = () => {
   };
 
   const handleBuyNow = async () => {
+    if (cooldown > 0) {
+      alert(`Anti-Spam ativado. Aguarde ${cooldown} segundos antes de enviar outra encomenda.`);
+      return;
+    }
+
     if (!user || !user.displayName) {
       alert('Você precisa estar logado com seu Nick para fazer uma encomenda!');
       return;
@@ -247,6 +273,8 @@ export const OrderForm = () => {
         status: 'Pendente',
         createdAt: serverTimestamp()
       });
+      localStorage.setItem('valiant_order_cooldown', (Date.now() + 30000).toString());
+      setCooldown(30);
       setForm(initialForm);
       setSearch('');
       setStep(4);
@@ -577,12 +605,16 @@ export const OrderForm = () => {
                 <div className="flex flex-col sm:flex-row w-full gap-4 z-10">
                   <div className="flex flex-col flex-1 gap-2">
                     <button 
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || cooldown > 0}
                       onClick={handleBuyNow} 
-                      className={`btn-manda w-full !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`btn-manda w-full !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${(isSubmitting || cooldown > 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <span className="font-extrabold uppercase text-sm">{isSubmitting ? 'Enviando...' : 'Comprar Agora'}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Apenas 1</span>
+                      <span className="font-extrabold uppercase text-sm">
+                        {isSubmitting ? 'Enviando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : 'Comprar Agora'}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        {cooldown > 0 ? 'Anti-Spam' : 'Apenas 1'}
+                      </span>
                     </button>
                     <button 
                       disabled={isSubmitting}

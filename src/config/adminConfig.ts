@@ -1,4 +1,6 @@
 export const ADMIN_CONFIG = {
-  password: "admin123", // Mude aqui para alterar a senha do painel admin
-  adminNicks: ["reskalla"] // Nicks que serão reconhecidos como Admin no chat
+  // A senha estática não é mais necessária pois usamos Google Auth, mas mantida por compatibilidade
+  password: "admin123", 
+  adminNicks: ["reskalla"], // Nicks que serão reconhecidos como Admin no chat
+  adminEmails: ["reskallaarthur@gmail.com"] // Emails permitidos no Admin Dashboard via Google Auth
 };

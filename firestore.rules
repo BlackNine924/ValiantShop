@@ -1,0 +1,141 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────────────────────────────────────────────
+    // Funções auxiliares
+    // ────────────────────────────────────────────────
+
+    // Usuário está autenticado?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // O documento pertence ao usuário logado?
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // O usuário logado é o admin (reskallaarthur@gmail.com)?
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'reskallaarthur@gmail.com';
+    }
+
+    // ────────────────────────────────────────────────
+    // /orders — Encomendas
+    // ────────────────────────────────────────────────
+    match /orders/{orderId} {
+      // Leitura: apenas o dono da encomenda ou o admin
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Criação: usuário autenticado criando sua própria encomenda
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.totalPrice is number
+        && request.resource.data.totalPrice > 0;
+
+      // Atualização: apenas o admin pode mudar status; o dono pode atualizar campos limitados
+      allow update: if isAdmin();
+
+      // Deleção: apenas o admin
+      allow delete: if isAdmin();
+
+      // Sub-coleção de mensagens do chat do pedido
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid);
+        allow create: if isAuthenticated()
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if isAdmin();
+      }
+
+      // Sub-coleção de indicadores de digitação
+      match /typing/{userId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        allow read: if isAdmin();
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // /support_chats — Chats de suporte
+    // ────────────────────────────────────────────────
+    match /support_chats/{chatId} {
+      // Leitura: apenas o dono do chat ou o admin
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Criação: usuário logado, criando chat com seu próprio userId
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Atualização e deleção: apenas o admin
+      allow update, delete: if isAdmin();
+
+      // Sub-coleção de mensagens do chat de suporte
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid);
+        allow create: if isAuthenticated()
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if isAdmin();
+      }
+
+      match /typing/{userId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        allow read: if isAdmin();
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // /users — Perfis de usuário
+    // ────────────────────────────────────────────────
+    match /users/{userId} {
+      // Leitura: o próprio usuário ou o admin
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Escrita: apenas o próprio usuário pode atualizar seu perfil
+      allow write: if isOwner(userId);
+    }
+
+    // ────────────────────────────────────────────────
+    // /inventory — Estoque (salas)
+    // ────────────────────────────────────────────────
+    match /inventory/{itemId} {
+      // Qualquer usuário autenticado pode LER o estoque (exibição pública)
+      allow read: if isAuthenticated();
+
+      // Apenas o admin pode criar, editar e deletar itens do estoque
+      allow write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /ClientReviews — Depoimentos
+    // ────────────────────────────────────────────────
+    match /ClientReviews/{reviewId} {
+      // Qualquer pessoa autenticada pode ver os depoimentos
+      allow read: if isAuthenticated();
+
+      // Usuário cria seu próprio depoimento com seu userId
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Apenas o admin pode editar ou deletar depoimentos
+      allow update, delete: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /admin_dismissed_notifications — Notificações do Admin
+    // ────────────────────────────────────────────────
+    match /admin_dismissed_notifications/{docId} {
+      // Apenas o admin acessa
+      allow read, write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // Qualquer outra coleção — bloqueada por padrão
+    // ────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -23,7 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
-# Security
+# Security — NUNCA commitar esses arquivos
 serviceAccountKey.json
+*ServiceAccount*.json
+*service_account*.json
+*.pem
+*.key
 .env
 .env.*

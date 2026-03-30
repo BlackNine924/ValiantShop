@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, MessageSquare } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { ADMIN_CONFIG } from '../config/adminConfig';
 
 interface Message {
   id: string;
@@ -106,7 +105,9 @@ export const OrderChat = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value);
+    const val = e.target.value;
+    if (val.length > 1000) return; // Hard limit — também protegido nas Firestore Rules
+    setNewMessage(val);
     
     // Typing logic
     updateTypingStatus(true);
@@ -145,13 +146,13 @@ export const OrderChat = ({
       return;
     }
 
-    const isSystemAdmin = isAdminView || (currentUser?.displayName && ADMIN_CONFIG.adminNicks.includes(currentUser.displayName));
-
+    // isAdmin é determinado APENAS pelo prop isAdminView (passado pelo AdminDashboard autenticado)
+    // NÃO usar displayName pois pode ser forjado por qualquer usuário no cadastro
     const messageData = {
       text: newMessage.trim(),
       senderId: currentUser.uid || currentUser.id || 'system',
       senderName: currentUser.displayName || 'Admin',
-      isAdmin: isSystemAdmin,
+      isAdmin: isAdminView,
       createdAt: serverTimestamp(),
     };
 
@@ -292,6 +293,7 @@ export const OrderChat = ({
         <form onSubmit={handleSendMessage} className={`${isFloating ? 'p-3' : 'p-6'} bg-white/[0.02] border-t border-white/5 flex gap-2`}>
           <input 
             type="text"
+            maxLength={1000}
             className="flex-1 bg-black/60 border-2 border-white/5 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:border-secondary transition-all"
             placeholder="Mensagem..."
             value={newMessage}
