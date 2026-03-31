@@ -18,6 +18,7 @@ interface UserProfile {
   discordId?: string;
   googleId?: string;
   discordTag?: string;
+  minecraftNick?: string;
 }
 
 interface AuthContextType {

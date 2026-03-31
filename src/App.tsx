@@ -968,7 +968,7 @@ function App() {
                 alt="Iron Valiant Shiny" 
                 className="w-32 h-32 object-contain filter drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]"
               />
-              <h2 className="pixel-title text-emerald-300 text-4xl mt-6 drop-shadow-md">SHINY FOUND!</h2>
+              <h2 className="pixel-title text-emerald-300 text-4xl mt-6 drop-shadow-md">SHINY ENCONTRADO!</h2>
               <p className="font-black text-emerald-100 uppercase tracking-widest mt-2 drop-shadow-sm">A lenda renasce no futuro...</p>
             </div>
           </motion.div>
