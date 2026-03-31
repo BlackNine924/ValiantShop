@@ -216,7 +216,7 @@ export const PokedexPage: React.FC = () => {
 
       {/* Modals */}
       <PokedexDetail 
-        pokemonId={selectedPokemonId || 0}
+        pokemonId={selectedPokemonId || undefined as any}
         isOpen={selectedPokemonId !== null}
         onClose={() => setSelectedPokemonId(null)}
         isCaught={selectedPokemonId ? caughtIds.includes(selectedPokemonId) : false}
