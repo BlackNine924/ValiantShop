@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Heart, Shield, Zap, Swords, Sword, Ruler, Weight, Globe, Calendar, BarChart3, Sparkles, ExternalLink, Trophy, CheckCircle2, MapPin, Package, Clock, CloudRain, Info } from 'lucide-react';
+import { X, Heart, Shield, Zap, Swords, Sword, Ruler, Weight, Globe, Calendar, BarChart3, Sparkles, ExternalLink, Trophy, CheckCircle2, Package, Clock, CloudRain } from 'lucide-react';
 import type { DetailedPokemon, Variation } from '../services/pokedexService';
 import { getDetailedPokemon, TYPE_TRADUCOES } from '../services/pokedexService';
 import { TYPE_COLORS, getPokemonArtwork, getCustomArtworkByName } from '../data/pokemonTypes';
