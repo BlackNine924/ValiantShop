@@ -6,6 +6,7 @@ import { PokedexFilterModal } from '../components/PokedexFilterModal';
 import { Search, ArrowLeft, Filter } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { LEGENDARY_IDS, MYTHICAL_IDS, HAS_MEGA_IDS, HAS_GMAX_IDS, PARADOX_IDS, ULTRABEAST_IDS, HAS_ALOLA_IDS, HAS_GALAR_IDS, HAS_HISUI_IDS, HAS_PALDEA_IDS } from '../data/categoryMappings';
+import { EGG_GROUPS_MAP } from '../data/eggGroups';
 
 import { useAuth } from '../context/AuthContext';
 import { loadPokedexState, savePokedexState } from '../services/persistenceService';
@@ -19,7 +20,8 @@ export const PokedexPage: React.FC = () => {
   const [filters, setFilters] = useState({
     types: [] as string[],
     generations: [] as number[],
-    special: [] as string[]
+    special: [] as string[],
+    eggGroups: [] as string[]
   });
   const [visibleCount, setVisibleCount] = useState(20);
   const [selectedPokemonId, setSelectedPokemonId] = useState<number | null>(null);
@@ -100,6 +102,14 @@ export const PokedexPage: React.FC = () => {
         if (!matchesAllSpecial) return false;
       }
 
+      // 5. Egg Groups
+      if (filters.eggGroups.length > 0) {
+        const slug = p.name.toLowerCase().replace(/[\s\-_.]/g, '');
+        const pGroups = EGG_GROUPS_MAP[slug] || [];
+        const matchesEggGroup = filters.eggGroups.some(g => pGroups.includes(g));
+        if (!matchesEggGroup) return false;
+      }
+
       return true;
     });
   }, [searchTerm, filters, GEN_RANGES]);
@@ -129,7 +139,7 @@ export const PokedexPage: React.FC = () => {
     setVisibleCount(20);
   }, [searchTerm, filters]);
 
-  const activeFilterCount = filters.types.length + filters.generations.length + filters.special.length;
+  const activeFilterCount = filters.types.length + filters.generations.length + filters.special.length + filters.eggGroups.length;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
@@ -197,7 +207,7 @@ export const PokedexPage: React.FC = () => {
               <div className="text-4xl opacity-20">🚫</div>
               <p className="text-white/40 font-black uppercase tracking-widest text-[10px]">Nenhum Pokémon encontrado com este filtro</p>
               <button 
-                onClick={() => {setSearchTerm(''); setFilters({ types: [], generations: [], special: [] })}}
+                onClick={() => {setSearchTerm(''); setFilters({ types: [], generations: [], special: [], eggGroups: [] })}}
                 className="text-primary text-[10px] font-black uppercase tracking-widest underline underline-offset-4"
               >
                 Resetar todos os filtros

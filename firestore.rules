@@ -130,6 +130,30 @@ service cloud.firestore {
       // Apenas o admin acessa
       allow read, write: if isAdmin();
     }
+    
+    // ────────────────────────────────────────────────
+    // /chest_stock — Estoque detalhado
+    // ────────────────────────────────────────────────
+    match /chest_stock/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /chest_matches — Matches processados
+    // ────────────────────────────────────────────────
+    match /chest_matches/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /stock_rooms — Salas de estoque
+    // ────────────────────────────────────────────────
+    match /stock_rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
 
     // ────────────────────────────────────────────────
     // Qualquer outra coleção — bloqueada por padrão

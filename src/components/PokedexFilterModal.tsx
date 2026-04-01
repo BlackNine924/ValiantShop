@@ -7,6 +7,7 @@ interface Filters {
   types: string[];
   generations: number[];
   special: string[];
+  eggGroups: string[];
 }
 
 interface PokedexFilterModalProps {
@@ -40,8 +41,15 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
     setFilters({ ...filters, special: newSpec });
   };
 
+  const toggleEggGroup = (group: string) => {
+    const newGroups = filters.eggGroups.includes(group)
+      ? filters.eggGroups.filter(g => g !== group)
+      : [...filters.eggGroups, group];
+    setFilters({ ...filters, eggGroups: newGroups });
+  };
+
   const clearFilters = () => {
-    setFilters({ types: [], generations: [], special: [] });
+    setFilters({ types: [], generations: [], special: [], eggGroups: [] });
   };
 
   const GENS = [
@@ -67,6 +75,11 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
     { id: 'galar', name: 'F. Galar', icon: <Sparkles size={14} /> },
     { id: 'hisui', name: 'F. Hisui', icon: <Sparkles size={14} /> },
     { id: 'paldea', name: 'F. Paldea', icon: <Sparkles size={14} /> },
+  ];
+
+  const EGG_GROUPS = [
+    "Monster", "Human-Like", "Water 1", "Water 2", "Water 3", "Bug", "Mineral", 
+    "Flying", "Amorphous", "Field", "Fairy", "Grass", "Dragon", "Ditto"
   ];
 
   return (
@@ -144,6 +157,25 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
                   >
                     {spec.icon}
                     {spec.name}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Categorias de Ovos (Egg Groups) */}
+          <section>
+            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Grupos de Cruzamento (Egg Groups)</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {EGG_GROUPS.map(group => {
+                const isSelected = filters.eggGroups.includes(group);
+                return (
+                  <button
+                    key={group}
+                    onClick={() => toggleEggGroup(group)}
+                    className={`p-2 rounded-xl border text-[9px] font-black uppercase transition-all flex items-center justify-center ${isSelected ? 'border-primary bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]' : 'border-white/5 bg-white/5 text-gray-500 hover:border-white/20'}`}
+                  >
+                    {group}
                   </button>
                 );
               })}
