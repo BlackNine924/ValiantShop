@@ -1,6 +1,6 @@
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, X, Shield, Star, BookOpen, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User, Brain } from 'lucide-react';
+import { ShoppingBag, X, Shield, Star, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User, Users, Brain, ChevronDown, Zap, LayoutGrid, Swords, Egg } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
@@ -9,6 +9,11 @@ import { PokeGridPage } from './pages/PokeGridPage';
 import { PokedlePage } from './pages/PokedlePage';
 import { PokedexPage } from './pages/PokedexPage';
 import { PokeQuizPage } from './pages/PokeQuizPage';
+import { ConsultoriaSystem } from './pages/ConsultoriaSystem';
+import { BreederDashboard } from './pages/BreederDashboard';
+import { CommunityFeed } from './pages/CommunityFeed';
+import { TrainerProfile } from './pages/TrainerProfile';
+import { PixelHunt } from './components/PixelHunt';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { CartModal } from './components/CartModal';
@@ -25,9 +30,9 @@ import { SettingsModal } from './components/SettingsModal';
 import { TOS_CONTENT } from './data/tosData';
 import { useAllMinigameStreaks } from './hooks/useMinigameStreak';
 
-const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
+const HomePage = () => {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 animate-fade">
+    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 pt-20 animate-fade">
       <div className="mb-12 text-center">
         <div className="relative w-48 h-48 mx-auto mb-8">
           <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
@@ -45,72 +50,163 @@ const HomePage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full">
-        <CategoryCard 
-          to="/order" 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl w-full">
+        <HubCard 
+          to="/hub/loja"
           icon={<ShoppingBag size={32} />} 
-          title="FAZER PEDIDO" 
-          desc="Encomendas competitivas e normais."
+          title="LOJA" 
           color="primary"
+          desc="Encomendas, Tabela de Preços e Status."
         />
-        <CategoryCard 
-          to="/prices" 
-          icon={<Table size={32} />} 
-          title="TABELA DE VALORES" 
-          desc="Preços fixos e transparentes."
-          color="primary"
-        />
-        <CategoryCard 
-          to="/status" 
-          icon={<History size={32} />} 
-          title="STATUS/HISTÓRICO" 
-          desc="Acompanhe sua encomenda ao vivo."
-          color="secondary"
-        />
-        <CategoryCard 
-          to="/pokegrid" 
-          icon={<Grid3X3 size={32} />} 
-          title="POKÉGRID" 
-          desc="Minigame diário de conhecimento Pokémon."
-          color="primary"
-        />
-        <CategoryCard 
-          to="/pokedle" 
-          icon={<Gamepad2 size={32} />} 
-          title="POKÉDLE" 
-          desc="Adivinhe o Pokémon do dia em 3 modos diferentes!"
-          color="secondary"
-        />
-        <CategoryCard 
-          to="/pokedex" 
+        <HubCard 
+          to="/hub/competitivo"
           icon={<Smartphone size={32} />} 
-          title="POKÉDEX" 
-          desc="Enciclopédia completa de Pokémon."
+          title="COMPETITIVO" 
+          color="primary"
+          desc="Pokédex e enciclopédia Pokémon."
+        />
+        <HubCard 
+          to="/hub/jogos"
+          icon={<Gamepad2 size={32} />} 
+          title="JOGOS" 
+          color="primary"
+          desc="PokéGrid, PokéDLE e PokéQuiz."
+        />
+        <HubCard 
+          to="/hub/social"
+          icon={<Users size={32} />} 
+          title="SOCIAL" 
+          color="primary"
+          desc="Feed Global, Perfis e Trocas."
+        />
+        <HubCard 
+          to="/hub/progresso"
+          icon={<Zap size={32} />} 
+          title="PROGRESSO" 
           color="secondary"
+          comingSoon={true}
         />
-        <CategoryCard 
-          to="/pokequiz" 
-          icon={<Brain size={32} />} 
-          title="POKÉQUIZ" 
-          desc="Teste sua velocidade e conhecimento!"
-          color="primary"
-        />
-        <CategoryCard 
-          to="/faq" 
-          icon={<BookOpen size={32} />} 
-          title="FAQ / AJUDA" 
-          desc="Dúvidas frequentes e suporte."
-          color="primary"
+        <HubCard 
+          to="/hub/eventos"
+          icon={<LayoutGrid size={32} />} 
+          title="EVENTOS" 
+          color="secondary"
+          comingSoon={true}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl w-full mt-12">
-        <div onClick={() => { setShowRankingModal(true); setShowReviewsModal(false); }} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
-          <RichTrainers limitCount={5} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl w-full mt-12 pb-20">
+        <RichTrainers limitCount={5} />
+        <ClientReviews />
+      </div>
+    </div>
+  );
+};
+
+const HubPage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
+  const { category } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const hubs: any = {
+    loja: {
+      title: 'LOJA',
+      icon: <ShoppingBag size={48} />,
+      color: 'primary',
+      items: [
+        { to: '/order', label: 'ENCOMENDAS', desc: 'Breeding personalizado e pronta entrega.', icon: <ShoppingBag size={24} /> },
+        { to: '/prices', label: 'TABELA DE PREÇOS', desc: 'Valores, taxas e prazos de entrega.', icon: <Table size={24} /> },
+        ...(user ? [{ to: '/status', label: 'STATUS DOS PEDIDOS', desc: 'Acompanhe suas encomendas ao vivo.', icon: <History size={24} /> }] : [])
+      ]
+    },
+    competitivo: {
+      title: 'COMPETITIVO',
+      icon: <Smartphone size={48} />,
+      color: 'primary',
+      items: [
+        { to: '/pokedex', label: 'POKÉDEX', desc: 'Enciclopédia completa de Cobblemon.', icon: <Smartphone size={24} /> },
+        { to: '/consultoria', label: 'CONSULTORIA', desc: 'Análise competitiva do seu time VGC.', icon: <Swords size={24} /> }
+      ]
+    },
+    jogos: {
+      title: 'JOGOS',
+      icon: <Gamepad2 size={48} />,
+      color: 'primary',
+      items: [
+        { to: '/pokegrid', label: 'POKÉGRID', desc: 'Minigame diário de lógica.', icon: <Grid3X3 size={24} /> },
+        { to: '/pokedle', label: 'POKÉDLE', desc: 'Adivinhe o Pokémon do dia.', icon: <Gamepad2 size={24} /> },
+        { to: '/pokequiz', label: 'POKÉQUIZ', desc: 'Desafie seu conhecimento Pokémon.', icon: <Brain size={24} /> }
+      ]
+    },
+    social: {
+      title: 'SOCIAL',
+      icon: <Users size={48} />,
+      color: 'primary',
+      items: [
+        { to: '/comunidade', label: 'FEED COMUNITÁRIO', desc: 'Veja o que outros treinadores estão capturando.', icon: <Users size={24} /> },
+        { onClick: () => { setShowRankingModal(true); navigate('/'); }, label: 'RANKING GLOBAL', desc: 'Top treinadores e compradores.', icon: <Trophy size={24} /> },
+        { onClick: () => { setShowReviewsModal(true); navigate('/'); }, label: 'FEEDBACKS DOS CLIENTES', desc: 'Avaliações de clientes reais.', icon: <Star size={24} /> },
+        ...(user ? [{ to: `/perfil/${(user.displayName || 'Treinador').replace(/\s+/g, '_')}`, label: 'MEU PERFIL', desc: 'Sua Coleção de Glints e Ranks.', icon: <User size={24} /> }] : [])
+      ]
+    },
+    progresso: { comingSoon: true, title: 'PROGRESSO' },
+    eventos: { comingSoon: true, title: 'EVENTOS' }
+  };
+
+  const hub = hubs[category || ''];
+
+  if (!hub) return <div className="p-20 text-center pixel-title opacity-20">HUB NÃO ENCONTRADO</div>;
+
+  return (
+    <div className="flex flex-col items-center min-h-[85vh] px-4 py-12 animate-fade">
+      <button 
+        onClick={() => navigate('/')} 
+        className="self-start mb-8 text-[10px] font-black text-gray-500 hover:text-primary transition-colors flex items-center gap-2 uppercase tracking-widest"
+      >
+        <ChevronDown size={14} className="rotate-90" /> Voltar para o Início
+      </button>
+
+      <div className="w-full max-w-4xl space-y-12">
+        <div className="flex items-center gap-6">
+          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl ${hub.color === 'primary' ? 'bg-primary/20 text-primary border border-primary/20' : 'bg-secondary/20 text-secondary border border-secondary/20'}`}>
+            {hub.icon}
+          </div>
+          <div>
+            <h1 className="pixel-title text-4xl mb-1 tracking-tighter">{hub.title}</h1>
+            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Sistemas e módulos disponíveis</p>
+          </div>
         </div>
-        <div onClick={() => { setShowReviewsModal(true); setShowRankingModal(false); }} className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
-          <ClientReviews />
-        </div>
+
+        {hub.comingSoon ? (
+          <div className="p-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl opacity-30 grayscale">
+            <Zap size={64} className="mb-4 text-gray-500" />
+            <h2 className="pixel-title text-xl mb-2">EM BREVE</h2>
+            <p className="text-[10px] font-black uppercase tracking-widest">Estamos trabalhando em novos módulos para este HUB</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hub.items?.map((item: any, idx: number) => (
+              <Link 
+                key={idx}
+                to={item.to || '#'} 
+                onClick={(e) => {
+                  if (item.onClick) {
+                    e.preventDefault();
+                    item.onClick();
+                  }
+                }}
+                className="glow-card group p-8 flex flex-col items-start gap-4 hover:border-primary/40 transition-all border border-white/5 bg-black/40"
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-white/[0.03] text-gray-400 group-hover:bg-primary/20 group-hover:text-primary transition-all border border-white/5 group-hover:border-primary/20 shadow-lg`}>
+                  {item.icon}
+                </div>
+                <div className="space-y-1">
+                  <h3 className="pixel-title text-xs text-white group-hover:text-primary transition-colors">{item.label}</h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -308,26 +404,114 @@ const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
   );
 };
 
-const CategoryCard = ({ to, icon, title, desc, color }: any) => {
-  const location = useLocation();
-  const isActive = location.pathname === to;
-
+const HubCard = ({ to, icon, title, color, desc, comingSoon }: any) => {
   return (
     <Link 
-      to={isActive ? "#" : to} 
-      onClick={(e) => { if (isActive) e.preventDefault(); }}
-      className={`glow-card group p-8 block ${isActive ? 'pointer-events-none' : ''}`}
+      to={comingSoon ? "#" : to}
+      className={`glow-card p-10 flex flex-col items-center text-center group h-full shadow-2xl relative border border-white/[0.05] hover:border-primary/20 transition-all ${comingSoon ? 'opacity-40 grayscale cursor-not-allowed' : 'active:scale-95'}`}
     >
-      <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 transition-all group-hover:scale-110 ${color === 'primary' ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'}`}>
-        {icon}
-      </div>
-      <h3 className="pixel-title text-sm mb-2 group-hover:text-primary transition-colors">{title}</h3>
-      <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+       <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-8 transition-all group-hover:scale-110 group-hover:rotate-6 shadow-xl ${color === 'primary' ? 'bg-primary/20 text-primary border border-primary/20' : 'bg-secondary/20 text-secondary border border-secondary/20'}`}>
+          {icon}
+       </div>
+       <h3 className="pixel-title text-sm mb-4 group-hover:text-primary transition-colors">
+          {title}
+       </h3>
+       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed mb-6 group-hover:text-gray-300 transition-colors">
+          {desc || (comingSoon ? "Em Breve" : "Aguardando descrição...")}
+       </p>
+       
+       <div className="mt-auto pt-4 w-full">
+          {!comingSoon ? (
+            <div className="w-full py-3 bg-white/[0.03] border border-white/[0.05] rounded-xl text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:bg-primary group-hover:text-black group-hover:border-primary transition-all shadow-lg">
+              Abrir HUB
+            </div>
+          ) : (
+            <div className="w-full py-3 bg-black/40 border border-white/5 rounded-xl text-[9px] font-black text-gray-700 uppercase tracking-[0.2em]">
+              Bloqueado
+            </div>
+          )}
+       </div>
     </Link>
   );
 };
 
-const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, removeNotification, onLogoClick, setIsSettingsOpen }: any) => {
+const NavDropdown = ({ title, items, isActive }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const timeoutRef = useRef<any>(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setIsOpen(false);
+    }, 150);
+  };
+
+  return (
+    <div 
+      className="relative px-2"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button className={`nav-link-manda flex items-center gap-2 py-2 group/btn ${isActive ? 'active' : ''} hover:text-primary`}>
+        <span className="relative">
+          {title}
+          {isActive && (
+            <motion.div 
+               layoutId="nav-underline"
+               className="absolute -bottom-1 left-0 right-0 h-px bg-primary shadow-[0_0_8px_var(--primary-glow)]"
+            />
+          )}
+        </span>
+        <ChevronDown size={10} className={`transition-transform duration-300 ${isOpen ? 'rotate-180 text-primary' : 'text-gray-600 group-hover/btn:text-primary'}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-black/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-2 z-[100]"
+          >
+            <div className="p-2 mb-2 border-b border-white/5">
+              <p className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em]">{title}</p>
+            </div>
+            <div className="space-y-1">
+              {items.map((item: any, idx: number) => (
+                <Link
+                  key={idx}
+                  to={item.to || '#'}
+                  onClick={(e) => {
+                    if (item.onClick) {
+                      e.preventDefault();
+                      item.onClick();
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-primary/10 transition-all group/item border border-transparent hover:border-primary/20"
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-white/[0.02] border border-white/5 group-hover/item:bg-primary/20 group-hover/item:text-primary group-hover/item:border-primary/20 transition-all shadow-lg`}>
+                    {item.icon}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest group-hover/item:text-white transition-colors">{item.label}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, removeNotification, onLogoClick, setIsSettingsOpen, setShowRankingModal, setShowReviewsModal }: any) => {
    const location = useLocation();
    const navigate = useNavigate();
    const { user } = useAuth();
@@ -437,26 +621,62 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, 
             </div>
           </div>
           
-          <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl items-center pointer-events-none z-0">
-             
-             <div className="flex-1 flex justify-end gap-6 pr-6 pointer-events-auto">
-                <Link to="/faq" className={`nav-link-manda ${isActive('/faq') ? 'active' : ''}`}>FAQ</Link>
-                <Link to="/prices" className={`nav-link-manda ${isActive('/prices') ? 'active' : ''}`}>Valores</Link>
-                {user && <Link to="/status" className={`nav-link-manda ${isActive('/status') ? 'active' : ''}`}>Status</Link>}
-                <Link to="/order" className={`nav-link-manda ${isActive('/order') ? 'active' : ''}`}>Encomendas</Link>
-             </div>
-             
-             <div className="pointer-events-auto shrink-0 px-2">
-                <Link to="/" className={`nav-link-manda ${isActive('/') ? 'active' : ''}`}>Início</Link>
-             </div>
-             
-             <div className="flex-1 flex justify-start gap-6 pl-6 pointer-events-auto">
-                <Link to="/pokedex" className={`nav-link-manda ${isActive('/pokedex') ? 'active' : ''}`}>Pokédex</Link>
-                <Link to="/pokegrid" className={`nav-link-manda ${isActive('/pokegrid') ? 'active' : ''}`}>PokéGrid</Link>
-                <Link to="/pokedle" className={`nav-link-manda ${isActive('/pokedle') ? 'active' : ''}`}>PokéDLE</Link>
-                <Link to="/pokequiz" className={`nav-link-manda ${isActive('/pokequiz') ? 'active' : ''}`}>PokéQuiz</Link>
-             </div>
+          <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center pointer-events-none">
+             <div className="flex items-center gap-x-2 pointer-events-auto">
+                <div className="flex items-center gap-x-6 justify-end min-w-[140px]">
+                   <NavDropdown 
+                     title="Loja" 
+                     isActive={['/order', '/prices', '/status', '/hub/loja'].includes(location.pathname)}
+                     items={[
+                       { to: '/order', label: 'Encomendas', icon: <ShoppingBag size={18} /> },
+                       { to: '/prices', label: 'Tabela de Preços', icon: <Table size={18} /> },
+                       ...(user ? [{ to: '/status', label: 'Status dos Pedidos', icon: <History size={18} /> }] : [])
+                     ]}
+                   />
 
+                    <NavDropdown 
+                      title="Competitivo" 
+                      isActive={['/pokedex', '/consultoria', '/hub/competitivo'].includes(location.pathname)}
+                      items={[
+                        { to: '/pokedex', label: 'Pokédex', icon: <Smartphone size={18} /> },
+                        { to: '/consultoria', label: 'Consultoria', icon: <Swords size={18} /> }
+                      ]}
+                    />
+                </div>
+
+                <div className="flex justify-center">
+                   <Link to="/" className={`nav-link-manda relative px-8 py-2 text-xs font-black tracking-[0.2em] uppercase transition-all duration-300 ${isActive('/') ? 'active text-primary' : 'text-gray-400 hover:text-primary'} active:scale-95`}>
+                     Início
+                     {isActive('/') && (
+                       <motion.div 
+                         layoutId="nav-underline"
+                         className="absolute -bottom-1 left-4 right-4 h-px bg-primary shadow-[0_0_12px_var(--primary-glow)]"
+                       />
+                     )}
+                   </Link>
+                </div>
+
+                <div className="flex items-center gap-x-6 justify-start min-w-[140px]">
+                   <NavDropdown 
+                     title="Jogos" 
+                     isActive={['/pokegrid', '/pokedle', '/pokequiz', '/hub/jogos'].includes(location.pathname)}
+                     items={[
+                       { to: '/pokegrid', label: 'PokéGrid', icon: <Grid3X3 size={18} /> },
+                       { to: '/pokedle', label: 'PokéDLE', icon: <Gamepad2 size={18} /> },
+                       { to: '/pokequiz', label: 'PokéQuiz', icon: <Brain size={18} /> }
+                     ]}
+                   />
+
+                   <NavDropdown 
+                     title="Social" 
+                     isActive={location.pathname === '/hub/social'}
+                     items={[
+                       { onClick: () => { setShowRankingModal(true); navigate('/hub/social'); }, label: 'Ranking', icon: <Trophy size={18} /> },
+                       { onClick: () => { setShowReviewsModal(true); navigate('/hub/social'); }, label: 'Feedbacks', icon: <Star size={18} /> }
+                     ]}
+                   />
+                </div>
+             </div>
           </div>
 
           <div className="flex items-center gap-6 z-10">
@@ -656,15 +876,19 @@ function App() {
         removeNotification={removeNotification}
         onLogoClick={handleLogoClick}
         setIsSettingsOpen={setIsSettingsOpen}
+        setShowRankingModal={setShowRankingModal}
+        setShowReviewsModal={setShowReviewsModal}
       />
+      <PixelHunt />
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
       />
-      <main className="py-12 relative z-10 flex-1">
+      <main className="relative z-10 flex-1">
         <Routes>
-          <Route path="/" element={<HomePage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
-          <Route 
+        <Route path="/" element={<HomePage />} />
+        <Route path="/hub/:category" element={<HubPage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
+        <Route 
             path="/order" 
             element={
               <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
@@ -675,6 +899,7 @@ function App() {
           <Route path="/prices" element={<Prices />} />
           <Route path="/status" element={<Status />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/breeder" element={<BreederDashboard />} />
           <Route 
             path="/pokegrid" 
             element={
@@ -699,8 +924,12 @@ function App() {
               </ProtectedOrderRoute>
             } 
           />
-          <Route path="/faq" element={<FAQ />} />
+          <Route path="/comunidade" element={<CommunityFeed />} />
+          <Route path="/perfil/:nick" element={<TrainerProfile />} />
+          <Route path="/ajuda" element={<FAQ />} />
+          <Route path="*" element={<HomePage />} />
           <Route path="/pokequiz" element={<PokeQuizPage />} />
+          <Route path="/consultoria" element={<ConsultoriaSystem />} />
         </Routes>
       </main>
       
@@ -934,6 +1163,13 @@ function App() {
                   title="Painel Admin"
                 >
                   <Shield size={20} className="group-hover:scale-110 transition-transform" />
+                </button>
+                <button 
+                  onClick={() => navigate('/breeder')}
+                  className="w-12 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.3)] group"
+                  title="Painel Breeder"
+                >
+                  <Egg size={20} className="group-hover:scale-110 transition-transform" />
                 </button>
                 <button 
                   onClick={() => navigate('/status?chat=support')}

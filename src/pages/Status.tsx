@@ -161,7 +161,7 @@ export const Status = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 animate-fade">
+    <div className="max-w-6xl mx-auto px-4 pt-24 animate-fade">
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="pixel-title text-3xl mb-2">Painel de <span className="text-secondary">Acompanhamento</span></h2>
@@ -392,7 +392,7 @@ export const Status = () => {
                                   >
                                     <MessageSquare size={12} /> Abrir Chat
                                   </button>
-                                  {order.status === 'Pendente' && (
+                                  {(order.status === 'Pendente' || order.status === 'Breeding') && (
                                     <button 
                                       onClick={async (e) => { 
                                         e.stopPropagation(); 

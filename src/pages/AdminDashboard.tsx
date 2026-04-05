@@ -2,40 +2,21 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Archive
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Archive, Zap, Sparkles
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc } from 'firebase/firestore';
+import { adminDb, adminAuth as auth } from '../firebase';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { getEggGroups } from '../data/eggGroups';
 import { EVOLUTION_LINES } from '../data/evolutionLines';
 import { POKEMON_DATA } from '../data/pokemonData';
 import { ADMIN_CONFIG } from '../config/adminConfig';
+import { getBreederRank } from '../config/breederConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrderChat } from '../components/OrderChat';
 import { KanbanBoard } from '../components/KanbanBoard';
-
-// Arrays de Regras (Genderless e Male Only)
-const GENDERLESS_POKEMON = [
-  'Magnemite', 'Magneton', 'Magnezone', 'Voltorb', 'Electrode', 'Staryu', 'Starmie', 'Porygon', 'Porygon2', 'Porygon-Z',
-  'Shedinja', 'Lunatone', 'Solrock', 'Baltoy', 'Claydol', 'Beldum', 'Metang', 'Metagross', 'Bronzor', 'Bronzong',
-  'Rotom', 'Phione', 'Manaphy', 'Darkrai', 'Shaymin', 'Arceus', 'Victini', 'Klink', 'Klang', 'Klinklang', 'Cryogonal',
-  'Golett', 'Golurk', 'Ditto', 'Mew', 'Celebi', 'Jirachi', 'Deoxys', 'Regirock', 'Regice', 'Registeel',
-  'Latias', 'Latios', 'Kyogre', 'Groudon', 'Rayquaza', 'Azelf', 'Mesprit', 'Uxie', 'Dialga', 'Palkia', 'Heatran', 'Regigigas',
-  'Giratina', 'Cresselia', 'Cobalion', 'Terrakion', 'Virizion', 'Tornadus', 'Thundurus', 'Reshiram', 'Zekrom', 'Landorus',
-  'Kyurem', 'Keldeo', 'Meloetta', 'Genesect', 'Xerneas', 'Yveltal', 'Zygarde', 'Diancie', 'Hoopa', 'Volcanion', 'Type: Null',
-  'Silvally', 'Minior', 'Dhelmise', 'Tapu Koko', 'Tapu Lele', 'Tapu Bulu', 'Tapu Fini', 'Cosmog', 'Cosmoem', 'Solgaleo',
-  'Lunala', 'Nihilego', 'Buzzwole', 'Pheromosa', 'Xurkitree', 'Celesteela', 'Kartana', 'Guzzlord', 'Necrozma', 'Magearna',
-  'Marshadow', 'Poipole', 'Naganadel', 'Stakataka', 'Blacephalon', 'Zeraora', 'Meltan', 'Melmetal', 'Sinistea', 'Poltchageist', 'Polteageist',
-  'Falinks', 'Calyrex', 'Regieleki', 'Regidrago', 'Glastrier', 'Spectrier', 'Pecharunt', 'Terapagos', 'Tandemaus', 'Maushold'
-];
-
-const MALE_ONLY_POKEMON = [
-  'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
-  'Volbeat', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
-  'Impidimp', 'Morgrem', 'Grimmsnarl', 
-  'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
-];
+import { GENDERLESS_POKEMON, MALE_ONLY_POKEMON } from '../data/pokemonCategories';
+import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';import { getBasePokemonName } from '../utils/pokemonNameUtils';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -48,8 +29,11 @@ export const AdminDashboard = () => {
   const [chestMatches, setChestMatches] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'chest_stock' | 'feedbacks' | 'inbox'>('pedidos');
+  const [newBreederEmail, setNewBreederEmail] = useState('');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'chest_stock' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
+  const [breeders, setBreeders] = useState<any[]>([]);
+  const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
@@ -57,6 +41,16 @@ export const AdminDashboard = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Match' | 'Pedido' | 'Support'>('Todos');
   const [expandedTrainerNick, setExpandedTrainerNick] = useState<string | null>(null);
+  const [showTrainerHistory, setShowTrainerHistory] = useState(false);
+  
+  const getDisplayAbility = (item: any) => {
+    if (!item || !item.pokemon) return item?.ability;
+    const pokemonInfo = POKEMON_DATA.find(p => p.name === item.pokemon);
+    if (pokemonInfo && !pokemonInfo.hiddenAbility && (item.ability === 'Qualquer Habilidade' || !item.ability)) {
+      return pokemonInfo.abilities[0];
+    }
+    return item.ability;
+  };
   const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState<{ 
     isOpen: boolean, 
@@ -135,7 +129,7 @@ export const AdminDashboard = () => {
   const updateStock = async (pokemon: string, ivs: string, gender: string, nature: string) => {
     try {
       const q = query(
-        collection(db, 'inventory'),
+        collection(adminDb, 'inventory'),
         where('pokemon', '==', pokemon),
         where('ivs', '==', ivs),
         where('gender', '==', gender),
@@ -147,7 +141,7 @@ export const AdminDashboard = () => {
         const itemDoc = snapshot.docs[0];
         const currentQty = itemDoc.data().quantity || 0;
         if (currentQty > 0) {
-          await updateDoc(doc(db, 'inventory', itemDoc.id), {
+          await updateDoc(doc(adminDb, 'inventory', itemDoc.id), {
             quantity: currentQty - 1,
             updatedAt: serverTimestamp()
           });
@@ -158,24 +152,227 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleTriggerHunt = async (pokemonName: string) => {
+    if (!pokemonName) return;
+    try {
+      await setDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
+        pokemonName,
+        isActive: true,
+        spawnTime: Date.now(), // Use current timestamp as unique session ID for state resets
+        winners: [],
+        location: 'random'
+      });
+      alert(`Caça ao ${pokemonName} disparada com sucesso!`);
+    } catch (error) {
+      console.error("Error triggering hunt:", error);
+    }
+  };
+
+  const handleStopHunt = async () => {
+    try {
+      await updateDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
+        isActive: false
+      });
+    } catch (error) {
+      console.error("Error stopping hunt:", error);
+    }
+  };
+
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
     
     try {
-      if (newStatus === 'Finalizado' && order) {
+      if ((newStatus === 'Finalizado' || newStatus === 'Entregue') && order) {
         await updateStock(order.pokemon, order.ivs, order.gender, order.nature);
+        
+        // Award Glint Fragments and Order Count
+        try {
+          const userNick = (order.playerNick || '').toLowerCase().trim();
+          const userUid = order.playerUid;
+          let profileDoc: any = null;
+          let profileData: any = null;
+
+          if (userUid) {
+            const pDoc = await getDoc(doc(adminDb, 'trainer_profiles', userUid));
+            if (pDoc.exists()) {
+              profileDoc = pDoc;
+              profileData = pDoc.data();
+            }
+          }
+
+          if (!profileDoc && userNick) {
+            const profilesRef = collection(adminDb, 'trainer_profiles');
+            const q = query(profilesRef, where('nick_lowercase', '==', userNick), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              profileDoc = snap.docs[0];
+              profileData = profileDoc.data();
+            }
+          }
+          
+          if (profileDoc && profileData) {
+            const glints = profileData.glintFragments || {};
+            const pData = POKEMON_TYPE_DATA.find(p => p.name.toLowerCase() === order.pokemon.toLowerCase());
+            const glintType = pData?.types[0] || 'Normal';
+            const currentFrag = glints[glintType] || 0;
+            const newFrag = currentFrag + 0.25;
+            
+            const updateData: any = {
+              [`glintFragments.${glintType}`]: newFrag,
+              ordersCompletedCount: (profileData.ordersCompletedCount || 0) + 1,
+              lastOrderAt: serverTimestamp()
+            };
+            
+            if (newFrag >= 1) {
+              updateData[`glintFragments.${glintType}`] = 0;
+              const coll = (profileData.glintCollection || []).concat([{
+                id: Math.random().toString(36).substr(2, 9),
+                type: glintType,
+                acquiredAt: new Date().toISOString()
+              }]);
+              updateData.glintCollection = coll;
+            }
+            
+            await updateDoc(profileDoc.ref, updateData);
+
+            await addDoc(collection(adminDb, 'social_posts'), {
+              authorUid: 'SYSTEM',
+              authorNick: 'Valiant Bot',
+              content: `🥳 O treinador @${order.playerNick} acaba de receber seu ${order.pokemon}! A jornada continua crescendo!`,
+              type: 'achievement',
+              createdAt: serverTimestamp(),
+              likes: [],
+              metadata: {
+                 pokemon: order.pokemon,
+                 type: glintType,
+                 shardAwarded: true
+              }
+            });
+          }
+        } catch (socialErr) {
+          console.error("Social update error:", socialErr);
+        }
       }
       
-      await updateDoc(doc(db, 'orders', orderId), { status: newStatus });
+      if (newStatus === 'Entregue' && order && order.assignedTo && !order.commissionPaid) {
+        const breederRef = doc(adminDb, 'breeder_profiles', order.assignedTo);
+        const bSnap = await getDoc(breederRef);
+        if (bSnap.exists()) {
+          const bData = bSnap.data();
+          const currentCount = bData.ordersCompleted || 0;
+          const currentWallet = bData.walletAmount || 0;
+          const currentRevenue = bData.totalRevenueGenerated || 0;
+          const rank = getBreederRank(currentCount, bData.rankOverride);
+          const commissionEarned = (order.totalPrice || 0) * rank.commissionRate;
+          
+          await updateDoc(breederRef, {
+            ordersCompleted: currentCount + 1,
+            walletAmount: currentWallet + commissionEarned,
+            totalRevenueGenerated: currentRevenue + (order.totalPrice || 0)
+          });
+          
+          await updateDoc(doc(adminDb, 'orders', orderId), { 
+            status: newStatus,
+            commissionPaid: true 
+          });
+          return;
+        }
+      }
+
+      await updateDoc(doc(adminDb, 'orders', orderId), { status: newStatus });
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Falha ao atualizar status no banco de dados.');
     }
   };
 
+  const handleAssignBreeder = async (orderId: string, breederUid: string, breederName: string) => {
+    try {
+      if (breederUid === "") {
+        await updateDoc(doc(adminDb, 'orders', orderId), { 
+          assignedTo: null,
+          assignedToName: null
+        });
+      } else {
+        await updateDoc(doc(adminDb, 'orders', orderId), { 
+          assignedTo: breederUid,
+          assignedToName: breederName
+        });
+      }
+    } catch (error) {
+      console.error('Error assigning breeder:', error);
+      alert('Falha ao atribuir o Breeder.');
+    }
+  };
+
+  const handlePayBreeder = async (breederUid: string) => {
+    const breeder = breeders.find(b => b.id === breederUid);
+    if (!breeder) return;
+    const wallet = breeder.walletAmount || 0;
+
+    if (!window.confirm(`Registrar pagamento de ${(wallet / 1000).toFixed(1)}k Poké para ${breeder.name}? Isso zerará a carteira dele e moverá o valor para o histórico de Total Pago.`)) return;
+    try {
+      const currentTotalPaid = breeder.totalHistoryPaid || 0;
+      await updateDoc(doc(adminDb, 'breeder_profiles', breederUid), { 
+        walletAmount: 0,
+        totalHistoryPaid: currentTotalPaid + wallet
+      });
+      alert("Pagamento registrado com sucesso!");
+    } catch (error) {
+      console.error('Error paying breeder:', error);
+      alert('Falha interna ao registrar pagamento.');
+    }
+  };
+
+  const handleRemoveBreeder = async (breederUid: string) => {
+    if (!window.confirm("ATENÇÃO: Deseja remover este breeder da equipe e REVOKAR o acesso dele ao painel permanentemente?")) return;
+    try {
+      await deleteDoc(doc(adminDb, 'breeder_profiles', breederUid));
+      alert("Breeder removido e acesso revogado.");
+    } catch (error) {
+      console.error("Erro ao remover breeder:", error);
+      alert("Falha ao remover o perfil.");
+    }
+  };
+
+  const handleUpdateBreederNotes = async (breederUid: string, notes: string) => {
+    try {
+      await updateDoc(doc(adminDb, 'breeder_profiles', breederUid), { internalNotes: notes });
+    } catch (error) {
+       console.error("Erro ao salvar notas:", error);
+    }
+  };
+
+  const handleUpdateBreederRank = async (breederUid: string, rankRate: number | null) => {
+    try {
+      await updateDoc(doc(adminDb, 'breeder_profiles', breederUid), { rankOverride: rankRate });
+      alert("Comissão manual atualizada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao atualizar comissão:", error);
+    }
+  };
+
+  const handleAddBreeder = async () => {
+    if (!newBreederEmail || !newBreederEmail.includes('@')) return alert("Preencha um e-mail válido!");
+    const emailSanitized = newBreederEmail.toLowerCase().trim();
+    try {
+      await setDoc(doc(adminDb, 'breeder_profiles', emailSanitized), {
+        email: emailSanitized,
+        name: 'Aguardando Login/Cadastro...',
+        ordersCompleted: 0,
+        walletAmount: 0
+      });
+      setNewBreederEmail('');
+      alert("Breeder adicionado com sucesso! Passe a URL do painel para o funcionário logar.");
+    } catch (error) {
+      console.error("Erro adicionando breeder", error);
+      alert("Falha ao adicionar o perfil.");
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      await deleteDoc(doc(db, 'orders', orderId));
+      await deleteDoc(doc(adminDb, 'orders', orderId));
       setDeleteConfirm(null);
     } catch (e) {
       console.error('Erro ao deletar encomenda:', e);
@@ -183,15 +380,41 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteFeedback = async (id: string) => {
+    try {
+      await deleteDoc(doc(adminDb, 'ClientReviews', id));
+      setDeleteConfirm(null);
+    } catch (e) {
+      console.error('Erro ao deletar feedback:', e);
+    }
+  };
+
+  const filteredFeedbacks = useMemo(() => {
+    return feedbacks.filter(fb => filterStars === null || Number(fb.rating) === filterStars);
+  }, [feedbacks, filterStars]);
+
 
 
 
 
   useEffect(() => {
+    // 1. Auth Persistence check for Admin Only app
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user && (ADMIN_CONFIG.adminEmails || []).includes(user.email || '')) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     
     // 1. Listen to Orders
-    const qOrders = query(collection(db, 'orders'));
+    const qOrders = query(collection(adminDb, 'orders'));
     const unsubscribeOrders = onSnapshot(qOrders, (snapshot) => {
       const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -209,7 +432,7 @@ export const AdminDashboard = () => {
     });
 
     // 2. Listen to Support Chats
-    const qSupport = query(collection(db, 'support_chats'));
+    const qSupport = query(collection(adminDb, 'support_chats'));
     const unsubscribeSupport = onSnapshot(qSupport, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -224,9 +447,18 @@ export const AdminDashboard = () => {
       console.error("Admin support stream error:", error);
     });
 
+    // 3. Listen to Breeder Profiles
+    const qBreeders = query(collection(adminDb, 'breeder_profiles'));
+    const unsubscribeBreeders = onSnapshot(qBreeders, (snapshot) => {
+      setBreeders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Admin breeders stream error:", error);
+    });
+
     return () => {
       unsubscribeOrders();
       unsubscribeSupport();
+      unsubscribeBreeders();
     };
   }, [isAuthenticated]);
 
@@ -235,7 +467,7 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    const q = query(collection(db, 'ClientReviews'));
+    const q = query(collection(adminDb, 'ClientReviews'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
@@ -243,8 +475,8 @@ export const AdminDashboard = () => {
         ...doc.data()
       })).sort((a: any, b: any) => {
         // First sort by stars (highest first)
-        const starsA = a.rating || 0;
-        const starsB = b.rating || 0;
+        const starsA = Number(a.rating) || 0;
+        const starsB = Number(b.rating) || 0;
         if (starsB !== starsA) return starsB - starsA;
         
         // Then by date
@@ -262,7 +494,7 @@ export const AdminDashboard = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const q = query(collection(db, 'inventory'));
+    const q = query(collection(adminDb, 'inventory'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setInventory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -274,7 +506,7 @@ export const AdminDashboard = () => {
   // Listen to Chest Stock (Baús Lotados)
   useEffect(() => {
     if (!isAuthenticated) return;
-    const q = query(collection(db, 'chest_stock'));
+    const q = query(collection(adminDb, 'chest_stock'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setChestStock(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -286,7 +518,7 @@ export const AdminDashboard = () => {
   // Listen to Chest Matches
   useEffect(() => {
     if (!isAuthenticated) return;
-    const q = query(collection(db, 'chest_matches'));
+    const q = query(collection(adminDb, 'chest_matches'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setChestMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -299,7 +531,7 @@ export const AdminDashboard = () => {
     if (!isAuthenticated) return;
     
     // Fetch dismissed notification IDs from Firebase
-    const q = query(collection(db, 'admin_dismissed_notifications'));
+    const q = query(collection(adminDb, 'admin_dismissed_notifications'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const ids = new Set(snapshot.docs.map(doc => doc.data().notificationId));
       setDismissedNotifIds(ids);
@@ -347,7 +579,8 @@ export const AdminDashboard = () => {
           if ((entry.quantity || 0) <= 0) return false;
           if (entry.ivs !== orderIvBase) return false;
           if (order.gender !== 'Qualquer' && entry.gender !== order.gender) return false;
-          if (order.ability !== 'Qualquer' && entry.ability.toLowerCase() !== order.ability.toLowerCase()) return false;
+          const orderAbility = getDisplayAbility(order);
+          if (orderAbility !== 'Qualquer' && orderAbility !== 'Qualquer Habilidade' && entry.ability.toLowerCase() !== orderAbility.toLowerCase()) return false;
           return true;
         });
       });
@@ -358,7 +591,8 @@ export const AdminDashboard = () => {
           if ((entry.quantity || 0) <= 0) return false;
           if (entry.ivs !== orderIvBase) return false;
           if (order.gender !== 'Qualquer' && entry.gender !== order.gender) return false;
-          if (order.ability !== 'Qualquer' && entry.ability.toLowerCase() !== order.ability.toLowerCase()) return false;
+          const orderAbility = getDisplayAbility(order);
+          if (orderAbility !== 'Qualquer' && orderAbility !== 'Qualquer Habilidade' && entry.ability.toLowerCase() !== orderAbility.toLowerCase()) return false;
           return true;
         });
 
@@ -368,7 +602,7 @@ export const AdminDashboard = () => {
         
         try {
           // Find which stock_room this pokemon is in
-          const roomsSnap = await getDocs(collection(db, 'stock_rooms'));
+          const roomsSnap = await getDocs(collection(adminDb, 'stock_rooms'));
           let roomName = 'Não encontrada';
           roomsSnap.docs.forEach(roomDoc => {
             const roomData = roomDoc.data();
@@ -381,13 +615,13 @@ export const AdminDashboard = () => {
           // Decrement chest stock entry quantity
           const updatedEntries = [...entries];
           updatedEntries[entryIdx] = { ...updatedEntries[entryIdx], quantity: (matchedEntry.quantity || 1) - 1 };
-          await updateDoc(doc(db, 'chest_stock', matchingChest.id), {
+          await updateDoc(doc(adminDb, 'chest_stock', matchingChest.id), {
             entries: updatedEntries,
             updatedAt: serverTimestamp()
           });
 
           // Create match record in Firestore
-          await addDoc(collection(db, 'chest_matches'), {
+          await addDoc(collection(adminDb, 'chest_matches'), {
             orderId: order.id,
             chestItemId: matchingChest.id,
             pokemon: order.pokemon,
@@ -602,12 +836,18 @@ export const AdminDashboard = () => {
 
 
   const toggleExpandTrainer = (nick: string) => {
-    setExpandedTrainerNick(expandedTrainerNick === nick ? null : nick);
+    if (expandedTrainerNick === nick) {
+      setExpandedTrainerNick(null);
+      setShowTrainerHistory(false);
+    } else {
+      setExpandedTrainerNick(nick);
+      setShowTrainerHistory(false);
+    }
   };
 
   const handleDeleteNotification = async (id: string) => {
     try {
-      await setDoc(doc(db, 'admin_dismissed_notifications', id), {
+      await setDoc(doc(adminDb, 'admin_dismissed_notifications', id), {
         notificationId: id,
         dismissedAt: serverTimestamp()
       });
@@ -667,16 +907,42 @@ export const AdminDashboard = () => {
   const trainersData = Array.from(
     validEconomyOrders.reduce((acc, o) => {
       const nick = o.playerNick || 'Veterano Anônimo';
+      const oTime = o.createdAt?.toMillis ? o.createdAt.toMillis() : 0;
+      
       if (!acc.has(nick)) {
-        acc.set(nick, { nick, totalSpent: 0, orderCount: 0, lastOrder: o.createdAt?.toMillis ? o.createdAt.toMillis() : 0 });
+        acc.set(nick, { 
+          nick, 
+          discordNick: o.discordNick || 'N/A',
+          totalSpent: 0, 
+          orderCount: 0, 
+          firstOrder: oTime,
+          lastOrder: oTime 
+        });
       }
+      
       const t = acc.get(nick)!;
       t.totalSpent += (o.totalPrice || 0);
       t.orderCount += 1;
-      const oTime = o.createdAt?.toMillis ? o.createdAt.toMillis() : 0;
-      if (oTime > t.lastOrder) t.lastOrder = oTime;
+      
+      // Update Discord Nick from the LATEST order
+      if (oTime >= t.lastOrder) {
+        t.lastOrder = oTime;
+        if (o.discordNick) t.discordNick = o.discordNick;
+      }
+      
+      if (oTime > 0 && (t.firstOrder === 0 || oTime < t.firstOrder)) {
+        t.firstOrder = oTime;
+      }
+      
       return acc;
-    }, new Map<string, { nick: string; totalSpent: number; orderCount: number; lastOrder: number }>())
+    }, new Map<string, { 
+      nick: string; 
+      discordNick: string; 
+      totalSpent: number; 
+      orderCount: number; 
+      firstOrder: number; 
+      lastOrder: number; 
+    }>())
     .values()
   ).filter((t: any) => t.nick.toLowerCase().includes(trainersSearch.toLowerCase()))
    .sort((a: any, b: any) => b.totalSpent - a.totalSpent);
@@ -696,7 +962,7 @@ export const AdminDashboard = () => {
   return (
     <>
       <div className="admin-wrapper">
-        <div className="max-w-7xl mx-auto px-4 animate-fade">
+        <div className="max-w-7xl mx-auto px-4 pt-24 animate-fade">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <aside className="space-y-4">
             <div className="glow-card p-6 space-y-2">
@@ -760,6 +1026,20 @@ export const AdminDashboard = () => {
               >
                 <Star size={18} /> Feedbacks ({feedbacks.length})
               </button>
+              
+              <button 
+                onClick={() => setActiveTab('equipe')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'equipe' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
+                <ShieldCheck size={18} /> Equipe Breeders ({breeders.length})
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('comunidade')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'comunidade' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
+                <Crosshair size={18} /> Comunidade & Eventos
+              </button>
 
               <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
                 <ShieldCheck size={18} /> Caixa: {totalEconomy}k
@@ -768,7 +1048,7 @@ export const AdminDashboard = () => {
           </aside>
 
           <main className="lg:col-span-3 space-y-8">
-            {activeTab !== 'stock_rooms' && activeTab !== 'chest_stock' && (
+            {activeTab !== 'stock_rooms' && activeTab !== 'chest_stock' && activeTab !== 'comunidade' && activeTab !== 'feedbacks' && (
               <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
 
               <div className="flex justify-between items-center">
@@ -1075,7 +1355,7 @@ export const AdminDashboard = () => {
                                <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                                  {chat.type === 'match' ? (
                                    <>
-                                     <span className="flex items-center gap-1.5 text-green-400"><Crosshair size={10} /> {chat.ivs} · {chat.gender} · {chat.ability}</span>
+                                     <span className="flex items-center gap-1.5 text-green-400"><Crosshair size={10} /> {chat.ivs} · {chat.gender} · {getDisplayAbility(chat)}</span>
                                      <span className="flex items-center gap-1.5 italic opacity-60">Sala: "{chat.roomName}"</span>
                                    </>
                                  ) : (
@@ -1166,11 +1446,11 @@ export const AdminDashboard = () => {
                       <div key={p.name} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl flex items-center gap-4 transition-all hover:border-primary/30 group">
                         <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5 relative">
                           <img 
-                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(pd => pd.name === p.name)?.id}.png`} 
+                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(pd => pd.name === getBasePokemonName(p.name))?.id || POKEMON_DATA.find(pd => pd.name === p.name)?.id}.png`} 
                             alt={p.name}
                             className="w-10 h-10 object-contain"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png';
+                              (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png';
                             }}
                           />
                         </div>
@@ -1204,95 +1484,195 @@ export const AdminDashboard = () => {
                 <div className="space-y-12 pb-20">
                   <ChestStockManager />
                 </div>
-              ) : activeTab === 'feedbacks' ? (
-                <div className="p-8 space-y-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary">GERENCIAMENTO DE FEEDBACKS</h3>
-                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Avaliações recebidas dos clientes</p>
+              ) : activeTab === 'comunidade' ? (
+                <div className="space-y-10 animate-fade">
+                  {/* Header Style like Breeders Tab */}
+                  <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[2.5rem] flex flex-col xl:flex-row xl:items-center justify-between gap-6 w-full shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-primary/[0.02] group-hover:bg-primary/[0.03] transition-all pointer-events-none" />
+                    <div className="relative z-10 flex items-center gap-6">
+                       <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30 shadow-[0_0_30px_var(--primary-glow)] text-primary">
+                          <Zap size={32} />
+                       </div>
+                       <div>
+                          <h3 className="pixel-title text-xl text-white mb-1">Disparar Novo Evento</h3>
+                          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">Inicie uma caça ao tesouro global para todos os treinadores conectados</p>
+                       </div>
                     </div>
-
-                    <div className="relative">
+                    
+                    <div className="relative z-10 flex flex-col sm:flex-row gap-4 items-center w-full xl:w-auto">
+                      <div className="relative w-full sm:w-80">
+                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" />
+                        <input 
+                          type="text"
+                          id="hunt-pokemon-name-real"
+                          placeholder="Ex: Mew, Shiny Celebi, Groudon..."
+                          className="w-full bg-black/60 border border-white/10 rounded-2xl pl-10 pr-4 py-4 text-xs font-black text-white focus:border-primary/40 outline-none transition-all uppercase tracking-widest placeholder:text-gray-700"
+                        />
+                      </div>
                       <button 
-                        onClick={() => setShowFeedbackFilters(!showFeedbackFilters)}
-                        className={`p-3 rounded-xl border transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${filterStars || showFeedbackFilters ? 'bg-primary border-primary text-black' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}
+                        onClick={() => {
+                          const input = document.getElementById('hunt-pokemon-name-real') as HTMLInputElement;
+                          handleTriggerHunt(input.value);
+                          input.value = '';
+                        }}
+                        className="w-full sm:w-auto px-10 py-4 bg-primary text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_var(--primary-glow)] flex items-center justify-center gap-3"
                       >
-                        <Filter size={14} /> Filtro {filterStars ? `(${filterStars}★)` : ''}
+                        <Crosshair size={16} /> Disparar Agora
                       </button>
-                      
-                      {showFeedbackFilters && (
-                        <div className="absolute top-full right-0 mt-2 bg-black border border-white/10 rounded-2xl p-2 shadow-2xl z-50 flex gap-2">
-                           <button onClick={() => { setFilterStars(null); setShowFeedbackFilters(false); }} className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest ${filterStars === null ? 'bg-white/20 text-white' : 'text-gray-500 hover:text-white'}`}>Tudo</button>
-                           {[5,4,3,2,1].map(s => (
-                             <button 
-                               key={s} 
-                               onClick={() => { setFilterStars(s); setShowFeedbackFilters(false); }}
-                               className={`p-2 rounded-lg flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${filterStars === s ? 'bg-primary text-black' : 'text-gray-500 hover:text-white'}`}
-                             >
-                               {s} <Star size={10} className="fill-current" />
-                             </button>
-                           ))}
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {feedbacks.length === 0 ? (
-                    <div className="text-center py-20">
-                      <Star size={48} className="mx-auto text-gray-700 mb-4 opacity-20" />
-                      <p className="text-gray-500 italic font-bold">Nenhum feedback recebido ainda...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                      {feedbacks
-                        .filter(fb => filterStars === null || fb.rating === filterStars)
-                        .map(fb => (
-                        <div key={fb.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group/fb">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary border border-primary/20">
-                                <Users size={18} />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-white text-sm">{fb.playerNick || fb.trainerNick || fb.userNick || 'Veterano Anônimo'}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex gap-0.5">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star 
-                                        key={i} 
-                                        size={10} 
-                                        className={i < (fb.rating || 0) ? "text-primary fill-primary" : "text-gray-700"} 
-                                      />
-                                    ))}
-                                  </div>
-                                  <span className="text-[9px] text-gray-600 font-black uppercase">
-                                    {fb.createdAt?.toMillis ? new Date(fb.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <button 
-                              onClick={() => setDeleteConfirm({
-                                isOpen: true,
-                                type: 'feedback',
-                                id: fb.id,
-                                name: `Avaliação de ${fb.trainerNick || fb.userNick || 'Anônimo'}`
-                              })}
-                              className="p-2 text-gray-600 hover:text-red-500 transition-colors bg-white/5 rounded-lg opacity-0 group-hover/fb:opacity-100"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <p className="text-xs text-gray-300 leading-relaxed italic pr-4">"{fb.comment || 'Nenhuma mensagem enviada.'}"</p>
-                          {fb.pokemon && (
-                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/5 text-[9px] font-bold text-gray-500">
-                              <ShoppingBag size={10} /> {fb.pokemon.toUpperCase()}
-                            </div>
-                          )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     {/* Event Status Card */}
+                     <div className="glow-card p-10 border-white/5 bg-black/40 relative overflow-hidden group">
+                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700" />
+                        <div className="flex items-center justify-between mb-8">
+                           <div className="flex items-center gap-4">
+                              <Crosshair size={20} className="text-gray-500" />
+                              <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest">Painel do Evento</h3>
+                           </div>
+                           <button 
+                             onClick={handleStopHunt}
+                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all"
+                           >
+                             Encerrar Tudo
+                           </button>
                         </div>
-                      ))}
+
+                        <div className="space-y-6">
+                           <div className="flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-2xl">
+                              <div className="flex items-center gap-4">
+                                 <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/10 [image-rendering:pixelated]">
+                                    <Sparkles size={24} className="text-primary/40" />
+                                 </div>
+                                 <div>
+                                    <p className="text-[10px] text-gray-600 font-bold uppercase mb-1">Status Global</p>
+                                    <h4 className="text-sm font-black text-white uppercase tracking-wider">Aguardando Disparo</h4>
+                                 </div>
+                              </div>
+                              <div className="w-3 h-3 bg-white/10 rounded-full" />
+                           </div>
+
+                           <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl">
+                              <p className="text-[9px] font-black text-primary/70 uppercase tracking-widest mb-3">Dica do Administrador</p>
+                              <p className="text-xs text-secondary leading-relaxed font-bold italic">
+                                "Use nomes compostos como 'Shiny Celebi' para disparar formas raras. O Pokémon aparecerá em uma posição aleatória na tela de todos os usuários logados."
+                              </p>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Social Moderation */}
+                     <div className="glow-card p-10 border-white/5 bg-black/40 group relative">
+                        <div className="flex items-center gap-4 mb-8">
+                           <MessageSquare size={20} className="text-gray-500" />
+                           <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest">Controles de Comunidade</h3>
+                        </div>
+                        
+                        <div className="flex flex-col items-center justify-center py-10 opacity-20">
+                           <ShieldCheck size={48} className="text-gray-600 mb-4" />
+                           <p className="text-[10px] font-black text-gray-600 uppercase tracking-wider">Tudo sob controle no Feed</p>
+                        </div>
+
+                        <div className="mt-4 pt-6 border-t border-white/5">
+                           <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest leading-relaxed text-center">
+                              Integração com denúncias em tempo real ativada.
+                           </p>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+              ) : activeTab === 'feedbacks' ? (
+                <div className="animate-fade p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="pixel-title text-xl text-primary">AVALIAÇÕES DOS CLIENTES</h2>
+                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mt-1">{feedbacks.length} avaliações no total</p>
                     </div>
-                  )}
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowFeedbackFilters(!showFeedbackFilters)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-[10px] font-black uppercase ${showFeedbackFilters ? 'bg-primary/20 border-primary text-primary' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'}`}
+                      >
+                        <Filter size={14} /> {filterStars ? `${filterStars} Estrelas` : 'Filtrar'}
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showFeedbackFilters && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute right-0 mt-2 w-48 bg-black/95 border border-white/10 rounded-2xl shadow-2xl p-2 z-50 backdrop-blur-xl"
+                          >
+                            <button 
+                              onClick={() => { setFilterStars(null); setShowFeedbackFilters(false); }}
+                              className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-gray-400 hover:text-primary transition-all rounded-lg"
+                            >
+                              Todas as estrelas
+                            </button>
+                            {[5,4,3,2,1].map(stars => (
+                              <button 
+                                key={stars}
+                                onClick={() => { setFilterStars(stars); setShowFeedbackFilters(false); }}
+                                className="w-full px-4 py-2 text-left flex items-center justify-between text-[10px] font-black uppercase text-gray-400 hover:text-primary transition-all rounded-lg hover:bg-primary/5"
+                              >
+                                <span>{stars} Estrelas</span>
+                                <div className="flex gap-0.5">
+                                  {[...Array(stars)].map((_, i) => <Star key={i} size={8} className="text-primary fill-primary" />)}
+                                </div>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    {filteredFeedbacks.map((fb) => (
+                      <div key={fb.id} className="bg-white/[0.03] border border-white/5 hover:border-primary/20 rounded-3xl p-6 group relative overflow-hidden flex flex-col transition-all duration-300">
+                         <div className="absolute top-0 right-0 p-4 opacity-[0.04] pointer-events-none">
+                            <Star size={56} className="text-primary" />
+                         </div>
+                         {/* Stars */}
+                         <div className="flex gap-1 mb-3">
+                           {[...Array(5)].map((_, i) => (
+                             <Star key={i} size={14} fill={i < Number(fb.rating || 0) ? 'currentColor' : 'none'} className={i < Number(fb.rating || 0) ? 'text-primary drop-shadow-[0_0_4px_var(--primary-glow)]' : 'text-gray-800'} />
+                           ))}
+                           <span className="ml-1 text-[9px] font-black text-gray-600 uppercase self-center">{Number(fb.rating || 0)}/5</span>
+                         </div>
+                         {/* Comment */}
+                         <p className="text-xs text-gray-300 italic leading-relaxed flex-1 mb-4 line-clamp-4 group-hover:line-clamp-none transition-all">
+                           "{fb.comment || fb.message || 'Não deixou comentário.'}"
+                         </p>
+                         {/* Footer */}
+                         <div className="pt-4 border-t border-white/5 flex justify-between items-end">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{fb.playerNick || 'Treinador Anônimo'}</p>
+                              {fb.pokemon && <p className="text-[8px] font-bold text-primary/60 uppercase tracking-[0.15em] mt-0.5 truncate">{fb.pokemon}</p>}
+                              <p className="text-[8px] font-bold text-gray-700 uppercase mt-0.5">
+                                {fb.createdAt?.toMillis ? new Date(fb.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                              </p>
+                            </div>
+                            <button
+                               onClick={() => handleDeleteFeedback(fb.id)}
+                               className="text-gray-700 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 p-2 rounded-xl hover:bg-red-500/10 shrink-0"
+                               title="Deletar avaliação"
+                            >
+                               <Trash2 size={14} />
+                            </button>
+                         </div>
+                      </div>
+                    ))}
+                    {filteredFeedbacks.length === 0 && (
+                      <div className="col-span-full py-24 text-center opacity-30">
+                         <Star size={56} className="mx-auto text-gray-700 mb-5" />
+                         <p className="pixel-title text-sm mb-2">NENHUMA AVALIAÇÃO</p>
+                         <p className="text-[10px] font-bold uppercase tracking-widest">{filterStars ? `Sem avaliações com ${filterStars} estrelas` : 'Nenhum feedback recebido ainda'}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1321,11 +1701,11 @@ export const AdminDashboard = () => {
                                 />
                               </th>
                             )}
-                            <th className="px-8 py-5 text-left">Identificador</th>
-                            <th className="px-8 py-5 text-left">Pokémon</th>
-                            <th className="px-8 py-5 text-left">Preço ($)</th>
-                            <th className="px-8 py-5 text-left">Status</th>
-                            <th className="px-8 py-5 text-left">Ações</th>
+                            <th className="px-8 py-5">Treinador & Tempo</th>
+                            <th className="px-8 py-5">Produto</th>
+                            <th className="px-8 py-5 text-primary">$$$</th>
+                            <th className="px-8 py-5 min-w-[200px]">Status & Delegação</th>
+                            <th className="px-8 py-5 w-24">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -1372,7 +1752,7 @@ export const AdminDashboard = () => {
                                       )}
                                       {o.ability && o.ability !== 'Qualquer Habilidade' && (
                                          <span className="text-[10px] text-gray-300 font-bold uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1">
-                                           {o.ability} {o.hasHA && <span className="text-primary font-black ml-1">HA</span>}
+                                           {getDisplayAbility(o)} {o.hasHA && <span className="text-primary font-black ml-1">HA</span>}
                                          </span>
                                       )}
                                       {o.ignoredIvs && o.ignoredIvs.length > 0 && (
@@ -1386,27 +1766,51 @@ export const AdminDashboard = () => {
                                         </span>
                                       )}
                                       {o.observations && (
-                                        <span className="text-[9px] px-2 py-0.5 bg-black border border-white/10 rounded-md text-gray-500 font-bold italic mt-1 w-full overflow-hidden text-ellipsis whitespace-nowrap" title={o.observations}>
-                                          Obs: {o.observations}
-                                        </span>
+                                        <div className="mt-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl px-4 py-3">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <MessageSquare size={12} className="text-yellow-500/70" />
+                                            <p className="text-[8px] font-black text-yellow-500/70 uppercase tracking-widest">OBSERVAÇÃO DO CLIENTE</p>
+                                          </div>
+                                          <p className="text-[11px] font-bold text-yellow-200/80 leading-relaxed italic">"{o.observations}"</p>
+                                        </div>
                                       )}
                                     </div>
                                   </div>
                                 </td>
                               <td className="px-8 py-6 font-black text-primary">{o.totalPrice / 1000}k</td>
-                              <td className="px-8 py-6">
-                                <div className="relative group/status">
-                                  <select 
-                                    value={o.status}
-                                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                                    className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusStyle(o.status)}`}
-                                  >
-                                    <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
-                                    <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
-                                    <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
-                                    <option value="Entregue" className="bg-black text-blue-400 font-bold">📦 Entregue</option>
-                                  </select>
-                                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                              <td className="px-8 py-6 min-w-[200px]">
+                                <div className="flex flex-col gap-2 relative">
+                                  <div className="relative group/status">
+                                    <select 
+                                      value={o.status}
+                                      onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                                      className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all w-full ${getStatusStyle(o.status)}`}
+                                    >
+                                      <option value="Pendente" className="bg-black text-orange-400 font-bold">⏳ Pendente</option>
+                                      <option value="Breeding" className="bg-black text-secondary font-bold">🥚 Breeding</option>
+                                      <option value="Finalizado" className="bg-black text-green-400 font-bold">✔️ Finalizado</option>
+                                      <option value="Entregue" className="bg-black text-blue-400 font-bold">📦 Entregue</option>
+                                    </select>
+                                    <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                                  </div>
+                                  <div className="relative group/breeder">
+                                    <select 
+                                      value={o.assignedTo || ''}
+                                      onChange={(e) => {
+                                        const selOption = e.target.options[e.target.selectedIndex];
+                                        handleAssignBreeder(o.id, e.target.value, selOption.text);
+                                      }}
+                                      className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all w-full ${o.assignedTo ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-500 border-white/10'}`}
+                                    >
+                                      <option value="" className="bg-black text-gray-500 font-bold">Atribuir a ninguém</option>
+                                      {breeders.map(b => (
+                                        <option key={b.id} value={b.id} className="bg-black text-blue-400 font-bold">
+                                          {b.name || b.email}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-8 py-6">
@@ -1443,14 +1847,15 @@ export const AdminDashboard = () => {
                         <thead>
                           <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
                             <th className="px-8 py-5">Treinador</th>
+                            <th className="px-8 py-5">Discord</th>
                             <th className="px-8 py-5 text-center">Total Gasto</th>
-                            <th className="px-8 py-5 text-center">Volume de Pedidos</th>
-                            <th className="px-8 py-5">Último Pedido</th>
+                            <th className="px-8 py-5 text-center">Volume</th>
+                            <th className="px-8 py-5 text-center">Último Pedido</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {trainersData.length === 0 && (
-                            <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum treinador encontrado...</td></tr>
+                            <tr><td colSpan={5} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum treinador encontrado...</td></tr>
                           )}
                           {trainersData.map((t: any, i: number) => (
                             <Fragment key={t.nick}>
@@ -1465,65 +1870,110 @@ export const AdminDashboard = () => {
                                   <span className="text-gray-600 text-[10px] uppercase font-black">#{i+1}</span>
                                   {t.nick}
                                 </td>
+                                <td className="px-8 py-6 text-sm font-black text-secondary tracking-tight">{t.discordNick}</td>
                                 <td className="px-8 py-6 text-center text-primary font-black">{t.totalSpent / 1000}k</td>
                                 <td className="px-8 py-6 text-center text-gray-400 font-bold">{t.orderCount} Encomendas</td>
-                                <td className="px-8 py-6 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                                <td className="px-8 py-6 text-center text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                                   {t.lastOrder > 0 ? new Date(t.lastOrder).toLocaleDateString('pt-BR', {month:'short', day:'numeric'}) : 'N/A'}
                                 </td>
                               </tr>
                               {expandedTrainerNick === t.nick && (
                                 <tr className="bg-black/40 animate-in slide-in-from-top-2 duration-300 overflow-hidden">
-                                  <td colSpan={4} className="px-12 py-8 border-x border-white/5">
-                                    <div className="space-y-6">
-                                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Histórico de Encomendas</h4>
-                                      <div className="grid grid-cols-1 gap-3">
-                                        {orders.filter(o => (o.playerNick || 'Veterano Anônimo') === t.nick).map((o: any) => (
-                                          <div key={o.id} className="bg-white/5 p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                            <div className="flex items-center gap-4">
-                                              <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5">
-                                                <img 
-                                                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(p => p.name === o.pokemon)?.id}.png`} 
-                                                  alt={o.pokemon}
-                                                  className="w-10 h-10 object-contain"
-                                                  onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png';
-                                                  }}
-                                                />
-                                              </div>
-                                              <div>
-                                                <h5 className="text-sm font-black text-white uppercase tracking-tight">{o.pokemon}</h5>
-                                                <div className="flex gap-2 mt-1">
-                                                  <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase">{o.ability}</span>
-                                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${o.isCastrated ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'}`}>
-                                                    {o.isCastrated ? 'Castrado' : 'Breedável'}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            <div className="flex flex-wrap gap-4 items-center">
-                                              <div className="text-center md:text-left">
-                                                <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Status / Data</p>
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-[10px] font-bold text-gray-400">{new Date(o.createdAt?.toMillis ? o.createdAt.toMillis() : Date.now()).toLocaleDateString('pt-BR')}</span>
-                                                  <span className={`w-2 h-2 rounded-full ${
-                                                    o.status === 'Finalizado' ? 'bg-green-500' : 
-                                                    o.status === 'Breeding' ? 'bg-secondary' :
-                                                    o.status === 'Entregue' ? 'bg-blue-500' :
-                                                    'bg-orange-400'
-                                                  }`}></span>
-                                                </div>
-                                              </div>
-                                              <div className="text-center md:text-left">
-                                                <p className="text-[8px] font-black text-gray-600 uppercase mb-1">IVs</p>
-                                                <p className="text-[10px] font-bold text-white uppercase">{o.ivs}</p>
-                                              </div>
-                                              <div className="text-center md:text-right">
-                                                <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Valor</p>
-                                                <p className="text-xs font-black text-primary">{o.totalPrice / 1000}k</p>
-                                              </div>
-                                            </div>
+                                  <td colSpan={5} className="px-8 py-10 border-x border-white/5">
+                                    <div className="space-y-8">
+                                      {/* Info Cards */}
+                                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
+                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Discord</p>
+                                          <p className="text-sm font-black text-secondary truncate" title={t.discordNick}>{t.discordNick}</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
+                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Gasto</p>
+                                          <p className="text-xl font-black text-primary">{t.totalSpent / 1000}k</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
+                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Primeira Encomenda</p>
+                                          <p className="text-sm font-black text-white">{t.firstOrder > 0 ? new Date(t.firstOrder).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
+                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Última Encomenda</p>
+                                          <p className="text-sm font-black text-white">{t.lastOrder > 0 ? new Date(t.lastOrder).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* History Toggle */}
+                                      <div className="space-y-6">
+                                        <button 
+                                          onClick={() => setShowTrainerHistory(!showTrainerHistory)}
+                                          className="flex items-center justify-between w-full px-6 py-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all group"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <ShoppingBag size={18} className="text-gray-500 group-hover:text-primary transition-colors" />
+                                            <span className="text-[10px] font-black text-gray-400 group-hover:text-white uppercase tracking-widest transition-colors">Histórico de Encomendas</span>
                                           </div>
-                                        ))}
+                                          <div className={`p-1.5 rounded-lg bg-white/5 transition-all ${showTrainerHistory ? 'rotate-180 bg-primary/20' : 'group-hover:bg-white/10'}`}>
+                                            <ChevronDown size={14} className={showTrainerHistory ? 'text-primary' : 'text-gray-500'} />
+                                          </div>
+                                        </button>
+
+                                        {showTrainerHistory && (
+                                          <div className="grid grid-cols-1 gap-3 animate-in slide-in-from-top-4 duration-500">
+                                            {orders
+                                              .filter(o => (o.playerNick || 'Veterano Anônimo') === t.nick)
+                                              .sort((a,b) => {
+                                                const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                                                const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                                                return timeB - timeA;
+                                              })
+                                              .map((o: any) => (
+                                              <div key={o.id} className="bg-white/[0.02] p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div className="flex items-center gap-4">
+                                                  <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5">
+                                                    <img 
+                                                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(p => p.name === getBasePokemonName(o.pokemon))?.id || POKEMON_DATA.find(p => p.name === o.pokemon)?.id}.png`} 
+                                                      alt={o.pokemon}
+                                                      className="w-10 h-10 object-contain"
+                                                      onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png';
+                                                      }}
+                                                    />
+                                                  </div>
+                                                  <div>
+                                                    <h5 className="text-sm font-black text-white uppercase tracking-tight">{o.pokemon}</h5>
+                                                    <div className="flex gap-2 mt-1">
+                                                      <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase">{getDisplayAbility(o)}</span>
+                                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${o.isCastrated ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'}`}>
+                                                        {o.isCastrated ? 'Castrado' : 'Breedável'}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                                <div className="flex flex-wrap gap-4 items-center">
+                                                  <div className="text-center md:text-left">
+                                                    <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Status / Data</p>
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="text-[10px] font-bold text-gray-400">{new Date(o.createdAt?.toMillis ? o.createdAt.toMillis() : Date.now()).toLocaleDateString('pt-BR')}</span>
+                                                      <span className={`w-2 h-2 rounded-full ${
+                                                        o.status === 'Finalizado' ? 'bg-green-500' : 
+                                                        o.status === 'Breeding' ? 'bg-secondary' :
+                                                        o.status === 'Entregue' ? 'bg-blue-500' :
+                                                        'bg-orange-400'
+                                                      }`}></span>
+                                                    </div>
+                                                  </div>
+                                                  <div className="text-center md:text-left">
+                                                    <p className="text-[8px] font-black text-gray-600 uppercase mb-1">IVs</p>
+                                                    <p className="text-[10px] font-bold text-white uppercase">{o.ivs}</p>
+                                                  </div>
+                                                  <div className="text-center md:text-right">
+                                                    <p className="text-[8px] font-black text-gray-600 uppercase mb-1">Valor</p>
+                                                    <p className="text-xs font-black text-primary">{o.totalPrice / 1000}k</p>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </td>
@@ -1534,9 +1984,107 @@ export const AdminDashboard = () => {
                         </tbody>
                       </>
                     )}
+
+                    {activeTab === 'equipe' && (
+                      <>
+                        <thead className="bg-transparent border-0">
+                          <tr>
+                            <th colSpan={5} className="px-8 pb-8 pt-4">
+                              <div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col xl:flex-row xl:items-center justify-between gap-4 w-full">
+                                <div>
+                                  <h3 className="text-sm text-white font-black uppercase tracking-widest mb-1">Cadastrar Novo Funcionário</h3>
+                                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Apenas contas do Google (Gmail) cadastradas aqui poderão logar no seu novo painel restrito.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full xl:w-auto">
+                                  <input 
+                                    type="email"
+                                    placeholder="E-mail google (gmail) do empregado"
+                                    value={newBreederEmail}
+                                    onChange={e => setNewBreederEmail(e.target.value)}
+                                    className="w-full sm:w-80 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none transition-colors"
+                                  />
+                                  <button 
+                                    onClick={handleAddBreeder}
+                                    className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/50 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap"
+                                  >
+                                    Liberar Acesso
+                                  </button>
+                                </div>
+                              </div>
+                            </th>
+                          </tr>
+                           <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
+                             <th className="px-8 py-5 text-left">Breeder / E-mail</th>
+                             <th className="px-8 py-5 text-center">Entregas</th>
+                             <th className="px-8 py-5 text-center">Rank</th>
+                             <th className="px-8 py-5 text-center">Comissão</th>
+                             <th className="px-8 py-5 text-center">A Receber</th>
+                             <th className="px-8 py-5 text-center">Ação</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {breeders.length === 0 && (
+                            <tr><td colSpan={6} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum breeder cadastrado na plataforma...</td></tr>
+                          )}
+                          {breeders.map((b: any) => {
+                            const count = b.ordersCompleted || 0;
+                            const wallet = b.walletAmount || 0;
+                            const rank = getBreederRank(count, b.rankOverride);
+                            return (
+                              <tr key={b.id} className="hover:bg-white/[0.03] transition-colors cursor-pointer group" onClick={() => setSelectedBreeder(b)}>
+                                <td className="px-8 py-6">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center border border-blue-500/30 group-hover:bg-blue-500/30 transition-all">
+                                      <ShieldCheck size={20} />
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-white text-sm uppercase">{b.name || 'Sem nome'}</p>
+                                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{b.email}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-8 py-6 text-center text-gray-300 font-bold">{count} crias</td>
+                                <td className="px-8 py-6 text-center">
+                                  <span className="text-[10px] font-black text-blue-400 bg-blue-400/10 px-3 py-1.5 rounded-lg border border-blue-400/20 uppercase tracking-widest">
+                                    {rank.name}
+                                  </span>
+                                </td>
+                                <td className="px-8 py-6 text-center">
+                                  <span className="text-[10px] font-black text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 uppercase tracking-widest">
+                                    {(rank.commissionRate * 100).toFixed(0)}%
+                                  </span>
+                                </td>
+                                <td className="px-8 py-6 text-center text-green-400 font-black text-lg">
+                                  {(wallet / 1000).toFixed(1)}k
+                                </td>
+                                <td className="px-8 py-6 text-center">
+                                  <div className="flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+                                    <button 
+                                      onClick={() => handlePayBreeder(b.id)}
+                                      disabled={wallet <= 0}
+                                      className="px-4 py-2 bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-green-500/20 text-xs font-black text-gray-400 hover:text-green-400 rounded-lg transition-all border border-white/5 hover:border-green-500/20 uppercase tracking-widest"
+                                    >
+                                      Pagar
+                                    </button>
+                                    <button 
+                                      onClick={() => handleRemoveBreeder(b.id)}
+                                      className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </>
+                    )}
                   </table>
                 </div>
               )}
+
+
 
               {/* Pagination Controls */}
               {(activeTab === 'pedidos' || activeTab === 'entregues') && filteredOrders.length > PAGE_SIZE && (
@@ -1637,9 +2185,9 @@ export const AdminDashboard = () => {
                     else if (deleteConfirm.type === 'mass-order') {
                         // Hard-delete em massa
                         try {
-                            const batch = writeBatch(db);
+                            const batch = writeBatch(adminDb);
                             selectedOrders.forEach(id => {
-                                batch.delete(doc(db, 'orders', id));
+                                batch.delete(doc(adminDb, 'orders', id));
                             });
                             await batch.commit();
                             setIsBulkDeleteMode(false);
@@ -1650,9 +2198,9 @@ export const AdminDashboard = () => {
                         }
                     } else if (deleteConfirm.type === 'mass-notification') {
                       try {
-                        const batch = writeBatch(db);
+                        const batch = writeBatch(adminDb);
                         selectedInboxIds.forEach(id => {
-                          const docRef = doc(db, 'admin_dismissed_notifications', id);
+                          const docRef = doc(adminDb, 'admin_dismissed_notifications', id);
                           batch.set(docRef, { notificationId: id, dismissedAt: serverTimestamp() });
                         });
                         await batch.commit();
@@ -1662,7 +2210,7 @@ export const AdminDashboard = () => {
                       } catch (err) { console.error("Erro ao limpar inbox:", err); }
                     } else if (deleteConfirm.type === 'stock_room') {
                       try {
-                        await deleteDoc(doc(db, 'stock_rooms', deleteConfirm.id));
+                        await deleteDoc(doc(adminDb, 'stock_rooms', deleteConfirm.id));
                         setDeleteConfirm(null);
                       } catch (err) {
                         console.error("Erro ao deletar sala:", err);
@@ -1670,7 +2218,7 @@ export const AdminDashboard = () => {
                       }
                     }
                     else {
-                      deleteDoc(doc(db, 'ClientReviews', deleteConfirm.id)).catch(err => {
+                      deleteDoc(doc(adminDb, 'ClientReviews', deleteConfirm.id)).catch(err => {
                         console.error("Erro ao deletar feedback:", err);
                         alert("Erro ao deletar: " + err.message);
                       });
@@ -1766,6 +2314,199 @@ export const AdminDashboard = () => {
           onClose={() => setShowKanbanBoard(false)} 
         />
       )}
+
+              {createPortal(
+                <AnimatePresence>
+                  {selectedBreeder && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-md"
+                      onClick={() => setSelectedBreeder(null)}
+                    >
+                      <motion.div 
+                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        className="glow-card max-w-[95vw] xl:max-w-7xl w-full h-[90vh] overflow-hidden flex flex-col bg-[#050505] relative border-blue-500/30 shadow-[0_0_50px_rgba(59,130,246,0.1)]"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <button onClick={() => setSelectedBreeder(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors z-20">
+                          <X size={24} />
+                        </button>
+
+                        <div className="flex flex-col md:flex-row h-full overflow-hidden">
+                          <div className="w-full md:w-80 p-8 border-b md:border-b-0 md:border-r border-white/5 bg-white/[0.01] overflow-y-auto custom-scrollbar">
+                             <div className="flex flex-col items-center text-center mb-8">
+                               <div className="w-20 h-20 bg-blue-500/20 rounded-3xl flex items-center justify-center border border-blue-500/40 mb-4 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+                                  <Users size={40} className="text-blue-400" />
+                               </div>
+                               <h3 className="pixel-title text-lg uppercase mb-1">{selectedBreeder.name || 'Breeder'}</h3>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest break-all mb-4">{selectedBreeder.email}</p>
+                               
+                               <div className="w-full bg-white/5 p-4 rounded-2xl border border-white/10 space-y-3">
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Rank Profissional</span>
+                                   <span className="text-[10px] text-blue-400 font-black uppercase tracking-widest">{selectedBreeder ? getBreederRank(selectedBreeder.ordersCompleted || 0, selectedBreeder.rankOverride).name : ''}</span>
+                                 </div>
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Comissão Direta</span>
+                                   <span className="text-[10px] text-primary font-black uppercase tracking-widest">{(getBreederRank(selectedBreeder?.ordersCompleted || 0, selectedBreeder?.rankOverride).commissionRate * 100).toFixed(0)}%</span>
+                                 </div>
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Crias Entregues</span>
+                                   <span className="text-xs text-white font-black">{selectedBreeder?.ordersCompleted || 0}</span>
+                                 </div>
+                               </div>
+                             </div>
+
+                             <div className="space-y-6">
+                                <div>
+                                  <h4 className="text-[9px] text-gray-600 font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <PieChart size={12}/> Métricas de Desempenho
+                                  </h4>
+                                  <div className="space-y-4">
+                                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/20 transition-all group">
+                                        <p className="text-[8px] text-gray-500 font-black uppercase mb-1">Rendimento Bruto (Shop)</p>
+                                        <p className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">{(selectedBreeder?.totalRevenueGenerated || 0) / 1000}k <span className="text-[10px] text-gray-600">POKÉ</span></p>
+                                     </div>
+                                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-green-500/20 transition-all group">
+                                        <p className="text-[8px] text-gray-500 font-black uppercase mb-1">Total Pago (Acumulado)</p>
+                                        <p className="text-lg font-black text-white group-hover:text-green-400 transition-colors">{(selectedBreeder?.totalHistoryPaid || 0) / 1000}k <span className="text-[10px] text-gray-600">POKÉ</span></p>
+                                     </div>
+                                      <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-primary/20 transition-all group">
+                                        <p className="text-[8px] text-gray-500 font-black uppercase mb-1">Saldo a Receber</p>
+                                        <p className="text-lg font-black text-white group-hover:text-primary transition-colors">{(selectedBreeder?.walletAmount || 0) / 1000}k <span className="text-[10px] text-gray-600">POKÉ</span></p>
+                                     </div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="text-[9px] text-gray-600 font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <ShieldCheck size={12}/> Painel de Controle
+                                  </h4>
+                                  <div className="space-y-4">
+                                     <div className="space-y-2">
+                                        <p className="text-[8px] text-gray-500 font-black uppercase ml-1">Comissão Manual (Override)</p>
+                                        <div className="flex gap-1 bg-black rounded-xl border border-white/5 p-1 relative overflow-hidden">
+                                           {[null, 0.15, 0.20, 0.30].map(val => (
+                                             <button 
+                                               key={val === null ? 'auto' : val}
+                                               onClick={() => handleUpdateBreederRank(selectedBreeder!.id, val)}
+                                               className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
+                                                 selectedBreeder?.rankOverride === val 
+                                                  ? 'bg-blue-600 text-white shadow-lg' 
+                                                  : 'text-gray-600 hover:text-gray-400 hover:bg-white/5'
+                                               }`}
+                                             >
+                                               {val === null ? 'AUTO' : `${val * 100}%`}
+                                             </button>
+                                           ))}
+                                        </div>
+                                     </div>
+                                     <div className="space-y-2">
+                                        <p className="text-[8px] text-gray-500 font-black uppercase ml-1">Notas Internas Privadas</p>
+                                        <textarea 
+                                          defaultValue={selectedBreeder?.internalNotes || ''}
+                                          onBlur={(e) => handleUpdateBreederNotes(selectedBreeder!.id, e.target.value)}
+                                          placeholder="Escreva segredos ou observações sobre este breeder..."
+                                          className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-[10px] font-bold text-gray-400 focus:text-white focus:border-blue-500/50 outline-none transition-all resize-none h-24 custom-scrollbar"
+                                        />
+                                     </div>
+                                  </div>
+                                </div>
+                             </div>
+                          </div>
+
+                          <div className="flex-1 flex flex-col overflow-hidden bg-black/20">
+                            <div className="p-8 border-b border-white/5">
+                               <div className="flex items-center gap-3 mb-2">
+                                 <Package size={18} className="text-gray-500" />
+                                 <h3 className="text-sm text-white font-black uppercase tracking-widest">Histórico de Encomendas Designadas</h3>
+                               </div>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase">Abaixo estão listadas apenas as ordens vinculadas a este funcionário.</p>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                               {orders.filter(o => o.assignedTo === selectedBreeder?.email).length === 0 ? (
+                                 <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                                    <Package size={48} className="mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-widest">Nenhuma encomenda vinculada</p>
+                                 </div>
+                               ) : (
+                                 <div className="space-y-4">
+                                    {orders.filter(o => o.assignedTo === selectedBreeder?.email).map(o => (
+                                      <div key={o.id} className="p-5 bg-white/5 border border-white/5 rounded-2xl hover:border-white/10 transition-all">
+                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div className="flex items-center gap-4">
+                                               <div className="w-12 h-12 bg-black/40 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
+                                                {(() => {
+                                                  const name = (o.pokemon || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                                  return name ? (
+                                                    <img 
+                                                      src={`https://play.pokemonshowdown.com/sprites/ani/${name}.gif`} 
+                                                      className="w-10 h-10 object-contain" 
+                                                      alt="" 
+                                                      onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.src = `https://play.pokemonshowdown.com/sprites/dex/${name}.png`;
+                                                        target.onerror = () => {
+                                                           target.style.display = 'none';
+                                                           if (target.parentElement) {
+                                                              target.parentElement.innerHTML = '<svg class="text-gray-700" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
+                                                           }
+                                                        };
+                                                      }}
+                                                    />
+                                                  ) : <Package size={20} className="text-gray-700" />;
+                                                })()}
+                                             </div>
+                                               <div>
+                                                  <h4 className="font-black text-white uppercase tracking-tighter text-sm">{o.pokemon}</h4>
+                                                  <p className="text-[10px] text-gray-400 font-bold uppercase">{o.playerNick}</p>
+                                               </div>
+                                            </div>
+                                            
+                                            <div className="flex flex-wrap items-center gap-4">
+                                               <div className="text-right">
+                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">IVs Solicitados</p>
+                                                  <p className="text-[10px] text-primary font-black uppercase">{o.ivs}</p>
+                                               </div>
+                                               <div className="h-8 w-px bg-white/5 hidden md:block"></div>
+                                               <div className="min-w-[80px] text-right">
+                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">Status</p>
+                                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded inline-block ${
+                                                    o.status === 'Finalizado' || o.status === 'Entregue' ? 'text-green-400 bg-green-400/10' :
+                                                    o.status === 'Breeding' ? 'text-secondary bg-secondary/10' : 'text-gray-500 bg-white/5'
+                                                  }`}>
+                                                    {o.status}
+                                                  </span>
+                                               </div>
+                                            </div>
+                                         </div>
+                                      </div>
+                                    ))}
+                                 </div>
+                               )}
+                            </div>
+
+                            <div className="p-8 border-t border-white/5 bg-white/[0.01]">
+                               <button 
+                                 onClick={() => setSelectedBreeder(null)}
+                                 className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                               >
+                                 FECHAR DETALHES
+                               </button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>, 
+                document.body
+              )}
       </div>
     </>
   );
@@ -1787,7 +2528,7 @@ const StockRoomsManager = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'stock_rooms'));
+    const q = query(collection(adminDb, 'stock_rooms'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRooms(data.sort((a: any, b: any) => {
@@ -1885,13 +2626,13 @@ const StockRoomsManager = () => {
       }
 
       if (modalState.isEdit && modalState.id) {
-        await updateDoc(doc(db, 'stock_rooms', modalState.id), {
+        await updateDoc(doc(adminDb, 'stock_rooms', modalState.id), {
           name: modalState.name.trim(),
           pokemonList: newPokemonList,
           updatedAt: serverTimestamp()
         });
       } else {
-        await addDoc(collection(db, 'stock_rooms'), {
+        await addDoc(collection(adminDb, 'stock_rooms'), {
           name: modalState.name.trim(),
           pokemonList: newPokemonList,
           createdAt: serverTimestamp()
@@ -2171,7 +2912,7 @@ const StockRoomsManager = () => {
                   <button 
                     onClick={async () => {
                       try {
-                        await deleteDoc(doc(db, 'stock_rooms', deleteConfirm.id));
+                        await deleteDoc(doc(adminDb, 'stock_rooms', deleteConfirm.id));
                         setDeleteConfirm(null);
                       } catch (err) {
                         console.error("Erro ao deletar sala:", err);
@@ -2221,15 +2962,15 @@ const ChestStockManager = () => {
   type Entry = { id: string, ivs: string, gender: string, ability: string, quantity: number };
 
   const [modalState, setModalState] = useState<{
-    isOpen: boolean, isEdit: boolean, id: string, pokemon: string, entries: Entry[]
+    isOpen: boolean, isEdit: boolean, id: string, pokemon: string, entries: Entry[], roomName: string
   }>({
-    isOpen: false, isEdit: false, id: '', pokemon: '', entries: []
+    isOpen: false, isEdit: false, id: '', pokemon: '', entries: [], roomName: ''
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'chest_stock'));
+    const q = query(collection(adminDb, 'chest_stock'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -2240,7 +2981,7 @@ const ChestStockManager = () => {
 
   // Listen to Stock Rooms for localization
   useEffect(() => {
-    const q = query(collection(db, 'stock_rooms'));
+    const q = query(collection(adminDb, 'stock_rooms'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -2278,20 +3019,15 @@ const ChestStockManager = () => {
 
   const getAllowedGenders = (pokemonName: string) => {
     const raw = pokemonName.toLowerCase().trim();
-    if (GENDERLESS_POKEMON.some(p => p.toLowerCase() === raw)) return ['Genderless'];
-    if (MALE_ONLY_POKEMON.some(p => p.toLowerCase() === raw)) return ['Macho'];
-    return ['Macho', 'Fêmea'];
+    if (GENDERLESS_POKEMON.some(p => p.toLowerCase() === raw)) return ['---', 'Genderless'];
+    if (MALE_ONLY_POKEMON.some(p => p.toLowerCase() === raw)) return ['---', 'Macho'];
+    return ['---', 'Macho', 'Fêmea'];
   };
 
   const addEntry = () => {
-    const allowed = getAllowedGenders(modalState.pokemon);
-    const defaultAbility = abilityOptions[0] || '';
-    
-    const defaultGender = allowed[0];
-    
     setModalState(s => ({
       ...s,
-      entries: [...s.entries, { id: crypto.randomUUID(), ivs: '---', gender: defaultGender, ability: defaultAbility, quantity: 1 }]
+      entries: [...s.entries, { id: crypto.randomUUID(), ivs: '---', gender: '---', ability: '---', quantity: 0 }]
     }));
     setError('');
   };
@@ -2299,13 +3035,19 @@ const ChestStockManager = () => {
   const updateEntry = (id: string, field: keyof Entry, value: any) => {
     setModalState(s => ({
       ...s,
-      entries: s.entries.map(e => e.id === id ? { ...e, [field]: value } : e)
+      entries: s.entries.map(e => e.id === id ? { ...e, [field]: field === 'quantity' ? Math.max(0, parseInt(value) || 0) : value } : e)
     }));
     if (error) setError('');
   };
 
   const removeEntry = (id: string) => {
     setModalState(s => ({ ...s, entries: s.entries.filter(e => e.id !== id) }));
+  };
+
+  const findRoomForPokemon = (pokemonName: string) => {
+    const raw = pokemonName.toLowerCase().trim();
+    const room = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === raw));
+    return room ? room.name : '';
   };
 
   const handleSelectPokemon = (name: string) => {
@@ -2348,10 +3090,12 @@ const ChestStockManager = () => {
       const ivTotals: Record<string, number> = { '4 IVs': 0, '5 IVs': 0, '6 IVs': 0 };
       
       for (const entry of modalState.entries) {
+        /*
         if (entry.ivs === '---') {
           setError(`Selecione um IV válido para todas as variações.`);
           setIsSaving(false); return;
         }
+        */
 
         const combo = `${entry.ivs}-${entry.gender}-${entry.ability}`;
         if (seencombos.has(combo)) {
@@ -2360,10 +3104,12 @@ const ChestStockManager = () => {
         }
         seencombos.add(combo);
 
+        /*
         if (!entry.ability.trim()) {
           setError("Todas as variações devem ter a ability (habilidade) preenchida!");
           setIsSaving(false); return;
         }
+        */
         
         if (ivTotals[entry.ivs] !== undefined) {
           ivTotals[entry.ivs] += entry.quantity;
@@ -2387,15 +3133,47 @@ const ChestStockManager = () => {
         updatedAt: serverTimestamp()
       };
 
+      // Sync Room logic
+      const currentRoomName = modalState.roomName.trim();
+      const oldRoomName = findRoomForPokemon(modalState.pokemon);
+
+      if (currentRoomName !== oldRoomName) {
+        // 1. Remove from all old rooms (safety first)
+        const pokemonToClean = modalState.pokemon.trim().toLowerCase();
+        for (const room of rooms) {
+          const list = (room.pokemonList || []).map((p: string) => p.toLowerCase());
+          if (list.includes(pokemonToClean)) {
+            const newList = (room.pokemonList || []).filter((p: string) => p.toLowerCase() !== pokemonToClean);
+            await updateDoc(doc(adminDb, 'stock_rooms', room.id), { pokemonList: newList, updatedAt: serverTimestamp() });
+          }
+        }
+
+        // 2. Add to new room
+        if (currentRoomName) {
+          const targetRoom = rooms.find(r => (r.name || '').toLowerCase() === currentRoomName.toLowerCase());
+          if (targetRoom) {
+            const list = Array.isArray(targetRoom.pokemonList) ? [...targetRoom.pokemonList] : [];
+            if (!list.map(p => p.toLowerCase()).includes(pokemonToClean)) {
+               list.push(modalState.pokemon.trim());
+               await updateDoc(doc(adminDb, 'stock_rooms', targetRoom.id), { pokemonList: list, updatedAt: serverTimestamp() });
+            }
+          } else {
+            // Option to create room if it doesn't exist? User said "poder editar manualmente", 
+            // but didn't explicitly say "auto-create". I'll stick to assignment for now to be safe, 
+            // but I'll add a check or just assume it's an existing room name to find.
+          }
+        }
+      }
+
       if (modalState.isEdit && modalState.id) {
-        await updateDoc(doc(db, 'chest_stock', modalState.id), data);
+        await updateDoc(doc(adminDb, 'chest_stock', modalState.id), data);
       } else {
-        await addDoc(collection(db, 'chest_stock'), {
+        await addDoc(collection(adminDb, 'chest_stock'), {
           ...data,
           addedAt: serverTimestamp()
         });
       }
-      setModalState({ isOpen: false, isEdit: false, id: '', pokemon: '', entries: [] });
+      setModalState({ isOpen: false, isEdit: false, id: '', pokemon: '', entries: [], roomName: '' });
       setPokemonSearch('');
       setError('');
     } catch (err) {
@@ -2436,7 +3214,34 @@ const ChestStockManager = () => {
     }
 
     return true;
-  }).sort((a, b) => (a.pokemon || '').localeCompare(b.pokemon || ''));
+  }).sort((a, b) => {
+    const nameA_raw = a.pokemon?.toLowerCase() || '';
+    const nameB_raw = b.pokemon?.toLowerCase() || '';
+    const roomA = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === nameA_raw));
+    const roomB = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === nameB_raw));
+    
+    const roomNameA = roomA ? roomA.name : 'ZZZ - Sem Sala';
+    const roomNameB = roomB ? roomB.name : 'ZZZ - Sem Sala';
+    
+    // 1. Sort by Room Name (Numeric)
+    if (roomNameA !== roomNameB) {
+      return roomNameA.localeCompare(roomNameB, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    
+    // 2. If same room, sort by index in pokemonList
+    if (roomA) {
+      const list = (roomA.pokemonList || []).map((p: string) => p.toLowerCase());
+      const idxA = list.indexOf(nameA_raw);
+      const idxB = list.indexOf(nameB_raw);
+      
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+    }
+    
+    // 3. Fallback to alphabetical
+    return nameA_raw.localeCompare(nameB_raw);
+  });
 
   const totalChests = items.length;
   const activeFilterCount = (filters.limitReached ? 1 : 0) + filters.eggGroups.length;
@@ -2484,7 +3289,7 @@ const ChestStockManager = () => {
 
           <button 
             onClick={() => {
-              setModalState({ isOpen: true, isEdit: false, id: '', pokemon: '', entries: [] });
+              setModalState({ isOpen: true, isEdit: false, id: '', pokemon: '', entries: [], roomName: '' });
               setPokemonSearch('');
               setError('');
             }}
@@ -2634,7 +3439,22 @@ const ChestStockManager = () => {
                           className={`w-full bg-black border ${showPokemonList ? 'border-green-500' : 'border-white/10'} rounded-xl pl-10 pr-4 py-4 text-base outline-none transition-all font-black text-white uppercase placeholder:text-gray-700 tracking-wider shadow-inner`}
                         />
                       </div>
-                      
+
+                      <div className="relative mt-4">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Sala do Pokémon (Localização)</label>
+                        <input 
+                          placeholder="Pesquise ou Digite a Sala (Ex: Sala 1, Gaveta A...)" 
+                          value={modalState.roomName}
+                          onChange={e => setModalState({...modalState, roomName: e.target.value})}
+                          list="available-rooms"
+                          className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-green-500 transition-all font-bold text-white uppercase"
+                        />
+                        <datalist id="available-rooms">
+                          {rooms.map(r => <option key={r.id} value={r.name} />)}
+                        </datalist>
+                        <p className="text-[9px] text-gray-600 mt-1 font-bold uppercase">Deixe em branco se não houver sala vinculada ainda.</p>
+                      </div>
+
                       {/* Pokemon Dropdown */}
                       <AnimatePresence>
                         {showPokemonList && filteredPokemonList.length > 0 && (
@@ -2711,7 +3531,8 @@ const ChestStockManager = () => {
                               onChange={e => updateEntry(entry.id, 'ability', e.target.value)}
                               className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-green-500 transition-all cursor-pointer uppercase"
                             >
-                              {!abilityOptions.includes(entry.ability) && <option value={entry.ability}>{entry.ability}</option>}
+                              <option value="---">---</option>
+                              {!abilityOptions.includes(entry.ability) && entry.ability !== '---' && <option value={entry.ability}>{entry.ability}</option>}
                               {abilityOptions.map((a: string) => <option key={a} value={a}>{a}</option>)}
                             </select>
                           </div>
@@ -2743,9 +3564,9 @@ const ChestStockManager = () => {
                             <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Qtd.</label>
                             <input 
                               type="number"
-                              min={1} 
+                              min={0} 
                               value={entry.quantity}
-                              onChange={e => updateEntry(entry.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                              onChange={e => updateEntry(entry.id, 'quantity', e.target.value)}
                               className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-black text-green-400 outline-none focus:border-green-500 transition-all text-center"
                             />
                           </div>
@@ -2813,6 +3634,7 @@ const ChestStockManager = () => {
         document.body
       )}
 
+
       {/* Chests Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredItems.map(item => {
@@ -2844,7 +3666,8 @@ const ChestStockManager = () => {
                       setError('');
                       setModalState({ 
                          isOpen: true, isEdit: true, id: item.id,
-                         pokemon: item.pokemon, entries: item.entries || []
+                         pokemon: item.pokemon, entries: item.entries || [],
+                         roomName: findRoomForPokemon(item.pokemon)
                       });
                       setPokemonSearch(item.pokemon);
                     }}
@@ -2872,7 +3695,7 @@ const ChestStockManager = () => {
                   const ivGroups = ['4 IVs', '5 IVs', '6 IVs'].map(ivLabel => {
                     const total = entries.filter((e: any) => e.ivs === ivLabel).reduce((acc: number, e: any) => acc + (e.quantity || 0), 0);
                     return { label: ivLabel.replace(' IVs', ''), total, full: total >= 54 };
-                  }).filter(g => g.total > 0);
+                  });
 
                   return ivGroups.map((g, i) => (
                     <div key={i} className={`flex items-center justify-between p-3 rounded-xl border ${g.full ? 'bg-red-500/10 border-red-500/30' : 'bg-white/[0.02] border-white/5'}`}>
@@ -2932,7 +3755,7 @@ const ChestStockManager = () => {
                   <button 
                     onClick={async () => {
                       try {
-                        await deleteDoc(doc(db, 'chest_stock', deleteConfirm.id));
+                        await deleteDoc(doc(adminDb, 'chest_stock', deleteConfirm.id));
                         setDeleteConfirm(null);
                       } catch (err) {
                          console.error("Erro ao deletar baú:", err);
@@ -3015,20 +3838,31 @@ const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
         const baseNameData = normalizedPokemonName.split(' de ')[0];
         const pokemonDBMatch = POKEMON_DATA.find(p => p.name.toLowerCase() === baseNameData.toLowerCase() || p.name.toLowerCase() === normalizedPokemonName.toLowerCase());
         const realHA = pokemonDBMatch?.hiddenAbility || 'Hidden Ability';
+        const pokemonHasNoHA = pokemonDBMatch && !pokemonDBMatch.hiddenAbility;
 
         if (abilityRaw.toUpperCase() === 'HA') {
-           hasHA = true;
-           ability = realHA;
+           if (pokemonHasNoHA) {
+             hasHA = false; // Cannot have HA if it doesn't exist
+             ability = pokemonDBMatch?.abilities[0] || abilityRaw;
+           } else {
+             hasHA = true;
+             ability = realHA;
+           }
         } else if (abilityRaw.toLowerCase().includes('(-ha)')) {
            hasHA = false;
            ability = abilityRaw.replace(/\(-HA\)/i, '').trim();
-           if (ability.toLowerCase() === 'random') ability = 'Qualquer Habilidade';
+           if (ability.toLowerCase() === 'random') ability = pokemonDBMatch?.abilities[0] || 'Qualquer Habilidade';
         } else if (abilityRaw.toLowerCase().includes('random')) {
-           ability = 'Qualquer Habilidade';
+           ability = pokemonDBMatch?.abilities[0] || 'Qualquer Habilidade';
            hasHA = false;
         } else {
            hasHA = false;
-           ability = abilityRaw; // Habilidade fixa como Hospitality
+           // Fallback if no HA exists and specific random/empty choice was made
+           if (pokemonHasNoHA && (abilityRaw === '' || abilityRaw.toLowerCase().includes('qualquer'))) {
+              ability = pokemonDBMatch?.abilities[0] || abilityRaw;
+           } else {
+              ability = abilityRaw;
+           }
         }
 
         let basePrice = 80000;
@@ -3109,6 +3943,15 @@ const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
         hasHA = true;
       }
 
+      // Ability Post-Processing for No-HA species
+      const pokemonDBMatch = POKEMON_DATA.find(p => p.name.toLowerCase() === pokemonName.toLowerCase());
+      if (pokemonDBMatch && !pokemonDBMatch.hiddenAbility) {
+        if (hasHA || ability === 'Qualquer Habilidade' || !ability) {
+           hasHA = false;
+           ability = pokemonDBMatch.abilities[0];
+        }
+      }
+
       let basePrice = 80000;
       if (ivValue === '4') basePrice = 40000;
       if (ivValue === '6') basePrice = 100000;
@@ -3158,9 +4001,9 @@ const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
 
     setIsSubmitting(true);
     try {
-      const batch = writeBatch(db);
+      const batch = writeBatch(adminDb);
       parsedData.forEach((orderData: any) => {
-        const orderRef = doc(collection(db, 'orders'));
+        const orderRef = doc(collection(adminDb, 'orders'));
         batch.set(orderRef, {
           ...orderData,
           createdAt: serverTimestamp()

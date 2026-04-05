@@ -8,13 +8,14 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
 
 interface UserProfile {
   bio: string;
   avatarUrl: string;
   bannerUrl: string;
+  isPrivate?: boolean;
   discordId?: string;
   googleId?: string;
   discordTag?: string;
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (user?.uid) {
       const userRef = doc(db, 'users', user.uid);
-      unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
+      unsubscribeProfile = onSnapshot(userRef, async (docSnap) => {
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
@@ -62,9 +63,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             avatarUrl: safeStorage.getItem(`settings_avatar_${user.uid}`, user.photoURL || ''),
             bannerUrl: safeStorage.getItem(`settings_banner_${user.uid}`, 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop'),
           };
-          setDoc(userRef, initialProfile);
+          await setDoc(userRef, initialProfile);
           setProfile(initialProfile);
         }
+
+        // ALWAYS ensure trainer_profiles (Public) exists for this user
+        const nick = user.displayName || user.email?.split('@')[0] || 'Treinador';
+        const profilesRef = collection(db, 'trainer_profiles');
+        const q = query(profilesRef, where('uid', '==', user.uid));
+        const profileSnap = await getDocs(q);
+        
+        if (profileSnap.empty) {
+          const currentProfile = docSnap.exists() ? (docSnap.data() as UserProfile) : null;
+          const trainerProfileRef = doc(db, 'trainer_profiles', user.uid);
+          await setDoc(trainerProfileRef, {
+            uid: user.uid,
+            displayName: nick,
+            nick_lowercase: nick.toLowerCase(),
+            bio: currentProfile?.bio || 'Apaixonado por Pokémon e batalhas competitivas!',
+            avatarUrl: currentProfile?.avatarUrl || '',
+            bannerUrl: currentProfile?.bannerUrl || '',
+            ordersCompletedCount: 0,
+            glintCollection: [],
+            favoriteTeam: [],
+            createdAt: serverTimestamp(),
+            isPrivate: false
+          });
+        }
+
         setLoading(false);
       }, (err) => {
         console.error("Profile sync error:", err);

@@ -39,7 +39,7 @@ export const PokedlePage = () => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 animate-fade min-h-screen">
+    <div className="max-w-7xl mx-auto px-4 pt-24 pb-8 animate-fade min-h-screen">
       <style>{`
         :root {
           --primary-rgb: 74, 222, 128;

@@ -18,7 +18,7 @@ const PRICES_GENDERLESS = [
 
 export const Prices = () => {
   return (
-    <div className="max-w-6xl mx-auto px-4 animate-fade">
+    <div className="max-w-6xl mx-auto px-4 pt-24 animate-fade">
       <div className="mb-20 text-center">
         <h2 className="pixel-title text-4xl mb-4">Tabela de <span className="text-primary">Valores</span></h2>
         <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-xs">Precisão técnica com preço justo</p>

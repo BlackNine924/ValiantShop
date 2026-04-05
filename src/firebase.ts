@@ -15,3 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Secondary app for Admin-only auth (allows two concurrent login sessions)
+const adminApp = initializeApp(firebaseConfig, 'admin-app');
+export const adminAuth = getAuth(adminApp);
+export const adminDb = getFirestore(adminApp);

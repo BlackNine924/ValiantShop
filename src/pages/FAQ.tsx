@@ -57,7 +57,7 @@ export const FAQ = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 animate-fade">
+    <div className="max-w-4xl mx-auto px-4 pt-24 animate-fade">
       <div className="text-center mb-16">
         <h2 className="pixel-title text-4xl mb-4">DÚVIDAS <span className="text-secondary">FREQUENTES</span></h2>
         <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Tudo o que você precisa saber sobre a Valiant Shop</p>

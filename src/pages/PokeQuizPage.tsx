@@ -414,7 +414,7 @@ export const PokeQuizPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] p-2 md:p-6 flex flex-col items-center transition-all">
+    <div className="min-h-screen bg-[#0a0a1a] pt-24 px-2 md:px-6 flex flex-col items-center transition-all">
         <div className="w-full max-w-[1400px] mb-4 flex items-center justify-between px-2 relative z-[70]">
         <button onClick={() => navigate('/')} className="text-gray-400 hover:text-white flex items-center gap-1 text-sm font-bold">
           <ChevronLeft size={16} /> Voltar

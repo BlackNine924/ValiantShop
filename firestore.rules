@@ -26,8 +26,8 @@ service cloud.firestore {
     // /orders — Encomendas
     // ────────────────────────────────────────────────
     match /orders/{orderId} {
-      // Leitura: apenas o dono da encomenda ou o admin
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Leitura: apenas o dono da encomenda, o admin, ou o breeder designado (agora verificado via email)
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || (isAuthenticated() && resource.data.assignedTo == request.auth.token.email);
 
       // Criação: usuário autenticado criando sua própria encomenda
       allow create: if isAuthenticated()
@@ -35,8 +35,12 @@ service cloud.firestore {
         && request.resource.data.totalPrice is number
         && request.resource.data.totalPrice > 0;
 
-      // Atualização: apenas o admin pode mudar status; o dono pode atualizar campos limitados
-      allow update: if isAdmin();
+      // Atualização: Admin edita tudo. Breeder designado pode apenas mudar status da sua ordem.
+      allow update: if isAdmin() || 
+        (isAuthenticated() 
+         && resource.data.assignedTo == request.auth.token.email 
+         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) 
+         && request.resource.data.status in ['Pendente', 'Breeding', 'Finalizado']);
 
       // Deleção: apenas o admin
       allow delete: if isAdmin();
@@ -151,6 +155,44 @@ service cloud.firestore {
     // /stock_rooms — Salas de estoque
     // ────────────────────────────────────────────────
     match /stock_rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /breeder_profiles — Perfis Financeiros dos Breeders (Doc ID === Email)
+    // ────────────────────────────────────────────────
+    match /breeder_profiles/{email} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == email);
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.token.email == email); // Permitir self-update de nome, etc.
+    }
+
+    // ────────────────────────────────────────────────
+    // /social_posts — Feed da Comunidade
+    // ────────────────────────────────────────────────
+    match /social_posts/{postId} {
+      allow read: if isAuthenticated();
+      // Permitir criar posts se estiver logado. O authorUid deve ser o UID do usuário.
+      allow create: if isAuthenticated();
+      // Permitir curtidas (uodate parcial do campo likes) ou edição do próprio post
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
+    }
+
+    // ────────────────────────────────────────────────
+    // /trainer_profiles — Perfis de Treinadores (Público)
+    // ────────────────────────────────────────────────
+    match /trainer_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // /global_events — Eventos (Caça Pixel)
+    // ────────────────────────────────────────────────
+    match /global_events/{eventId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }

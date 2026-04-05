@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, Zap } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, Zap, MessageSquare } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { POKEMON_DATA, NATURES } from '../data/pokemonData';
@@ -87,10 +87,14 @@ export const OrderForm = () => {
     hasHA: false,
     ignoredIvs: [] as string[],
     giftNick: '',
+    discordNick: '',
     observations: ''
   };
 
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(() => ({
+    ...initialForm,
+    discordNick: safeStorage.getItem('valiant_discord_nick', '')
+  }));
   const [favorites, setFavorites] = useState<string[]>(() => {
     return safeStorage.getItem('pokemon_favorites', []);
   });
@@ -170,6 +174,7 @@ export const OrderForm = () => {
         hasHA: s.hasHA || false,
         ignoredIvs: s.ignoredIvs || [],
         giftNick: '',
+        discordNick: '',
         observations: ''
       });
       setSearch(s.pokemon);
@@ -233,11 +238,16 @@ export const OrderForm = () => {
         return false;
       }
     }
+    if (!form.discordNick || form.discordNick.trim() === '') {
+      setError('O Nick do Discord é obrigatório!');
+      return false;
+    }
     return true;
   }
 
   const handleAddToCart = () => {
     if (!handleValidation()) return;
+    safeStorage.setItem('valiant_discord_nick', form.discordNick);
     addToCart({ ...form, price: totalPrice });
     setForm(initialForm);
     setSearch('');
@@ -269,12 +279,16 @@ export const OrderForm = () => {
         hasHA: form.hasHA,
         totalPrice: totalPrice,
         playerNick: user.displayName,
+        playerUid: user.uid,
         giftNick: form.giftNick || null,
+        discordNick: form.discordNick,
+        observations: form.observations.trim() || null,
         status: 'Pendente',
         createdAt: serverTimestamp()
       });
       localStorage.setItem('valiant_order_cooldown', (Date.now() + 30000).toString());
       setCooldown(30);
+      safeStorage.setItem('valiant_discord_nick', form.discordNick);
       setForm(initialForm);
       setSearch('');
       setStep(4);
@@ -480,6 +494,20 @@ export const OrderForm = () => {
                       placeholder="Insira o Nick"
                       value={form.giftNick}
                       onChange={e => setForm({...form, giftNick: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block flex items-center gap-2">
+                       <MessageSquare size={12} className="text-secondary" /> Nick do Discord (Obrigatório)
+                    </label>
+                    <input 
+                      type="text"
+                      required
+                      className="w-full bg-black/60 border-2 border-white/5 rounded-2xl px-6 py-5 text-white font-bold transition-all outline-none focus:border-secondary" 
+                      placeholder="Ex: usuario#0000"
+                      value={form.discordNick}
+                      onChange={e => setForm({...form, discordNick: e.target.value})}
                     />
                   </div>
 

@@ -1,9 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Settings, LogOut, Shield, Zap, Tag, Eye, EyeOff, Copy, Check, Edit2 } from 'lucide-react';
+import { X, User, Settings, LogOut, Shield, Zap, Tag, Eye, EyeOff, Copy, Check, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAllMinigameStreaks } from '../hooks/useMinigameStreak';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,7 +14,6 @@ type TabType = 'profile' | 'account';
 
 export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const { user, profile, logout, updateProfileData } = useAuth();
-  const { pokegrid, pokedle, pokequiz } = useAllMinigameStreaks(user?.uid);
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   
@@ -23,11 +21,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
-  const [discordTag, setDiscordTag] = useState('');
-  const [minecraftNick, setMinecraftNick] = useState('');
-
-  const [isEditingDiscord, setIsEditingDiscord] = useState(false);
-  const [isEditingNick, setIsEditingNick] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   // Track changes
   const [hasChanges, setHasChanges] = useState(false);
@@ -41,26 +35,28 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   // Sync edit state with profile data
   useEffect(() => {
     if (profile) {
-      setBio(profile.bio);
-      setAvatarUrl(profile.avatarUrl);
-      setBannerUrl(profile.bannerUrl);
-      setDiscordTag(profile.discordTag || user?.displayName || '');
-      setMinecraftNick(profile.minecraftNick || user?.displayName || '');
+      setBio(profile.bio || '');
+      setAvatarUrl(profile.avatarUrl || '');
+      setBannerUrl(profile.bannerUrl || '');
+      setIsPrivate(!!profile.isPrivate);
     }
   }, [profile, isOpen, user]);
 
   // Detect changes
   useEffect(() => {
     if (!profile) return;
-    const isChanged = bio !== profile.bio || avatarUrl !== profile.avatarUrl || bannerUrl !== profile.bannerUrl || discordTag !== (profile.discordTag || user?.displayName || '') || minecraftNick !== (profile.minecraftNick || user?.displayName || '');
+    const isChanged = bio !== profile.bio || 
+                      avatarUrl !== profile.avatarUrl || 
+                      bannerUrl !== profile.bannerUrl ||
+                      isPrivate !== !!profile.isPrivate;
     setHasChanges(isChanged);
-  }, [bio, avatarUrl, bannerUrl, discordTag, minecraftNick, profile, user]);
+  }, [bio, avatarUrl, bannerUrl, profile]);
 
   if (!isOpen) return null;
 
   const saveProfile = async () => {
     try {
-      await updateProfileData({ bio, avatarUrl, bannerUrl, discordTag, minecraftNick });
+      await updateProfileData({ bio, avatarUrl, bannerUrl, isPrivate });
       setHasChanges(false);
       setShowSavedMsg(true);
       setTimeout(() => setShowSavedMsg(false), 3000);
@@ -75,12 +71,8 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       setBio(profile.bio);
       setAvatarUrl(profile.avatarUrl);
       setBannerUrl(profile.bannerUrl);
-      setDiscordTag(profile.discordTag || user?.displayName || '');
-      setMinecraftNick(profile.minecraftNick || user?.displayName || '');
     }
     setHasChanges(false);
-    setIsEditingDiscord(false);
-    setIsEditingNick(false);
   };
 
   const handleLogout = async () => {
@@ -247,71 +239,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     </div>
 
                     <div className="p-8 space-y-8">
-                    {/* Streaks dos Minigames */}
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                        <Zap size={12} className="text-orange-400 fill-orange-400" /> Streaks de Minigames
-                      </h4>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'PokéGrid', streak: pokegrid.streak, emoji: '🟩' },
-                          { label: 'PokéDLE',  streak: pokedle.streak,  emoji: '🔮' },
-                          { label: 'PokéQuiz', streak: pokequiz.streak, emoji: '📖' },
-                        ].map(({ label, streak: s, emoji }) => (
-                          <div key={label} className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl text-center">
-                            <p className="text-[7px] font-black text-gray-500 uppercase mb-1">{emoji} {label}</p>
-                            <p className={`text-lg font-black ${s > 0 ? 'text-orange-400' : 'text-gray-600'}`}>
-                              {s > 0 ? `🔥 ${s}` : '–'}
-                            </p>
-                            <p className="text-[7px] text-gray-600 font-bold uppercase">dias seguidos</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Nick Breakdown */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl relative group">
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="text-[9px] font-black text-gray-500 uppercase">Minecraft Nick</p>
-                                <button onClick={() => setIsEditingNick(!isEditingNick)} className="text-gray-500 hover:text-white transition-colors">
-                                    <Edit2 size={12} />
-                                </button>
-                            </div>
-                            {isEditingNick ? (
-                                <input 
-                                    type="text" 
-                                    value={minecraftNick}
-                                    onChange={(e) => setMinecraftNick(e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-green-500 outline-none"
-                                />
-                            ) : (
-                                <p className="text-sm font-bold text-white flex items-center gap-2 mt-1">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span> {minecraftNick}
-                                </p>
-                            )}
-                        </div>
-                        <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl relative group">
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="text-[9px] font-black text-gray-500 uppercase">Discord Tag / ID</p>
-                                <button onClick={() => setIsEditingDiscord(!isEditingDiscord)} className="text-gray-500 hover:text-white transition-colors">
-                                    <Edit2 size={12} />
-                                </button>
-                            </div>
-                            {isEditingDiscord ? (
-                                <input 
-                                    type="text" 
-                                    value={discordTag}
-                                    onChange={(e) => setDiscordTag(e.target.value)}
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#5865F2] outline-none"
-                                />
-                            ) : (
-                                <p className="text-sm font-bold text-[#5865F2] flex items-center gap-2 mt-1 drop-shadow-sm">
-                                    {discordTag}
-                                </p>
-                            )}
-                        </div>
-                    </div>
 
                     {/* Editors */}
                     <div className="space-y-4">
@@ -368,7 +295,26 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                     <h2 className="pixel-title text-xl text-white mb-6">GERENCIAR CONTA</h2>
                     
                     <div className="space-y-6">
-                        <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-5">
+                        <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-6">
+                        {/* Privacy Toggle */}
+                        <div className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl">
+                           <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${isPrivate ? 'bg-red-500/20 text-red-400' : 'bg-primary/20 text-primary'}`}>
+                                 {isPrivate ? <Lock size={18} /> : <Eye size={18} />}
+                              </div>
+                              <div>
+                                 <p className="text-[10px] font-black text-white uppercase tracking-widest">Perfil Privado</p>
+                                 <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter">Esconder suas conquistas e feed</p>
+                              </div>
+                           </div>
+                           <button 
+                             onClick={() => setIsPrivate(!isPrivate)}
+                             className={`w-12 h-6 rounded-full transition-all relative ${isPrivate ? 'bg-red-500' : 'bg-gray-700'}`}
+                           >
+                              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPrivate ? 'right-1' : 'left-1'}`} />
+                           </button>
+                        </div>
+
                         {/* UID Field with Privacy */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center text-[8px] font-black text-gray-500 uppercase tracking-widest px-1">

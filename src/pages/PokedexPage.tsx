@@ -142,9 +142,9 @@ export const PokedexPage: React.FC = () => {
   const activeFilterCount = filters.types.length + filters.generations.length + filters.special.length + filters.eggGroups.length;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-screen bg-[#050505] text-white pt-20">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/5 py-4 px-6 md:px-12 flex flex-col md:flex-row items-center gap-6">
+      <div className="sticky top-20 z-50 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/5 py-4 px-6 md:px-12 flex flex-col md:flex-row items-center gap-6">
         <Link to="/" className="flex items-center gap-3 text-white/50 hover:text-white transition-colors group">
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
           <span className="text-[10px] font-black uppercase tracking-widest">Início</span>

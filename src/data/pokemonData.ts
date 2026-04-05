@@ -8221,15 +8221,31 @@ export const POKEMON_DATA = [
   ],
   "hiddenAbility": "Cud Chew"
 },
-{
-  "id": 10253,
-  "name": "Wooper de Paldea",
-  "abilities": [
-    "Poison Point",
-    "Water Absorb"
-  ],
-  "hiddenAbility": "Unaware"
-}
+  {
+    "id": 10253,
+    "name": "Wooper de Paldea",
+    "abilities": [
+      "Poison Point",
+      "Water Absorb"
+    ],
+    "hiddenAbility": "Unaware"
+  },
+  {
+    "id": 10254,
+    "name": "Cyndaquil de Hisui",
+    "abilities": [
+      "Blaze"
+    ],
+    "hiddenAbility": "Flash Fire"
+  },
+  {
+    "id": 10255,
+    "name": "Quilava de Hisui",
+    "abilities": [
+      "Blaze"
+    ],
+    "hiddenAbility": "Flash Fire"
+  }
 ];
 
 export const NATURES = [
