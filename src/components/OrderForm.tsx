@@ -280,6 +280,7 @@ export const OrderForm = () => {
         totalPrice: totalPrice,
         playerNick: user.displayName,
         playerUid: user.uid,
+        userId: user.uid,
         giftNick: form.giftNick || null,
         discordNick: form.discordNick,
         observations: form.observations.trim() || null,
