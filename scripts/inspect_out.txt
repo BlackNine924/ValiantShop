@@ -1,0 +1,36 @@
+﻿Last 20 orders:
+[2026-04-07T18:32] qs8PBU5X | "Rookidee" | Charmander_com_F | status:Breeding | glintsAwarded:undefined
+[2026-04-07T17:44] vF2agAI2 | "Bulbasaur" | polarpao | status:Breeding | glintsAwarded:undefined
+[2026-04-07T02:25] pcITpLDS | "Hawlucha" | Charmander_com_F | status:Breeding | glintsAwarded:undefined
+[2026-04-07T01:02] Da15m5OJ | "Fennekin" | RyannBrZera | status:Breeding | glintsAwarded:undefined
+[2026-04-06T22:55] XffmfOZm | "Timburr" | mil | status:Breeding | glintsAwarded:undefined
+[2026-04-06T21:57] ov71Hmnl | "Dreepy" | Jonathan6815 | status:Breeding | glintsAwarded:undefined
+[2026-04-06T20:46] FUXR3aJC | "Koffing galar" | Muniz | status:Breeding | glintsAwarded:undefined
+[2026-04-06T20:46] 5b3bEWTS | "Koffing galar" | Muniz | status:Breeding | glintsAwarded:undefined
+[2026-04-06T16:07] yhMdcdwc | "Bouffalant" | Querty_0810000 | status:Breeding | glintsAwarded:undefined
+[2026-04-02T03:37] Jc9zokty | "Rotom" | MobeFlux | status:Breeding | glintsAwarded:undefined
+[2026-04-02T03:36] 1NOtOysT | "Mareanie" | MobeFlux | status:Breeding | glintsAwarded:undefined
+[2026-04-02T03:34] ytEsNh2G | "Gastly" | MobeFlux | status:Finalizado | glintsAwarded:undefined
+[2026-04-02T01:24] A7i4r7kx | "Grookey" | Ramonkkj | status:Entregue | glintsAwarded:undefined
+[2026-04-01T00:11] oVI5dF11 | "Piplup" | MOB_GHSOT | status:Breeding | glintsAwarded:undefined
+[2026-03-30T21:46] Gjndxxfo | "Pincurchin" | ViperBe16 | status:Breeding | glintsAwarded:undefined
+[2026-03-30T21:00] Q2LeqYLy | "Eelektross" | ShadowStar_Dust | status:Entregue | glintsAwarded:undefined
+[2026-03-30T18:21] xd8TwqPh | "Venipede" | Josa | status:Breeding | glintsAwarded:undefined
+[2026-03-30T16:03] jVsLxk7a | "Shroomish" | Muniz | status:Entregue | glintsAwarded:undefined
+[2026-03-30T16:03] HmB5Ht0N | "Shroomish" | Muniz | status:Breeding | glintsAwarded:undefined
+[2026-03-30T03:36] NeWMXCht | "Ralts" | jorge102 | status:Finalizado | glintsAwarded:undefined
+
+
+All trainer profiles:
+  UID: 95LcduC4rr | nick: "ValiantPro" | glints: {}
+  UID: 9N0ZWVBShU | nick: "querty0810000" | glints: {}
+  UID: FEelmyfacY | nick: "Arthur Reskalla" | glints: {"Fire":0.25}
+  UID: Hl8zA123R8 | nick: "Mimikyu001" | glints: {"dark":0.25,"Grass":0.25}
+  UID: OYtPMVmolA | nick: "Song D Dia" | glints: {}
+  UID: PC3RBwkwqw | nick: "Mimikyu001" | glints: {}
+  UID: VuLEs8GAft | nick: "reskalla" | glints: {"grass":0,"Ice":0,"Fire":0,"Bug":0}
+  UID: ZO0VmDBRfA | nick: "charmandercomf" | glints: {}
+  UID: fIxIqEYDND | nick: "cafelmao" | glints: {}
+  UID: hSIvTRTZKJ | nick: "dwauifhwaiopfwa" | glints: {"Water":0.25}
+  UID: jOSsAkPmqR | nick: "TesterJet123" | glints: {}
+  UID: kxPjfCaISU | nick: "ViperBe16" | glints: {}

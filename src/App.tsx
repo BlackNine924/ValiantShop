@@ -1,6 +1,6 @@
 import { Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, X, Shield, Star, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User, Users, Brain, ChevronDown, Zap, LayoutGrid, Swords, Egg } from 'lucide-react';
+import { ShoppingBag, X, Shield, Star, FileText, HelpCircle, Table, History, Grid3X3, Smartphone, Trophy, Quote, Bell, Trash2, Gamepad2, User, Users, Brain, ChevronDown, Zap, LayoutGrid, Swords, Egg, Crown } from 'lucide-react';
 import { OrderForm } from './components/OrderForm';
 import { Prices } from './pages/Prices';
 import { Status } from './pages/Status';
@@ -20,9 +20,9 @@ import { CartModal } from './components/CartModal';
 import { LoginModal } from './components/LoginModal';
 import { FAQ } from './pages/FAQ';
 import { FloatingSupport } from './components/FloatingSupport';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { db } from './firebase';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, onSnapshot, where, limit, doc, getDoc, orderBy } from 'firebase/firestore';
 import logoUrl from './assets/hero.png';
 import { safeStorage } from './utils/storageUtils';
 import { ReviewModal } from './components/ReviewModal';
@@ -146,16 +146,36 @@ const HubPage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
         { to: '/comunidade', label: 'FEED COMUNITÁRIO', desc: 'Veja o que outros treinadores estão capturando.', icon: <Users size={24} /> },
         { onClick: () => { setShowRankingModal(true); navigate('/'); }, label: 'RANKING GLOBAL', desc: 'Top treinadores e compradores.', icon: <Trophy size={24} /> },
         { onClick: () => { setShowReviewsModal(true); navigate('/'); }, label: 'FEEDBACKS DOS CLIENTES', desc: 'Avaliações de clientes reais.', icon: <Star size={24} /> },
-        ...(user ? [{ to: `/perfil/${(user.displayName || 'Treinador').replace(/\s+/g, '_')}`, label: 'MEU PERFIL', desc: 'Sua Coleção de Glints e Ranks.', icon: <User size={24} /> }] : [])
+        ...(user ? [{ 
+          to: `/perfil/${(user.displayName || user.uid).replace(/\s+/g, '_')}`, 
+          label: 'MEU PERFIL', 
+          desc: 'Sua Coleção de Glints e Ranks.', 
+          icon: <User size={24} /> 
+        }] : [])
       ]
     },
     progresso: { comingSoon: true, title: 'PROGRESSO' },
     eventos: { comingSoon: true, title: 'EVENTOS' }
   };
 
-  const hub = hubs[category || ''];
+  // Definitive "Ref-Freezing" strategy: capture last valid category to prevent exit animation crashes
+  const lastValid = useRef<string | null>(category || null);
+  if (category && category !== lastValid.current) {
+    lastValid.current = category;
+  }
+  const frozenCategory = lastValid.current;
 
-  if (!hub) return <div className="p-20 text-center pixel-title opacity-20">HUB NÃO ENCONTRADO</div>;
+  const hub = frozenCategory ? hubs[frozenCategory] : null;
+
+  if (!hub) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] p-20 animate-fade">
+      <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-6 opacity-20">
+        <LayoutGrid size={40} />
+      </div>
+      <h2 className="pixel-title text-xl opacity-20 mb-4 tracking-tighter">MÓDULO NÃO SELECIONADO</h2>
+      <button onClick={() => navigate('/')} className="text-[10px] font-black text-primary hover:underline uppercase tracking-widest">Voltar ao Início</button>
+    </div>
+  );
 
   return (
     <div className="flex flex-col items-center min-h-[85vh] px-4 py-12 animate-fade">
@@ -222,60 +242,87 @@ const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number
       setTopTrainers([]);
       return;
     }
-    const q = query(collection(db, 'orders'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      // Filter out ghost support orders and test accounts before building the ranking
-      const cleanDocs = snapshot.docs.filter(doc => {
-        const data = doc.data();
-        const nick = (data.playerNick || '').toLowerCase();
-        return (
-          data.pokemon !== 'SUPORTE GERAL' &&
-          data.type !== 'support' &&
-          nick !== 'reskalla'
+    let isMounted = true;
+    
+    const fetchTrainers = async () => {
+      try {
+        const statsDoc = await getDoc(doc(db, 'public_stats', 'global'));
+        if (!isMounted) return;
+
+        if (statsDoc.exists()) {
+          const data = statsDoc.data();
+          if (data.topTrainers && data.topTrainers.length > 0) {
+            setTopTrainers(data.topTrainers.slice(0, limitCount));
+            return;
+          }
+        }
+        
+        // Fallback: Query trainer_profiles directly if stats are empty
+        const q = query(
+          collection(db, 'trainer_profiles'), 
+          orderBy('totalSpent', 'desc'), 
+          limit(limitCount + 5)
         );
-      });
+        const snapshot = await getDocs(q);
+        if (!isMounted) return;
 
-      const trainersMap = cleanDocs.reduce((acc, doc) => {
-        const data = doc.data();
-        const nick = data.playerNick || 'Veterano Anônimo';
-        if (!acc[nick]) acc[nick] = 0;
-        acc[nick] += (data.totalPrice || 0);
-        return acc;
-      }, {} as any);
+        const profiles = snapshot.docs
+          .map(doc => doc.data())
+          .filter(p => {
+             const nick = (p.nick_lowercase || '').toLowerCase();
+             return nick !== 'reskalla' && nick !== 'reskallaarthur';
+          })
+          .map(p => ({
+            nick: p.displayName || p.nick_lowercase || 'Veterano',
+            spent: p.totalSpent || 0 
+          }))
+          .filter(p => p.spent > 0)
+          .slice(0, limitCount);
+        
+        setTopTrainers(profiles);
+      } catch (error: any) {
+        console.warn("RichTrainers fetch error:", error.message || error);
+        // Sugestão para o usuário caso o erro seja de índice
+        if (error.message?.includes('index')) {
+          console.error("FIREBASE INDEX REQUIRED: Acesse o link no console para criar o índice de 'totalSpent' desc.");
+        }
+        if (isMounted) setTopTrainers([]);
+      }
+    };
 
-      const sorted = Object.entries(trainersMap)
-        .map(([nick, spent]) => ({ nick, spent: spent as number }))
-        .sort((a, b) => b.spent - a.spent)
-        .slice(0, limitCount);
-      
-      setTopTrainers(sorted);
-    }, (error) => {
-      console.error("Firestore error in RichTrainers:", error);
-    });
-    return unsubscribe;
-  }, [user, limitCount]);
+    fetchTrainers();
+    return () => { isMounted = false; };
+  }, [user?.uid, limitCount]);
 
   return (
-    <div className={`glow-card p-8 border-primary/20 bg-black/40 relative overflow-hidden h-full ${isModal ? '!border-none !bg-transparent !p-0' : ''}`}>
-      <div className="absolute top-0 right-0 p-4 opacity-10">
-        <Trophy size={80} className="text-primary" />
+    <div className={`glow-card p-10 border-purple-500/20 bg-black/40 relative overflow-hidden h-full ${isModal ? '!border-none !bg-transparent !p-0' : ''}`}>
+      <div className="absolute -top-4 -right-4 p-4 opacity-5 pointer-events-none">
+        <Trophy size={160} className="text-purple-400" />
       </div>
-      <h3 className="pixel-title text-sm mb-6 flex items-center gap-3">
-        <Trophy size={18} className="text-primary" /> TREINADORES MAIS FIÉIS
+      
+      <h3 className="pixel-title text-sm mb-10 flex items-center gap-3 relative z-10 text-purple-400">
+        <Trophy size={20} className="text-purple-400" /> TREINADORES MAIS FIÉIS
       </h3>
-      <div className="space-y-4">
+      
+      <div className="space-y-3 relative z-10">
         {topTrainers.map((t, i) => (
-          <div key={t.nick} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-primary/30 transition-all group">
-            <div className="flex items-center gap-4">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${i === 0 ? 'bg-primary border-black text-black' : 'border-white/10 text-gray-500'}`}>
-                {i + 1}
+          <div key={t.nick} className="flex items-center justify-between p-5 rounded-2xl bg-black/40 border border-white/5 hover:border-purple-500/30 transition-all group hover:bg-white/[0.02] relative overflow-hidden">
+            <div className="flex items-center gap-4 relative z-10">
+              <span className={`text-[10px] font-black w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-purple-500/40'}`}>{i + 1}º</span>
+              <span className={`font-black uppercase tracking-widest text-xs ${i === 0 ? 'text-yellow-400' : 'text-white'} flex items-center gap-2`}>
+                {t.nick}
+                {i === 0 && <Crown size={12} className="text-yellow-400 mb-1" />}
               </span>
-              <span className="font-bold text-gray-200 uppercase tracking-tighter text-sm">{t.nick}</span>
             </div>
-            <span className="text-primary font-black text-xs">{t.spent / 1000}k</span>
+            <span className="text-purple-400 font-black text-xs tracking-tight">{(t.spent || 0) >= 1000 ? `${Math.floor((t.spent || 0) / 1000)}k` : (t.spent || 0)}</span>
+            <div className="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         ))}
-        {topTrainers.length === 0 && <p className="text-gray-600 italic text-[10px] text-center py-4">Nenhum dado de fidelidade ainda...</p>}
+        {topTrainers.length === 0 && (
+          <div className="py-20 text-center opacity-20 italic font-black uppercase text-[10px] tracking-widest bg-black/20 rounded-3xl border border-white/5">
+            Nenhum dado de fidelidade ainda...
+          </div>
+        )}
       </div>
     </div>
   );
@@ -283,7 +330,6 @@ const RichTrainers = ({ limitCount = 5, isModal = false }: { limitCount?: number
 
 const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
   const [reviews, setReviews] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -291,33 +337,36 @@ const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
       setReviews([]);
       return;
     }
-    const q = query(collection(db, 'ClientReviews'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a: any, b: any) => {
-          const starsA = a.rating || 0;
-          const starsB = b.rating || 0;
-          if (starsB !== starsA) return starsB - starsA;
-          
-          const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
-          const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
-          return timeB - timeA;
-        })
-        .slice(0, isModal ? 20 : 10);
-      setReviews(data);
-    }, (error) => {
-      console.error("Firestore error in ClientReviews:", error);
-    });
-    return unsubscribe;
-  }, [user, isModal]);
+    let isMounted = true;
 
-  useEffect(() => {
-    if (isModal || reviews.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % reviews.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isModal, reviews.length]);
+    const fetchReviews = async () => {
+      try {
+        const q = query(collection(db, 'ClientReviews'), limit(50));
+        const snapshot = await getDocs(q);
+        
+        if (!isMounted) return;
+
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a: any, b: any) => {
+            const starsA = a.rating || 0;
+            const starsB = b.rating || 0;
+            if (starsB !== starsA) return starsB - starsA;
+            
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
+            return timeB - timeA;
+          })
+          .slice(0, isModal ? 20 : 10);
+        setReviews(data);
+      } catch (error) {
+        console.warn("ClientReviews fetch suppressed:", error);
+        if (isMounted) setReviews([]);
+      }
+    };
+
+    fetchReviews();
+    return () => { isMounted = false; };
+  }, [user?.uid, isModal]);
 
   if (reviews.length === 0) {
     return (
@@ -359,10 +408,8 @@ const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
     );
   }
 
-  const r = reviews[currentIndex];
-
   return (
-    <div className="glow-card p-8 border-secondary/20 bg-black/40 relative overflow-hidden h-full group">
+    <div className="glow-card p-8 border-secondary/20 bg-black/40 relative overflow-hidden h-full flex flex-col group">
       <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
         <Quote size={80} className="text-secondary" />
       </div>
@@ -370,34 +417,19 @@ const ClientReviews = ({ isModal = false }: { isModal?: boolean }) => {
         <Star size={18} className="text-secondary" /> DEPOIMENTOS
       </h3>
       
-      <div className="relative h-24">
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={currentIndex}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="absolute inset-0 space-y-3"
-          >
+      <div className="flex-1 space-y-4">
+        {reviews.slice(0, 3).map((r) => (
+          <div key={r.id} className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex flex-col gap-2 hover:border-secondary/20 transition-all">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black text-secondary uppercase tracking-widest">{r.playerNick}</span>
+              <span className="text-[10px] font-black text-secondary uppercase tracking-widest leading-none">{r.playerNick}</span>
               <div className="flex gap-0.5">
                 {[...Array(5)].map((_, j) => (
                   <Star key={j} size={8} fill={j < (r.rating || 5) ? "currentColor" : "none"} className={j < (r.rating || 5) ? "text-secondary" : "text-gray-700"} />
                 ))}
               </div>
             </div>
-            <p className="text-sm text-gray-300 italic leading-relaxed line-clamp-2">"{r.comment || `Excelente atendimento e agilidade no meu ${r.pokemon}.`}"</p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      <div className="flex gap-1.5 mt-4">
-        {reviews.map((_, i) => (
-          <div 
-            key={i} 
-            className={`h-1 rounded-full transition-all duration-500 ${i === currentIndex ? 'w-4 bg-secondary' : 'w-1 bg-white/10'}`}
-          />
+            <p className="text-xs text-gray-400 italic leading-snug line-clamp-2">"{r.comment || `Recomendo muito a equipe, ótimo trabalho em meu ${r.pokemon}.`}"</p>
+          </div>
         ))}
       </div>
     </div>
@@ -669,9 +701,11 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, 
 
                    <NavDropdown 
                      title="Social" 
-                     isActive={location.pathname === '/hub/social'}
+                     isActive={location.pathname === '/hub/social' || location.pathname === '/comunidade' || location.pathname.startsWith('/perfil/')}
                      items={[
-                       { onClick: () => { setShowRankingModal(true); navigate('/hub/social'); }, label: 'Ranking', icon: <Trophy size={18} /> },
+                       { to: '/comunidade', label: 'Feed Comunitário', icon: <Users size={18} /> },
+                       { to: user ? `/perfil/${(user.displayName || user.uid).replace(/\s+/g, '_')}` : '#', label: 'Meu Perfil', icon: <User size={18} />, onClick: !user ? () => setIsLoginOpen(true) : undefined },
+                       { onClick: () => { setShowRankingModal(true); navigate('/hub/social'); }, label: 'Ranking Global', icon: <Trophy size={18} /> },
                        { onClick: () => { setShowReviewsModal(true); navigate('/hub/social'); }, label: 'Feedbacks', icon: <Star size={18} /> }
                      ]}
                    />
@@ -743,6 +777,38 @@ const ProtectedOrderRoute = ({ children, setIsLoginOpen }: any) => {
   return children;
 };
 
+// Error Boundary Component
+class ErrorBoundary extends Component<any, { hasError: boolean }> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any, errorInfo: any) { console.error("Global Error Boundary caught:", error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-red-500/20 rounded-3xl flex items-center justify-center mb-6 border border-red-500/40 animate-pulse">
+            <X size={40} className="text-red-500" />
+          </div>
+          <h1 className="pixel-title text-2xl text-white mb-4">SISTEMA REINICIANDO...</h1>
+          <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-8 max-w-sm leading-relaxed">
+            Houve uma instabilidade nas frequências de Kanto. Por favor, recarregue a página ou tente novamente em instantes.
+          </p>
+          <button 
+            onClick={() => {
+              sessionStorage.clear();
+              window.location.reload();
+            }} 
+            className="btn-manda !bg-red-500 !text-white !px-8 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+          >
+            REINICIAR INTERFACE
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -807,67 +873,101 @@ function App() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(collection(db, 'orders'));
+    const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const relevantOrders = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() as any }))
-        .filter(order => 
-          order.playerNick === user.displayName && 
-          (order.status === 'Finalizado' || order.status === 'Breeding')
-        );
-
-      if (relevantOrders.length > 0) {
-        const notifiedIds = JSON.parse(sessionStorage.getItem('notified_orders') || '{}');
-        const newNotifs: any[] = [];
-        let showModalOrder: any = null;
-
-        relevantOrders.forEach(o => {
-          const lastNotifiedStatus = notifiedIds[o.id];
-          
-          if (lastNotifiedStatus !== o.status) {
-            const notifId = `order-${o.id}-${o.status}`;
-            
-            if (o.status === 'Finalizado') {
-              newNotifs.push({
-                id: notifId,
-                type: 'order',
-                title: 'ENCOMENDA PRONTA!',
-                message: `Seu ${o.pokemon} está pronto para entrega.`,
-                time: Date.now(),
-                read: false,
-                orderData: o
-              });
-              if (!o.isReviewed) showModalOrder = o;
-            } else if (o.status === 'Breeding') {
-              newNotifs.push({
-                id: notifId,
-                type: 'order',
-                title: 'BREEDING INICIADO!',
-                message: `Seu ${o.pokemon} entrou em fase de breeding.`,
-                time: Date.now(),
-                read: false,
-                orderData: o
-              });
+      try {
+        const relevantOrders = snapshot.docs
+          .map(doc => {
+            try {
+              return { id: doc.id, ...doc.data() as any };
+            } catch (e) {
+              console.error("Error parsing order doc:", doc.id, e);
+              return null;
             }
-            
-            notifiedIds[o.id] = o.status;
-          }
-        });
+          })
+          .filter(order => 
+            order && 
+            order.status &&
+            (order.playerNick === user.displayName || (user.displayName === null)) && 
+            (order.status === 'Finalizado' || order.status === 'Breeding')
+          );
 
-        if (newNotifs.length > 0) {
-          setNotifications(prev => [...newNotifs, ...prev].slice(0, 50));
-          if (showModalOrder) setShowFinishedNotification(showModalOrder);
-          sessionStorage.setItem('notified_orders', JSON.stringify(notifiedIds));
+        if (relevantOrders.length > 0) {
+          let notifiedIds: any = {};
+          try {
+            const raw = sessionStorage.getItem('notified_orders');
+            if (raw && raw !== "[object Object]") {
+              notifiedIds = JSON.parse(raw);
+            }
+          } catch (e) {
+            console.error("Error parsing notified_orders from sessionStorage:", e);
+            notifiedIds = {};
+          }
+          
+          const newNotifs: any[] = [];
+          let showModalOrder: any = null;
+
+          relevantOrders.forEach(o => {
+            if (!o || !o.id) return;
+            const lastNotifiedStatus = notifiedIds[o.id];
+            
+            if (lastNotifiedStatus !== o.status) {
+              const notifId = `order-${o.id}-${o.status}`;
+              
+              if (o.status === 'Finalizado') {
+                newNotifs.push({
+                  id: notifId,
+                  type: 'order',
+                  title: 'ENCOMENDA PRONTA!',
+                  message: `Seu ${o.pokemon || 'Pokémon'} está pronto para entrega.`,
+                  time: Date.now(),
+                  read: false,
+                  orderData: o
+                });
+                if (!o.isReviewed) showModalOrder = o;
+              } else if (o.status === 'Breeding') {
+                newNotifs.push({
+                  id: notifId,
+                  type: 'order',
+                  title: 'BREEDING INICIADO!',
+                  message: `Seu ${o.pokemon || 'Pokémon'} entrou em fase de breeding.`,
+                  time: Date.now(),
+                  read: false,
+                  orderData: o
+                });
+              }
+              
+              notifiedIds[o.id] = o.status;
+            }
+          });
+
+          if (newNotifs.length > 0) {
+            setNotifications(prev => {
+              if (!Array.isArray(prev)) return newNotifs;
+              return [...newNotifs, ...prev].slice(0, 50);
+            });
+            if (showModalOrder) setShowFinishedNotification(showModalOrder);
+            try {
+              sessionStorage.setItem('notified_orders', JSON.stringify(notifiedIds));
+            } catch (e) {}
+          }
         }
+      } catch (err) {
+        console.error("Global order sync crash prevented:", err);
       }
+    }, (error) => {
+      console.error("Firebase permission error in global listener:", error);
     });
 
-    return unsubscribe;
-  }, [user, notifications.length]);
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
 
   return (
     <div className="min-h-screen relative overflow-x-hidden flex flex-col">
       <div className="bg-overlay"></div>
+      <ErrorBoundary>
       <Navbar 
         isLoginOpen={isLoginOpen} 
         setIsLoginOpen={setIsLoginOpen}
@@ -885,55 +985,58 @@ function App() {
         onClose={() => setIsSettingsOpen(false)} 
       />
       <main className="relative z-10 flex-1">
-        <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/hub/:category" element={<HubPage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
-        <Route 
-            path="/order" 
-            element={
-              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                <OrderForm />
-              </ProtectedOrderRoute>
-            } 
-          />
-          <Route path="/prices" element={<Prices />} />
-          <Route path="/status" element={<Status />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/breeder" element={<BreederDashboard />} />
-          <Route 
-            path="/pokegrid" 
-            element={
-              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                <PokeGridPage />
-              </ProtectedOrderRoute>
-            } 
-          />
-          <Route 
-            path="/pokedex" 
-            element={
-              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                <PokedexPage />
-              </ProtectedOrderRoute>
-            } 
-          />
-          <Route 
-            path="/pokedle" 
-            element={
-              <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
-                <PokedlePage />
-              </ProtectedOrderRoute>
-            } 
-          />
-          <Route path="/comunidade" element={<CommunityFeed />} />
-          <Route path="/perfil/:nick" element={<TrainerProfile />} />
-          <Route path="/ajuda" element={<FAQ />} />
-          <Route path="*" element={<HomePage />} />
-          <Route path="/pokequiz" element={<PokeQuizPage />} />
-          <Route path="/consultoria" element={<ConsultoriaSystem />} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/hub/:category" element={<HubPage setShowRankingModal={setShowRankingModal} setShowReviewsModal={setShowReviewsModal} />} />
+            <Route 
+                path="/order" 
+                element={
+                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                    <OrderForm />
+                  </ProtectedOrderRoute>
+                } 
+              />
+              <Route path="/prices" element={<Prices />} />
+              <Route path="/status" element={<Status />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/breeder" element={<BreederDashboard />} />
+              <Route 
+                path="/pokegrid" 
+                element={
+                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                    <PokeGridPage />
+                  </ProtectedOrderRoute>
+                } 
+              />
+              <Route 
+                path="/pokedex" 
+                element={
+                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                    <PokedexPage />
+                  </ProtectedOrderRoute>
+                } 
+              />
+              <Route 
+                path="/pokedle" 
+                element={
+                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                    <PokedlePage />
+                  </ProtectedOrderRoute>
+                } 
+              />
+            <Route path="/comunidade" element={<CommunityFeed />} />
+            <Route path="/perfil/:nick" element={<TrainerProfile />} />
+            <Route path="/ajuda" element={<FAQ />} />
+            <Route path="*" element={<HomePage />} />
+            <Route path="/pokequiz" element={<PokeQuizPage />} />
+            <Route path="/consultoria" element={<ConsultoriaSystem />} />
+          </Routes>
+        </AnimatePresence>
       </main>
       
       <FloatingSupport />
+      </ErrorBoundary>
 
       {/* Global Modals */}
       <AnimatePresence>
@@ -961,7 +1064,7 @@ function App() {
                 <X size={20} />
               </button>
               <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                <RichTrainers limitCount={20} isModal />
+                <RichTrainers limitCount={15} isModal />
               </div>
             </motion.div>
           </motion.div>

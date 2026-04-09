@@ -1,14 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, Zap, MessageSquare } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, onSnapshot, limit } from 'firebase/firestore';
-
+import { MALE_ONLY_POKEMON, GENDERLESS_POKEMON } from '../data/pokemonCategories';
+import { collection, addDoc, serverTimestamp, doc, getDocs, query, orderBy, limit, updateDoc, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
 import { useCart } from '../context/CartContext';
 import { safeStorage } from '../utils/storageUtils';
+import { updateGlobalRank } from '../utils/rankUtils';
+import { createPortal } from 'react-dom';
 
 type IVOption = '4' | '5' | '6';
 
@@ -18,28 +20,6 @@ const IV_DETAILS: Record<IVOption, { label: string, price: number, numIgnored: n
   '6': { label: '6 IVs (F6)', price: 100000, numIgnored: 0 }
 };
 
-const GENDERLESS_POKEMON = [
-  'Magnemite', 'Magneton', 'Magnezone', 'Voltorb', 'Electrode', 'Staryu', 'Starmie', 'Porygon', 'Porygon2', 'Porygon-Z',
-  'Shedinja', 'Lunatone', 'Solrock', 'Baltoy', 'Claydol', 'Beldum', 'Metang', 'Metagross', 'Bronzor', 'Bronzong',
-  'Rotom', 'Phione', 'Manaphy', 'Darkrai', 'Shaymin', 'Arceus', 'Victini', 'Klink', 'Klang', 'Klinklang', 'Cryogonal',
-  'Golett', 'Golurk', 'Staryu', 'Starmie', 'Ditto', 'Mew', 'Celebi', 'Jirachi', 'Deoxys', 'Regirock', 'Regice', 'Registeel',
-  'Latias', 'Latios', 'Kyogre', 'Groudon', 'Rayquaza', 'Azelf', 'Mesprit', 'Uxie', 'Dialga', 'Palkia', 'Heatran', 'Regigigas',
-  'Giratina', 'Cresselia', 'Cobalion', 'Terrakion', 'Virizion', 'Tornadus', 'Thundurus', 'Reshiram', 'Zekrom', 'Landorus',
-  'Kyurem', 'Keldeo', 'Meloetta', 'Genesect', 'Xerneas', 'Yveltal', 'Zygarde', 'Diancie', 'Hoopa', 'Volcanion', 'Type: Null',
-  'Silvally', 'Minior', 'Dhelmise', 'Tapu Koko', 'Tapu Lele', 'Tapu Bulu', 'Tapu Fini', 'Cosmog', 'Cosmoem', 'Solgaleo',
-  'Lunala', 'Nihilego', 'Buzzwole', 'Pheromosa', 'Xurkitree', 'Celesteela', 'Kartana', 'Guzzlord', 'Necrozma', 'Magearna',
-  'Marshadow', 'Poipole', 'Naganadel', 'Stakataka', 'Blacephalon', 'Zeraora', 'Meltan', 'Melmetal', 'Sinistea', 'Polteageist',
-  'Falinks', 'Calyrex', 'Regieleki', 'Regidrago', 'Glastrier', 'Spectrier', 'Meloetta', 'Pecharunt', 'Terapagos'
-];
-
-const MALE_ONLY_POKEMON = [
-  'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
-  'Volbeat', 'Latios', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
-  'Tornadus', 'Thundurus', 'Landorus', 'Impidimp', 'Morgrem', 'Grimmsnarl', 
-  'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
-];
-
-
 const CASTRATED_DISCOUNT = 10000;
 
 const STATS = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
@@ -48,8 +28,7 @@ const HA_FEE = 15000;
 
 export const OrderForm = () => {
   const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // usado no botão 'Ver Meu Histórico'
   const { addToCart, setIsCartOpen } = useCart();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,38 +70,113 @@ export const OrderForm = () => {
     observations: ''
   };
 
-  const [form, setForm] = useState(() => ({
-    ...initialForm,
-    discordNick: safeStorage.getItem('valiant_discord_nick', '')
-  }));
+  const [form, setForm] = useState(() => {
+    const baseForm = {
+      ...initialForm,
+      discordNick: safeStorage.getItem('valiant_discord_nick', '')
+    };
+
+    try {
+      const raw = sessionStorage.getItem('repeat_order_data');
+      if (raw) {
+        const s = JSON.parse(raw);
+        sessionStorage.removeItem('repeat_order_data'); // Limpa imediatamente — one-shot
+        if (s && s.pokemon) {
+          const isCastrated = s.ivs?.includes('Castrado');
+          const ivValue = s.ivs?.includes('4') ? '4' : s.ivs?.includes('5') ? '5' : '6';
+          return {
+            ...baseForm,
+            pokemon: s.pokemon,
+            nature: s.nature === 'Aleatória' ? '' : s.nature || '',
+            ability: s.ability || '',
+            gender: s.gender || '',
+            ivs: ivValue as IVOption,
+            isCastrated: Boolean(isCastrated),
+            hasHA: Boolean(s.hasHA),
+            ignoredIvs: Array.isArray(s.ignoredIvs) ? s.ignoredIvs : [],
+            observations: s.observations || ''
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao ler repeat_order_data:', e);
+    }
+
+    return baseForm;
+  });
   const [favorites, setFavorites] = useState<string[]>(() => {
     return safeStorage.getItem('pokemon_favorites', []);
   });
   const [hotPokemon, setHotPokemon] = useState<{name: string, count: number}[]>([]);
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [wishlistSuccessModal, setWishlistSuccessModal] = useState<{isOpen: boolean, pokemon: string}>({isOpen: false, pokemon: ''});
+  const [wishlistRemoveConfirm, setWishlistRemoveConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'orders'), limit(100));
+    if (!user) {
+      setWishlist([]);
+      return;
+    }
+    const q = query(collection(db, 'wishlists'), where('uid', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const counts: Record<string, number> = {};
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const name = data.pokemon;
-        const nick = (data.playerNick || '').toLowerCase();
-        // Exclude ghost support entries and test accounts
-        if (!name || name === 'SUPORTE GERAL' || data.type === 'support' || nick === 'reskalla') return;
-        counts[name] = (counts[name] || 0) + 1;
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Ordenação manual em memória para evitar erro de Missing Index no Firebase
+      data.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
       });
-      const sorted = Object.entries(counts)
-        .map(([name, count]) => ({ name, count }))
-        .sort((a: any, b: any) => b.count - a.count)
-        .slice(0, 3);
-      setHotPokemon(sorted);
+      setWishlist(data);
+    }, (err) => {
+      console.error("Error fetching wishlist:", err);
     });
     return unsubscribe;
+  }, [user]);
+
+  useEffect(() => {
+    const fetchHotPokemon = async () => {
+      try {
+        let snap;
+        try {
+          // Fallback Fetch: sem orderBy para evitar erro de Missing Index
+          snap = await getDocs(query(collection(db, 'orders'), limit(150)));
+        } catch (e) {
+          console.warn("Hot Pokemon fetch failed:", e);
+          return;
+        }
+        
+        const counts: Record<string, number> = {};
+        snap.docs.forEach(doc => {
+          const name = doc.data().pokemon;
+          if (name) counts[name] = (counts[name] || 0) + 1;
+        });
+
+        const sorted = Object.entries(counts)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 3);
+          
+        setHotPokemon(sorted);
+      } catch (err) {
+        console.warn("Hot Pokemon calculation error:", err);
+      }
+    };
+    fetchHotPokemon();
   }, []);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => {
+    // Verifica se há um pedido sendo repetido para pré-preencher o campo de busca
+    try {
+      const raw = sessionStorage.getItem('repeat_order_data');
+      if (raw) {
+        const s = JSON.parse(raw);
+        return s?.pokemon || '';
+      }
+    } catch (e) {}
+    return '';
+  });
   const [showPokemonList, setShowPokemonList] = useState(false);
+  const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const selectedPokemon = useMemo(() => POKEMON_DATA.find(p => p.name === form.pokemon), [form.pokemon]);
   const isGenderless = useMemo(() => {
     return GENDERLESS_POKEMON.includes(form.pokemon);
@@ -138,6 +192,9 @@ export const OrderForm = () => {
       setForm(prev => ({ ...prev, gender: 'Genderless' }));
     } else if (isMaleOnly) {
       setForm(prev => ({ ...prev, gender: 'Macho' }));
+    } else if (form.gender === 'Genderless') {
+      // Revert if switching from genderless to non-genderless
+      setForm(prev => ({ ...prev, gender: '' }));
     }
   }, [isGenderless, isMaleOnly]);
 
@@ -157,38 +214,35 @@ export const OrderForm = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (location.state && location.state.pokemon) {
-      const s = location.state;
-      // Tratar o campo IVS que vem como string formatada no pedido (ex: "5 IVs (Breedable)")
-      const ivValue = s.ivs?.includes('4') ? '4' : s.ivs?.includes('5') ? '5' : '6';
-      const isCastrated = s.ivs?.includes('Castrado');
-      
-      setForm({
-        pokemon: s.pokemon,
-        nature: s.nature === 'Aleatória' ? '' : s.nature,
-        ability: s.ability,
-        gender: s.gender,
-        ivs: ivValue as IVOption,
-        isCastrated: isCastrated,
-        hasHA: s.hasHA || false,
-        ignoredIvs: s.ignoredIvs || [],
-        giftNick: '',
-        discordNick: '',
-        observations: ''
-      });
-      setSearch(s.pokemon);
-      // Limpar o state para não reaplicar ao recarregar
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location, navigate]);
 
-  const toggleFavorite = (name: string) => {
-    const newFavs = favorites.includes(name) 
+
+  const toggleFavorite = async (name: string) => {
+    const isRemoving = favorites.includes(name);
+    
+    if (!isRemoving && favorites.length >= 6) {
+      setError('Limite atingido! Seu time favorito pode ter no máximo 6 Pokémon.');
+      return;
+    }
+
+    const newFavs = isRemoving 
       ? favorites.filter(f => f !== name)
       : [...favorites, name];
+      
     setFavorites(newFavs);
     safeStorage.setItem('pokemon_favorites', newFavs);
+
+    if (user) {
+      try {
+        await setDoc(doc(db, 'trainer_profiles', user.uid), {
+          uid: user.uid,
+          displayName: user.displayName || '',
+          nick_lowercase: (user.displayName || '').toLowerCase(),
+          favoriteTeam: isRemoving ? arrayRemove(name) : arrayUnion(name)
+        }, { merge: true });
+      } catch (e) {
+        console.error("Erro ao sincronizar favoritos:", e);
+      }
+    }
   };
 
   useEffect(() => {
@@ -220,7 +274,6 @@ export const OrderForm = () => {
       ...(selectedPokemon?.abilities.map((ab: string) => ({ label: ab, value: ab })) || []),
       ...(selectedPokemon?.hiddenAbility ? [{ label: `${selectedPokemon.hiddenAbility} (HA +15k)`, value: selectedPokemon.hiddenAbility }] : [])
     ];
-    console.log("Ability Options for", selectedPokemon?.name, ":", opts);
     return opts;
   }, [selectedPokemon]);
 
@@ -247,9 +300,11 @@ export const OrderForm = () => {
 
   const handleAddToCart = () => {
     if (!handleValidation()) return;
-    safeStorage.setItem('valiant_discord_nick', form.discordNick);
+    const nick = form.discordNick;
+    safeStorage.setItem('valiant_discord_nick', nick);
     addToCart({ ...form, price: totalPrice });
-    setForm(initialForm);
+    // Reset form but preserve the discord nick for next cart item
+    setForm({ ...initialForm, discordNick: nick });
     setSearch('');
     setStep(1);
     setIsCartOpen(true);
@@ -287,6 +342,12 @@ export const OrderForm = () => {
         status: 'Pendente',
         createdAt: serverTimestamp()
       });
+      
+      // Update global rank automatically!
+      if (user.displayName) {
+        await updateGlobalRank(user.displayName, totalPrice);
+      }
+
       localStorage.setItem('valiant_order_cooldown', (Date.now() + 30000).toString());
       setCooldown(30);
       safeStorage.setItem('valiant_discord_nick', form.discordNick);
@@ -321,13 +382,46 @@ export const OrderForm = () => {
         totalPrice: totalPrice,
         createdAt: serverTimestamp()
       });
-      alert(`${form.pokemon} adicionado à sua Wishlist!`);
+      setWishlistSuccessModal({isOpen: true, pokemon: form.pokemon});
     } catch (e) {
       console.error(e);
       alert('Erro ao salvar na Wishlist.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleRequestRemoveWishlist = (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWishlistRemoveConfirm({isOpen: true, id, name});
+  };
+
+  const confirmRemoveWishlist = async () => {
+    if (!wishlistRemoveConfirm) return;
+    try {
+      await deleteDoc(doc(db, 'wishlists', wishlistRemoveConfirm.id));
+      setWishlistRemoveConfirm(null);
+    } catch (e) {
+      console.error("Erro ao remover da wishlist:", e);
+      alert('Erro ao remover da wishlist.');
+    }
+  };
+
+  const applyWishlistItem = (item: any) => {
+    setForm({
+      ...initialForm,
+      pokemon: item.pokemon,
+      nature: item.nature === 'Aleatória' ? '' : item.nature,
+      ability: item.ability,
+      gender: item.gender,
+      ivs: item.ivs as IVOption,
+      isCastrated: item.isCastrated || false,
+      hasHA: item.hasHA || false,
+      ignoredIvs: item.ignoredIvs || [],
+      discordNick: form.discordNick // Preserve current discord nick
+    });
+    setSearch(item.pokemon);
+    setShowPokemonList(false);
   };
 
   return (
@@ -388,39 +482,21 @@ export const OrderForm = () => {
                     )}
                   </div>
                   
-                  {/* Atalhos de Favoritos e Tendências */}
-                  {(favorites.length > 0 || hotPokemon.length > 0) && search.trim() === '' && (
-                    <div className="flex flex-col gap-4 mt-4">
-                      {hotPokemon.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-[8px] font-black text-primary uppercase tracking-widest self-center mr-2 flex items-center gap-1">
-                            <Zap size={10} className="fill-primary" /> Tendências:
-                          </span>
-                          {hotPokemon.map(p => (
-                            <button 
-                              key={p.name}
-                              onClick={() => { setForm({...form, pokemon: p.name, ability: ''}); setSearch(p.name); }}
-                              className="px-3 py-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full text-[10px] font-bold text-primary transition-all animate-pulse"
-                            >
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {favorites.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest self-center mr-2">Seus Favoritos:</span>
-                          {favorites.map(fav => (
-                            <button 
-                              key={fav}
-                              onClick={() => { setForm({...form, pokemon: fav, ability: ''}); setSearch(fav); }}
-                              className="px-3 py-1 bg-white/5 hover:bg-secondary/20 border border-white/10 rounded-full text-[10px] font-bold text-gray-400 hover:text-secondary transition-all"
-                            >
-                              {fav}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                  {/* Atalhos de Favoritos quando digitando */}
+                  {favorites.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-4">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest self-center mr-2">Seus Favoritos:</span>
+                        {favorites.map(fav => (
+                          <button 
+                            key={fav}
+                            onClick={() => { setForm({...form, pokemon: fav, ability: ''}); setSearch(fav); }}
+                            className="px-3 py-1 bg-white/5 hover:bg-secondary/20 border border-white/10 rounded-full text-[10px] font-bold text-gray-400 hover:text-secondary transition-all"
+                          >
+                            {fav}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -440,6 +516,83 @@ export const OrderForm = () => {
                   )}
                 </div>
 
+                 {/* ✨ TENDÊNCIAS */}
+                 {hotPokemon.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 p-4 bg-secondary/5 border border-secondary/10 rounded-2xl animate-fade">
+                       <span className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] flex items-center gap-2 shrink-0">
+                         ✨ TENDÊNCIAS:
+                       </span>
+                       <div className="flex flex-wrap gap-2">
+                         {hotPokemon.map((p) => (
+                           <button
+                             key={p.name}
+                             type="button"
+                             onClick={() => { setForm({...form, pokemon: p.name, ability: ''}); setSearch(p.name); setShowPokemonList(false); }}
+                             className="px-4 py-1.5 bg-secondary/10 hover:bg-secondary/20 border border-secondary/20 rounded-full text-[10px] font-bold text-secondary transition-all hover:scale-105 active:scale-95"
+                           >
+                             {p.name}
+                           </button>
+                         ))}
+                       </div>
+                    </div>
+                 )}
+
+                 {/* 💖 WISHLIST integrada em Acordeão */}
+                 {wishlist.length > 0 && (
+                   <div className="mt-4">
+                     <button 
+                       type="button"
+                       onClick={() => setIsWishlistOpen(!isWishlistOpen)}
+                       className="flex items-center gap-2 group hover:opacity-80 transition-all p-2"
+                     >
+                       <Heart size={14} className={`transition-all ${isWishlistOpen ? 'text-primary fill-primary animate-pulse' : 'text-gray-600'}`} />
+                       <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] group-hover:text-primary transition-colors">
+                         Sua Wishlist ({wishlist.length} {wishlist.length === 1 ? 'item' : 'itens'}) {isWishlistOpen ? '↑' : '↓'}
+                       </span>
+                     </button>
+                     
+                     <AnimatePresence>
+                       {isWishlistOpen && (
+                         <motion.div 
+                           initial={{ height: 0, opacity: 0 }}
+                           animate={{ height: 'auto', opacity: 1 }}
+                           exit={{ height: 0, opacity: 0 }}
+                           className="overflow-hidden"
+                         >
+                           <div className="p-4 bg-white/5 border border-white/5 rounded-2xl mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                             {wishlist.map((item) => (
+                               <div 
+                                 key={item.id} 
+                                 onClick={() => applyWishlistItem(item)}
+                                 className="group relative p-3 bg-black/40 border border-white/10 rounded-xl hover:border-primary/50 cursor-pointer transition-all flex flex-col gap-1"
+                               >
+                                 <div className="flex justify-between items-start">
+                                   <span className="font-black text-white text-xs uppercase tracking-wider">{item.pokemon}</span>
+                                   <button 
+                                     onClick={(e) => handleRequestRemoveWishlist(item.id, item.pokemon, e)}
+                                     className="p-1 hover:text-red-500 text-gray-600 transition-colors"
+                                     title="Remover da Wishlist"
+                                   >
+                                     <X size={14} />
+                                   </button>
+                                 </div>
+                                 <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                   <span className="text-[9px] font-bold text-gray-500 uppercase">{item.gender}</span>
+                                   <span className="text-[9px] font-bold text-primary uppercase">{item.ability}</span>
+                                   <span className="text-[9px] font-black text-secondary uppercase italic">{item.ivs} IVs</span>
+                                 </div>
+                                 <span className="text-[10px] font-black text-white mt-1">
+                                   {formatPrice(item.totalPrice)}
+                                 </span>
+                               </div>
+                             ))}
+                           </div>
+                         </motion.div>
+                       )}
+                     </AnimatePresence>
+                   </div>
+                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <CustomSelect 
                     label={`Gênero (Obrigatório) ${isMaleOnly ? '[Apenas Macho]' : ''}`} 
@@ -448,9 +601,9 @@ export const OrderForm = () => {
                     placeholder="Selecione..."
                     disabled={isGenderless || isMaleOnly}
                     options={isGenderless ? [
-                      { label: 'Genderless', value: 'Genderless' }
+                      { label: 'Sem Gênero', value: 'Genderless' }
                     ] : isMaleOnly ? [
-                      { label: 'Macho (100% Tax)', value: 'Macho' }
+                      { label: 'Macho (Fixo)', value: 'Macho' }
                     ] : [
                       { label: 'Qualquer', value: 'Qualquer' },
                       { label: 'Macho', value: 'Macho' },
@@ -686,6 +839,95 @@ export const OrderForm = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* MODAL DE SUCESSO - WISHLIST */}
+      {createPortal(
+        <AnimatePresence>
+          {wishlistSuccessModal.isOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setWishlistSuccessModal({isOpen: false, pokemon: ''})}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} 
+                animate={{ scale: 1, y: 0 }} 
+                exit={{ scale: 0.9, y: 20 }}
+                className="glow-card max-w-sm w-full p-8 text-center bg-black border border-primary/20 space-y-6"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto border-2 border-primary/20 shadow-[0_0_20px_var(--primary-glow)]">
+                  <Heart size={32} className="text-primary fill-primary" />
+                </div>
+                <div>
+                  <h3 className="pixel-title text-xl text-white mb-2 uppercase">Adicionado!</h3>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+                    <span className="text-primary">{wishlistSuccessModal.pokemon}</span> foi salvo na sua Wishlist com sucesso.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setWishlistSuccessModal({isOpen: false, pokemon: ''})}
+                  className="w-full py-3 px-6 bg-primary text-black rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-primary/20 hover:scale-105"
+                >
+                  Continuar
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO - REMOVER WISHLIST */}
+      {createPortal(
+        <AnimatePresence>
+          {wishlistRemoveConfirm?.isOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setWishlistRemoveConfirm(null)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} 
+                animate={{ scale: 1, y: 0 }} 
+                exit={{ scale: 0.9, y: 20 }}
+                className="glow-card max-w-sm w-full p-8 text-center bg-black border border-white/10 space-y-6"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                  <AlertCircle size={32} className="text-red-500" />
+                </div>
+                <div>
+                  <h3 className="pixel-title text-xl text-white mb-2 uppercase">Remover?</h3>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+                    Deseja remover <br/><span className="text-white">{wishlistRemoveConfirm.name}</span><br/> da sua Wishlist?
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setWishlistRemoveConfirm(null)}
+                    className="flex-1 py-3 px-6 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={confirmRemoveWishlist}
+                    className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
     </div>
   );
 };

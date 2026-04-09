@@ -20,6 +20,12 @@ interface UserProfile {
   googleId?: string;
   discordTag?: string;
   minecraftNick?: string;
+  rank?: string;
+  rankOverride?: string;
+  nick_lowercase?: string;
+  displayName?: string;
+  totalSpent?: number;
+  ordersCompletedCount?: number;
 }
 
 interface AuthContextType {
@@ -48,61 +54,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // 2. Real-time Profile Sync
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2. Profile Sync & Persistence Check
+  useEffect(() => {
+    let isMounted = true;
     let unsubscribeProfile: (() => void) | undefined;
-    
-    if (user?.uid) {
-      const userRef = doc(db, 'users', user.uid);
-      unsubscribeProfile = onSnapshot(userRef, async (docSnap) => {
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
-        } else {
-          // Pre-populate with defaults or migrated data if new
+
+    const syncProfile = async () => {
+      if (!user?.uid) return;
+
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        
+        // Initial Check & Create if missing (Single one-off check to avoid recursive listener loops)
+        const initialSnap = await getDocs(query(collection(db, 'users'), where('__name__', '==', user.uid)));
+        if (initialSnap.empty) {
           const initialProfile: UserProfile = {
             bio: safeStorage.getItem(`settings_bio_${user.uid}`, 'Apaixonado por Pokémon e batalhas competitivas!'),
             avatarUrl: safeStorage.getItem(`settings_avatar_${user.uid}`, user.photoURL || ''),
             bannerUrl: safeStorage.getItem(`settings_banner_${user.uid}`, 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop'),
           };
-          await setDoc(userRef, initialProfile);
-          setProfile(initialProfile);
+          await setDoc(userRef, initialProfile, { merge: true });
         }
 
-        // ALWAYS ensure trainer_profiles (Public) exists for this user
-        const nick = user.displayName || user.email?.split('@')[0] || 'Treinador';
-        const profilesRef = collection(db, 'trainer_profiles');
-        const q = query(profilesRef, where('uid', '==', user.uid));
-        const profileSnap = await getDocs(q);
+        // Trainer Profile check (Single one-off check)
+        const trainerProfileRef = doc(db, 'trainer_profiles', user.uid);
+        const trainerSnap = await getDocs(query(collection(db, 'trainer_profiles'), where('uid', '==', user.uid)));
         
-        if (profileSnap.empty) {
-          const currentProfile = docSnap.exists() ? (docSnap.data() as UserProfile) : null;
-          const trainerProfileRef = doc(db, 'trainer_profiles', user.uid);
+        if (trainerSnap.empty) {
+          const nick = user.displayName || user.email?.split('@')[0] || 'Treinador';
           await setDoc(trainerProfileRef, {
             uid: user.uid,
             displayName: nick,
             nick_lowercase: nick.toLowerCase(),
-            bio: currentProfile?.bio || 'Apaixonado por Pokémon e batalhas competitivas!',
-            avatarUrl: currentProfile?.avatarUrl || '',
-            bannerUrl: currentProfile?.bannerUrl || '',
+            bio: 'Apaixonado por Pokémon e batalhas competitivas!',
+            avatarUrl: user.photoURL || '',
+            bannerUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop',
             ordersCompletedCount: 0,
             glintCollection: [],
             favoriteTeam: [],
             createdAt: serverTimestamp(),
             isPrivate: false
-          });
+          }, { merge: true });
         }
 
-        setLoading(false);
-      }, (err) => {
-        console.error("Profile sync error:", err);
-        setLoading(false);
-      });
+        if (!isMounted) return;
+
+        // Now start the listener for read-only sync
+        unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
+          if (isMounted && docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+            setLoading(false);
+          }
+        }, (err) => {
+          console.error("Profile sync error (Firestore Guard):", err);
+          if (isMounted) setLoading(false);
+        });
+
+      } catch (err) {
+        console.error("AuthContext structural error:", err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    if (user) {
+      syncProfile();
     }
 
-    // 3. Removed Discord OAuth Hash Handler
-
-
     return () => {
-      unsubscribeAuth();
+      isMounted = false;
       if (unsubscribeProfile) unsubscribeProfile();
     };
   }, [user?.uid]);

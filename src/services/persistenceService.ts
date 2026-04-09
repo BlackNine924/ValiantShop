@@ -14,37 +14,45 @@ export interface UserProgress {
 export const savePokeGridState = async (userId: string, gridId: string, state: any) => {
   if (!userId) return;
   const stateJson = JSON.stringify(state); // JSON.stringify descarta funções automaticamente
-  const gridKey = `${userId}_${gridId}`;
-  const gridRef = doc(db, 'grids', gridKey);
-  await setDoc(gridRef, { stateJson, userId, gridId, lastUpdated: new Date().toISOString() }, { merge: true });
+  try {
+    const gridKey = `${userId}_${gridId}`;
+    const gridRef = doc(db, 'grids', gridKey);
+    await setDoc(gridRef, { stateJson, userId, gridId, lastUpdated: new Date().toISOString() }, { merge: true });
 
-  // Também salvar dentro do documento do usuário
-  const userGridRef = doc(db, 'users', userId, 'gridProgress', gridId);
-  await setDoc(userGridRef, { stateJson, lastUpdated: new Date().toISOString() }, { merge: true });
+    // Também salvar dentro do documento do usuário
+    const userGridRef = doc(db, 'users', userId, 'gridProgress', gridId);
+    await setDoc(userGridRef, { stateJson, lastUpdated: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.error("Error saving PokeGrid state to Firestore:", err);
+  }
 };
 
 
 export const loadPokeGridState = async (userId: string, gridId: string) => {
   if (!userId) return null;
   
-  // Tentar primeiro na coleção principal de grids
-  const gridKey = `${userId}_${gridId}`;
-  const gridRef = doc(db, 'grids', gridKey);
-  const snap = await getDoc(gridRef);
-  
-  if (snap.exists()) {
-    const data = snap.data();
-    if (data.stateJson) return JSON.parse(data.stateJson); // novo formato
-    return data.state || null; // fallback para formato antigo
-  }
+  try {
+    // Tentar primeiro na coleção principal de grids
+    const gridKey = `${userId}_${gridId}`;
+    const gridRef = doc(db, 'grids', gridKey);
+    const snap = await getDoc(gridRef);
+    
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.stateJson) return JSON.parse(data.stateJson); // novo formato
+      return data.state || null; // fallback para formato antigo
+    }
 
-  // Fallback para a subcoleção do usuário
-  const userGridRef = doc(db, 'users', userId, 'gridProgress', gridId);
-  const userSnap = await getDoc(userGridRef);
-  if (userSnap.exists()) {
-    const data = userSnap.data();
-    if (data.stateJson) return JSON.parse(data.stateJson);
-    return data.state || null;
+    // Fallback para a subcoleção do usuário
+    const userGridRef = doc(db, 'users', userId, 'gridProgress', gridId);
+    const userSnap = await getDoc(userGridRef);
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      if (data.stateJson) return JSON.parse(data.stateJson);
+      return data.state || null;
+    }
+  } catch (err) {
+    console.error("Critical error in loadPokeGridState (Firestore):", err);
   }
   return null;
 };
@@ -76,10 +84,14 @@ export const savePokedexState = async (nick: string, caughtIds: number[]) => {
 
 export const loadPokedexState = async (nick: string) => {
   if (!nick) return null;
-  const userRef = doc(db, 'users', nick.toLowerCase());
-  const snap = await getDoc(userRef);
-  if (snap.exists()) {
-    return snap.data().pokedex?.caught || [];
+  try {
+    const userRef = doc(db, 'users', nick.toLowerCase());
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      return snap.data().pokedex?.caught || [];
+    }
+  } catch (err) {
+    console.error("Critical error in loadPokedexState (Firestore):", err);
   }
   return [];
 };

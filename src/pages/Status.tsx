@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Search, Clock, Package, CheckCircle2, Coins, Star, X, RefreshCw, MessageSquare, ChevronDown, ChevronUp, Heart, Filter } from 'lucide-react';
+import { Search, Clock, Package, CheckCircle2, Coins, Star, X, RefreshCw, MessageSquare, ChevronDown, ChevronUp, Filter, Trash2 } from 'lucide-react';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { OrderChat } from '../components/OrderChat';
 import { ReviewModal } from '../components/ReviewModal';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
 
 export const Status = () => {
@@ -20,11 +21,10 @@ export const Status = () => {
   const [monthFilter, setMonthFilter] = useState<string>('Todos');
   const [priceFilter, setPriceFilter] = useState<'Tudo' | 'Inferior a 100k' | 'Acima de 100k' | 'Acima de 200k' | 'Acima de 500k' | 'Acima de 1M'>('Tudo');
   const [showFilters, setShowFilters] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'history' | 'wishlist'>('history');
-  const [wishlist, setWishlist] = useState<any[]>([]);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; orderId: string; status: string }>({ isOpen: false, orderId: '', status: '' });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,38 +37,74 @@ export const Status = () => {
     }
   }, [user]);
 
+  const [uidOrders, setUidOrders] = useState<any[]>([]);
+  const [nickOrders, setNickOrders] = useState<any[]>([]);
+
   useEffect(() => {
-    if (!user || !user.displayName) return;
-
-    const q = query(
-      collection(db, 'orders'),
-      where('playerNick', '==', user.displayName)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : Date.now();
-        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : Date.now();
-        return timeB - timeA;
-      });
-      setOrders(ordersData);
+    if (authLoading) return;
+    if (!user) {
       setLoading(false);
-    });
+      return;
+    }
 
-    return unsubscribe;
-  }, [user]);
+    setLoading(true);
+    const timeout = setTimeout(() => setLoading(false), 8000);
 
+    let isMounted = true;
+    const unsubs: (() => void)[] = [];
+    const qUid = query(collection(db, 'orders'), where('playerUid', '==', user.uid));
+    
+    unsubs.push(onSnapshot(qUid, (snapshot) => {
+      if (!isMounted) return;
+      setUidOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+      clearTimeout(timeout);
+    }, (err) => {
+      console.warn("UID Query Suppressed:", err);
+      if (isMounted) setLoading(false);
+    }));
+
+    if (user.displayName) {
+      const qNick = query(collection(db, 'orders'), where('playerNick', '==', user.displayName));
+      unsubs.push(onSnapshot(qNick, (snapshot) => {
+        if (!isMounted) return;
+        setNickOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+        clearTimeout(timeout);
+      }, (err) => {
+        console.warn("Nick Query Suppressed:", err);
+        if (isMounted) setLoading(false);
+      }));
+    }
+
+    return () => {
+      isMounted = false;
+      unsubs.forEach(u => u());
+      clearTimeout(timeout);
+    };
+  }, [user?.uid, user?.displayName, authLoading]);
+
+  // Merge and sort orders reactively
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'wishlists'), where('uid', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setWishlist(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return unsubscribe;
-  }, [user]);
+    try {
+      const mergedMap = new Map();
+      [...uidOrders, ...nickOrders].forEach(o => {
+        if (o && o.id) mergedMap.set(o.id, o);
+      });
+      const mergedList = Array.from(mergedMap.values());
+      
+      mergedList.sort((a, b) => {
+        const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return (tB || 0) - (tA || 0);
+      });
+
+      setOrders(mergedList);
+    } catch (err) {
+      console.error("Error merging orders:", err);
+    }
+  }, [uidOrders, nickOrders]);
+
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -95,6 +131,45 @@ export const Status = () => {
   }, [location.search, user]);
 
 
+  const handleDeleteOrder = async (orderId: string, status: string) => {
+    if (!['Pendente', 'Aguardando Pagamento', 'Breeding'].includes(status)) {
+       alert("Este pedido já está em estágio avançado e não pode ser cancelado pelo painel. Entre em contato com o suporte.");
+       return;
+    }
+    setConfirmModal({ isOpen: true, orderId, status });
+  };
+
+  const confirmDelete = async () => {
+    const { orderId } = confirmModal;
+    try {
+      // Registrar cancelamento para o admin
+      const orderToCancel = orders.find(o => o.id === orderId);
+      if (orderToCancel) {
+        await addDoc(collection(db, 'order_cancellations'), {
+          orderId: orderId,
+          pokemon: orderToCancel.pokemon,
+          playerNick: orderToCancel.playerNick,
+          ivs: orderToCancel.ivs,
+          ability: orderToCancel.ability,
+          totalPrice: orderToCancel.totalPrice,
+          cancelledAt: serverTimestamp(),
+          previousStatus: orderToCancel.status,
+          userUid: user?.uid,
+          userEmail: user?.email
+        });
+      }
+
+      // Optimistic update
+      setUidOrders(prev => prev.filter(o => o.id !== orderId));
+      setNickOrders(prev => prev.filter(o => o.id !== orderId));
+      
+      await deleteDoc(doc(db, 'orders', orderId));
+      setConfirmModal({ isOpen: false, orderId: '', status: '' });
+    } catch (err) {
+      console.error("Erro ao cancelar pedido:", err);
+      alert("Erro ao remover pedido. Tente novamente.");
+    }
+  };
 
   const filteredOrders = orders.filter(o => {
     if (o.pokemon === 'SUPORTE GERAL') return false;
@@ -126,7 +201,19 @@ export const Status = () => {
   }).filter(Boolean))).sort();
 
   const handleRepeatOrder = (order: any) => {
-    navigate('/order', { state: order });
+    // Salva na sessionStorage como ponte — location.state é destruído
+    // quando ProtectedOrderRoute re-monta o componente durante o loading do auth
+    sessionStorage.setItem('repeat_order_data', JSON.stringify({
+      pokemon: order.pokemon,
+      nature: order.nature,
+      ability: order.ability,
+      gender: order.gender,
+      ivs: order.ivs,
+      hasHA: order.hasHA,
+      ignoredIvs: order.ignoredIvs || [],
+      observations: order.observations || ''
+    }));
+    navigate('/order');
   };
 
   const getStatusColor = (status: string) => {
@@ -167,16 +254,9 @@ export const Status = () => {
           <h2 className="pixel-title text-3xl mb-2">Painel de <span className="text-secondary">Acompanhamento</span></h2>
           <div className="flex flex-wrap gap-4 mt-2">
             <button 
-              onClick={() => setActiveSubTab('history')}
-              className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'history' ? 'border-secondary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
+              className="text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 border-secondary text-white"
             >
               Histórico de Encomendas
-            </button>
-            <button 
-              onClick={() => setActiveSubTab('wishlist')}
-              className={`text-[10px] font-black uppercase tracking-widest pb-1 border-b-2 transition-all ${activeSubTab === 'wishlist' ? 'border-primary text-white' : 'border-transparent text-gray-600 hover:text-gray-400'}`}
-            >
-              Minha Wishlist ({wishlist.length})
             </button>
             <button 
               onClick={() => navigate('/status?chat=support')}
@@ -289,193 +369,131 @@ export const Status = () => {
       </div>
 
         <div className="glow-card overflow-hidden bg-black/40 border-primary/10">
-          {activeSubTab === 'history' ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/5">
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {loading ? (
-                    <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
-                  ) : filteredOrders.length === 0 ? (
-                    <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
-                  ) : filteredOrders.map((order) => (
-                    <React.Fragment key={order.id}>
-                      <tr 
-                        className={`hover:bg-white/5 transition-colors group cursor-pointer ${expandedOrder === order.id ? 'bg-white/5' : ''}`}
-                        onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                      >
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
-                            <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
-                            {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/5">
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {loading ? (
+                  <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Sincronizando com o centro Pokémon...</td></tr>
+                ) : filteredOrders.length === 0 ? (
+                  <tr><td colSpan={6} className="px-8 py-20 text-center text-gray-600 font-bold italic">Nenhuma encomenda encontrada no seu registro.</td></tr>
+                ) : filteredOrders.map((order) => (
+                  <React.Fragment key={order.id}>
+                    <tr 
+                      className={`hover:bg-white/5 transition-colors group cursor-pointer ${expandedOrder === order.id ? 'bg-white/5' : ''}`}
+                      onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                    >
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
+                          <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
+                          {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-black text-white uppercase tracking-wider flex items-center gap-2">
+                            {order.pokemon} {order.gender && order.gender !== 'Aleatório' && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{order.gender}</span>}
                           </span>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex flex-col gap-1">
-                            <span className="font-black text-white uppercase tracking-wider flex items-center gap-2">
-                              {order.pokemon} {order.gender && order.gender !== 'Aleatório' && <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{order.gender}</span>}
+                          {order.giftNick && (
+                            <span className="text-[9px] text-primary font-black uppercase flex items-center gap-1">
+                              🚀 Presente para: {order.giftNick}
                             </span>
-                            {order.giftNick && (
-                              <span className="text-[9px] text-primary font-black uppercase flex items-center gap-1">
-                                🚀 Presente para: {order.giftNick}
-                              </span>
-                            )}
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs || `${order.ivs} IVs`}</span>
+                          <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
+                          {order.ignoredIvs && order.ignoredIvs.length > 0 && (
+                            <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
+                          )}
+                          {order.observations && (
+                            <span className="text-[9px] text-gray-400 font-bold uppercase italic mt-1 bg-white/5 py-0.5 px-2 rounded w-fit">OBS: {order.observations}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className="font-black text-secondary">{order.totalPrice / 1000}k</span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
+                              {order.status}
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{order.ivs || `${order.ivs} IVs`}</span>
-                            <span className="text-[10px] text-primary font-black uppercase tracking-tighter">{order.ability} {order.hasHA ? '(HA)' : ''}</span>
-                            {order.ignoredIvs && order.ignoredIvs.length > 0 && (
-                              <span className="text-[10px] text-red-400 font-black uppercase tracking-tighter bg-red-500/10 px-2 py-0.5 rounded-full w-fit">IGNORA: {order.ignoredIvs.map((iv: string) => `-${iv}`).join(' ')}</span>
-                            )}
-                            {order.observations && (
-                              <span className="text-[9px] text-gray-400 font-bold uppercase italic mt-1 bg-white/5 py-0.5 px-2 rounded w-fit">OBS: {order.observations}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          <span className="font-black text-secondary">{order.totalPrice / 1000}k</span>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-4">
-                            <div className="flex flex-col items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${getStatusColor(order.status)}`}>
-                                {order.status}
-                              </span>
+                          {expandedOrder === order.id ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    {expandedOrder === order.id && (
+                      <tr className="bg-white/[0.02]">
+                        <td colSpan={6} className="px-8 py-8">
+                          <div className="flex flex-col md:flex-row gap-12 items-center justify-between">
+                            <div className="flex-1 w-full">
+                              <OrderTimeline status={order.status} />
                             </div>
-                            {expandedOrder === order.id ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                            
+                            <div className="flex flex-wrap gap-4 shrink-0">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setActiveChat(order); }}
+                                className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-xl hover:bg-primary/20 transition-all font-black text-[10px] uppercase tracking-widest"
+                                title="Chat com Admin"
+                              >
+                                <MessageSquare size={14} /> Atendimento Local
+                              </button>
+                              
+                              {['Pendente', 'Aguardando Pagamento', 'Breeding'].includes(order.status) && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id, order.status); }}
+                                  className="flex items-center gap-2 px-6 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all font-black text-[10px] uppercase tracking-widest"
+                                  title={order.status === 'Breeding' ? 'Cancelar (Fase Breeding — Admin será avisado)' : 'Cancelar Pedido'}
+                                >
+                                  <Trash2 size={14} /> Cancelar Pedido
+                                </button>
+                              )}
+
+                              {order.status === 'Finalizado' && !order.isReviewed && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); setShowReviewModal(order); }}
+                                  className="flex items-center gap-2 px-6 py-3 bg-secondary/10 text-secondary border border-secondary/20 rounded-xl hover:bg-secondary/20 transition-all font-black text-[10px] uppercase tracking-widest"
+                                >
+                                  <Star size={14} fill="currentColor" /> Avaliar Pedido
+                                </button>
+                              )}
+
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
+                                className="flex items-center gap-2 px-6 py-3 bg-white/5 text-gray-400 border border-white/10 rounded-xl hover:bg-white/10 transition-all font-black text-[10px] uppercase tracking-widest"
+                              >
+                                <RefreshCw size={14} /> Repetir Pedido
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
-                      
-                      {expandedOrder === order.id && (
-                        <tr className="bg-white/[0.02]">
-                          <td colSpan={6} className="px-8 py-8">
-                            <div className="flex flex-col md:flex-row gap-12 items-center justify-between">
-                              <div className="flex-1 w-full">
-                                <OrderTimeline status={order.status} />
-                              </div>
-                              
-                              <div className="flex flex-wrap gap-4 shrink-0">
-                                {order.status === 'Finalizado' && !order.isReviewed && (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); setShowReviewModal(order); }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-secondary/20 text-secondary rounded-lg text-[10px] font-black uppercase hover:bg-secondary hover:text-white transition-all"
-                                  >
-                                    <Star size={12} fill="currentColor" /> Avaliar Pedido
-                                  </button>
-                                )}
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); handleRepeatOrder(order); }}
-                                  className="flex items-center gap-2 px-4 py-2 bg-white/5 text-gray-300 rounded-lg text-[10px] font-black uppercase hover:bg-white/10 transition-all border border-white/5"
-                                >
-                                  <RefreshCw size={12} /> Repetir Pedido
-                                </button>
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); setActiveChat(order); }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary rounded-lg text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all"
-                                  >
-                                    <MessageSquare size={12} /> Abrir Chat
-                                  </button>
-                                  {(order.status === 'Pendente' || order.status === 'Breeding') && (
-                                    <button 
-                                      onClick={async (e) => { 
-                                        e.stopPropagation(); 
-                                        if (window.confirm('Tem certeza que deseja cancelar esta encomenda? Esta ação não pode ser desfeita.')) {
-                                          const { deleteDoc, doc } = await import('firebase/firestore');
-                                          await deleteDoc(doc(db, 'orders', order.id));
-                                        }
-                                      }}
-                                      className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
-                                    >
-                                      <X size={12} /> Cancelar Encomenda
-                                    </button>
-                                  )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-8 space-y-6">
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {wishlist.map(item => (
-                    <div key={item.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group relative">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
-                            <Heart size={20} className="text-primary fill-primary/20" />
-                          </div>
-                          <div>
-                            <h4 className="font-black text-white uppercase tracking-wider">{item.pokemon}</h4>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase">{item.ivs} IVs • {item.ability}</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={async () => {
-                            if (window.confirm(`Remover ${item.pokemon} da Wishlist?`)) {
-                              const { deleteDoc, doc } = await import('firebase/firestore');
-                              await deleteDoc(doc(db, 'wishlists', item.id));
-                            }
-                          }}
-                          className="p-2 text-gray-700 hover:text-red-500 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-2 mb-6">
-                        <div className="flex justify-between text-[10px]">
-                           <span className="text-gray-500 font-bold uppercase">Gênero:</span>
-                           <span className="text-white font-black uppercase">{item.gender}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                           <span className="text-gray-500 font-bold uppercase">Natureza:</span>
-                           <span className="text-white font-black uppercase">{item.nature}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                           <span className="text-gray-500 font-bold uppercase">Preço Estimado:</span>
-                           <span className="text-primary font-black uppercase">{item.totalPrice / 1000}k</span>
-                        </div>
-                      </div>
-
-                      <button 
-                        onClick={() => handleRepeatOrder(item)}
-                        className="w-full py-3 bg-primary/10 text-primary border border-primary/20 rounded-xl text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all shadow-lg"
-                      >
-                        Aplicar e Encomendar
-                      </button>
-                    </div>
-                  ))}
-                  {wishlist.length === 0 && (
-                    <div className="col-span-full py-20 text-center">
-                      <Heart size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
-                      <p className="text-gray-500 font-bold italic">Sua wishlist está vazia. Adicione pokémons no formulário de encomendas!</p>
-                    </div>
-                  )}
-               </div>
-            </div>
-          )}
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       <ReviewModal 
@@ -532,6 +550,14 @@ export const Status = () => {
         <StatusCard icon={<CheckCircle2 className="text-green-400" />} label="Entregues / Finalizados" value={completedCount} border="border-green-400/30" />
         <StatusCard icon={<Coins className="text-secondary" />} label="Total Gasto" value={`${totalSpent / 1000}k`} border="border-secondary/30 bg-secondary/5" />
       </div>
+
+      <ConfirmationModal 
+        isOpen={confirmModal.isOpen}
+        title="CANCELAR ENCOMENDA"
+        message="Tem certeza que deseja cancelar e apagar esta encomenda permanentemente? Esta ação é irreversível."
+        onConfirm={confirmDelete}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

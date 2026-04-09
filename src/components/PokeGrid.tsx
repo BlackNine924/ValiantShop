@@ -87,83 +87,88 @@ export const PokeGrid: React.FC = () => {
     }
 
     const loadState = async () => {
-      let savedState = null;
-      const userId = user.displayName?.toLowerCase() || user.uid;
-      console.log(`📡 [Pokégrid] Carregando ${unlimitedMode ? 'Infinito' : 'Diário'} (${gridId}) para:`, userId);
+      try {
+        let savedState = null;
+        const userId = user.displayName?.toLowerCase() || user.uid;
+        console.log(`📡 [Pokégrid] Carregando ${unlimitedMode ? 'Infinito' : 'Diário'} (${gridId}) para:`, userId);
 
-      // Load settings first
-      const savedSettings = await loadPokeGridSettings(userId);
-      if (savedSettings) {
-        if (savedSettings.enabledCriteriaIds?.length) {
-          setEnabledCriteriaIds(new Set(savedSettings.enabledCriteriaIds));
+        // Load settings first
+        const savedSettings = await loadPokeGridSettings(userId);
+        if (savedSettings) {
+          if (savedSettings.enabledCriteriaIds?.length) {
+            setEnabledCriteriaIds(new Set(savedSettings.enabledCriteriaIds));
+          }
+          if (typeof savedSettings.unlimitedMode === 'boolean') setUnlimitedMode(savedSettings.unlimitedMode);
+          if (typeof savedSettings.timerEnabled === 'boolean') setTimerEnabled(savedSettings.timerEnabled);
         }
-        if (typeof savedSettings.unlimitedMode === 'boolean') setUnlimitedMode(savedSettings.unlimitedMode);
-        if (typeof savedSettings.timerEnabled === 'boolean') setTimerEnabled(savedSettings.timerEnabled);
-      }
 
-      // Then load grid state
-      savedState = await loadPokeGridState(userId, gridId);
-      if (savedState) {
-        console.log('✅ [Pokégrid] Progresso carregado do Firebase!');
-      } else {
-        // Fallback to localStorage
-        const parsed = safeStorage.getItem<any>('pokegrid_state', null);
-        if (parsed) {
-          try {
+        // Then load grid state
+        savedState = await loadPokeGridState(userId, gridId);
+        if (savedState) {
+          console.log('✅ [Pokégrid] Progresso carregado do Firebase!');
+        } else {
+          // Fallback to localStorage
+          const parsed = safeStorage.getItem<any>('pokegrid_state', null);
+          if (parsed) {
             if (parsed && (parsed.gridId === gridId || (parsed.unlimitedMode === unlimitedMode && !unlimitedMode))) {
               savedState = parsed;
               console.log('📁 [Pokégrid] Progresso carregado do cache local.');
             }
-          } catch (e) {}
+          }
         }
-      }
 
-      if (savedState) {
-        const dateStr = new Date().toLocaleDateString('en-CA');
-        if (savedState.unlimitedMode || savedState.date === dateStr) {
-          // Regenerate fresh grid (with Criterion.matches functions) then overlay saved cells
-          const freshGrid = unlimitedMode ? generateGrid(enabledCriteriaIds) : generateDailyGrid();
-          if (savedState.gridCells) {
-            // new format: flat array of cell data
-            for (const cd of savedState.gridCells) {
-              if (freshGrid.cells[cd.row]?.[cd.col] !== undefined) {
-                freshGrid.cells[cd.row][cd.col] = {
-                  ...freshGrid.cells[cd.row][cd.col],
-                  guessedPokemon: cd.guessedPokemon || null,
-                  isCorrect: cd.isCorrect || false,
-                };
+        if (savedState) {
+          const dateStr = new Date().toLocaleDateString('en-CA');
+          if (savedState.unlimitedMode || savedState.date === dateStr) {
+            // Regenerate fresh grid (with Criterion.matches functions) then overlay saved cells
+            const freshGrid = unlimitedMode ? generateGrid(enabledCriteriaIds) : generateDailyGrid();
+            if (savedState.gridCells) {
+              // new format: flat array of cell data
+              for (const cd of savedState.gridCells) {
+                if (freshGrid.cells[cd.row]?.[cd.col] !== undefined) {
+                  freshGrid.cells[cd.row][cd.col] = {
+                    ...freshGrid.cells[cd.row][cd.col],
+                    guessedPokemon: cd.guessedPokemon || null,
+                    isCorrect: cd.isCorrect || false,
+                  };
+                }
               }
-            }
-          } else if (savedState.grid?.cells) {
-            // legacy format: full grid object
-            for (let r = 0; r < 3; r++) {
-              for (let c = 0; c < 3; c++) {
-                const saved = savedState.grid.cells[r]?.[c];
-                if (saved) {
-                  freshGrid.cells[r][c].guessedPokemon = saved.guessedPokemon || null;
-                  freshGrid.cells[r][c].isCorrect = saved.isCorrect || false;
+            } else if (savedState.grid?.cells) {
+              // legacy format: full grid object
+              for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                  const saved = savedState.grid.cells[r]?.[c];
+                  if (saved) {
+                    freshGrid.cells[r][c].guessedPokemon = saved.guessedPokemon || null;
+                    freshGrid.cells[r][c].isCorrect = saved.isCorrect || false;
+                  }
                 }
               }
             }
+            setGrid(freshGrid);
+            setScore(savedState.score || 0);
+            setGuesses(savedState.guesses || 0);
+            setUsedPokemon(new Set(savedState.usedPokemon || []));
+            setGameComplete(savedState.gameComplete || false);
+            // Only restore surrender for daily mode; unlimited mode always starts fresh
+            setIsSurrendered(!unlimitedMode ? (savedState.isSurrendered || false) : false);
+            setTime(savedState.time || 0);
+          } else {
+            console.log('🌅 [Pokégrid] Novo dia detectado. Resetando grid diário.');
+            handleRestartToDaily();
           }
-          setGrid(freshGrid);
-          setScore(savedState.score || 0);
-          setGuesses(savedState.guesses || 0);
-          setUsedPokemon(new Set(savedState.usedPokemon || []));
-          setGameComplete(savedState.gameComplete || false);
-          // Only restore surrender for daily mode; unlimited mode always starts fresh
-          setIsSurrendered(!unlimitedMode ? (savedState.isSurrendered || false) : false);
-          setTime(savedState.time || 0);
         } else {
-          console.log('🌅 [Pokégrid] Novo dia detectado. Resetando grid diário.');
-          handleRestartToDaily();
+          if (!unlimitedMode) handleRestartToDaily();
+          else handleNewGame();
         }
-      } else {
+      } catch (err) {
+        console.error('❌ [Pokégrid] Erro crítico ao carregar estado:', err);
+        // Fallback safely if anything goes wrong
         if (!unlimitedMode) handleRestartToDaily();
         else handleNewGame();
+      } finally {
+        setHasLoaded(true);
       }
-      
-      setHasLoaded(true);
     };
 
     loadState();

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
+import { updateGlobalRank } from '../utils/rankUtils';
 
 export const CartModal = () => {
   const { cart, removeFromCart, clearCart, isCartOpen, setIsCartOpen } = useCart();
@@ -45,6 +46,12 @@ export const CartModal = () => {
           createdAt: serverTimestamp()
         })
       ));
+      
+      // Update global rank automatically with cart Total!
+      if (user.displayName) {
+        await updateGlobalRank(user.displayName, cartTotal);
+      }
+
       clearCart();
       setSuccess(true);
       setTimeout(() => {

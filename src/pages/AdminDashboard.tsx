@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Archive, Zap, Sparkles
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap, Sparkles, History
 } from 'lucide-react';
 import { adminDb, adminAuth as auth } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc, orderBy } from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider, signOut, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { getEggGroups } from '../data/eggGroups';
 import { EVOLUTION_LINES } from '../data/evolutionLines';
 import { POKEMON_DATA } from '../data/pokemonData';
@@ -21,16 +21,14 @@ import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';import { getBasePokemon
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+  const [isInitialAuthCheck, setIsInitialAuthCheck] = useState(true);
   const [authError, setAuthError] = useState<{ email: string } | null>(null);
   const [orders, setOrders] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
   const [supportChats, setSupportChats] = useState<any[]>([]);
-  const [chestStock, setChestStock] = useState<any[]>([]);
-  const [chestMatches, setChestMatches] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
   const [newBreederEmail, setNewBreederEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'chest_stock' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [breeders, setBreeders] = useState<any[]>([]);
   const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
@@ -39,9 +37,10 @@ export const AdminDashboard = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
 
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Match' | 'Pedido' | 'Support'>('Todos');
+  const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Cancelamento' | 'Pedido' | 'Support'>('Todos');
   const [expandedTrainerNick, setExpandedTrainerNick] = useState<string | null>(null);
   const [showTrainerHistory, setShowTrainerHistory] = useState(false);
+  const [isSyncingRank, setIsSyncingRank] = useState(false);
   
   const getDisplayAbility = (item: any) => {
     if (!item || !item.pokemon) return item?.ability;
@@ -178,6 +177,144 @@ export const AdminDashboard = () => {
     }
   };
 
+  // ONE-TIME ADMIN TOOL: Merge duplicate profiles
+  const handleMergeProfiles = async () => {
+    const MAIN_UID = 'FEelmyfacYc42kn3mcBhT7tyWYG2'; // Real Google Auth UID
+    const OLD_UID  = 'VuLEs8GAftUG2n1JC0QkYFuDpue2'; // Old duplicate profile
+
+    if (!window.confirm('Isso vai mesclar o perfil antigo (reskalla) no perfil principal e deletar o duplicado. Continuar?')) return;
+
+    try {
+      const mainDoc = await getDoc(doc(adminDb, 'trainer_profiles', MAIN_UID));
+      const oldDoc  = await getDoc(doc(adminDb, 'trainer_profiles', OLD_UID));
+
+      if (!mainDoc.exists()) { alert('Perfil principal não encontrado!'); return; }
+
+      const mainData = mainDoc.data();
+      const oldData  = oldDoc.exists() ? oldDoc.data() : null;
+
+      // Merge glint fragments (take max value of each type)
+      const mergedGlintFragments: any = { ...(mainData.glintFragments || {}) };
+      if (oldData?.glintFragments) {
+        for (const [key, val] of Object.entries(oldData.glintFragments)) {
+          const lk = key.toLowerCase();
+          const existingKey = Object.keys(mergedGlintFragments).find(k => k.toLowerCase() === lk);
+          if (existingKey) {
+            mergedGlintFragments[existingKey] = Math.max((mergedGlintFragments[existingKey] as number) || 0, (val as number) || 0);
+          } else {
+            mergedGlintFragments[lk] = val;
+          }
+        }
+      }
+
+      // Merge glint collection (avoid duplicates)
+      const mergedCollection = [...(mainData.glintCollection || [])];
+      if (oldData?.glintCollection) {
+        for (const g of oldData.glintCollection) {
+          const alreadyHas = mergedCollection.some((mg: any) => mg.type === g.type);
+          if (!alreadyHas) mergedCollection.push(g);
+        }
+      }
+
+      // Update main profile
+      await updateDoc(doc(adminDb, 'trainer_profiles', MAIN_UID), {
+        nick: 'reskalla',
+        nick_lowercase: 'reskalla',
+        displayName: 'reskalla',
+        glintFragments: mergedGlintFragments,
+        glintCollection: mergedCollection,
+        totalSpent: Math.max(mainData.totalSpent || 0, oldData?.totalSpent || 0),
+        ordersCompletedCount: Math.max(mainData.ordersCompletedCount || 0, oldData?.ordersCompletedCount || 0),
+      });
+
+      // Delete old duplicate profile
+      if (oldDoc.exists()) {
+        await deleteDoc(doc(adminDb, 'trainer_profiles', OLD_UID));
+      }
+
+      alert('Perfis mesclados! Nick "reskalla" definido. Perfil antigo deletado.');
+    } catch (e: any) {
+      console.error('Merge error:', e);
+      alert('Erro ao mesclar: ' + e.message);
+    }
+  };
+
+  const handleSyncRank = async () => {
+    if (!window.confirm("Essa operação varrerá todos os pedidos e sincronizará os totais exatos gastos nos perfis públicos. Tem certeza?")) return;
+    setIsSyncingRank(true);
+    try {
+      const qOrders = query(collection(adminDb, 'orders'), limit(10000));
+      const snapshot = await getDocs(qOrders);
+      
+      const userAggregates = snapshot.docs.reduce((acc: any, doc) => {
+        const data = doc.data();
+        const nickRaw = data.playerNick || '';
+        const nick = nickRaw.toLowerCase().trim();
+        
+        // Skip admins or support docs
+        if (!nick || nick === 'reskalla' || nick === 'reskallaarthur' || data.pokemon === 'SUPORTE GERAL' || data.type === 'support') return acc;
+        
+        if (!acc[nick]) acc[nick] = { spent: 0, count: 0, rawNick: nickRaw };
+        acc[nick].spent += (data.totalPrice || 0);
+        acc[nick].count += 1;
+        return acc;
+      }, {});
+
+      const qProfiles = query(collection(adminDb, 'trainer_profiles'), limit(1000));
+      const profSnap = await getDocs(qProfiles);
+      
+      let updatedCount = 0;
+      for (const pDoc of profSnap.docs) {
+         const pData = pDoc.data();
+         let pNick = (pData.nick_lowercase || pData.displayName || '').toLowerCase().trim();
+         
+         if (userAggregates[pNick]) {
+            await updateDoc(pDoc.ref, {
+               totalSpent: userAggregates[pNick].spent || 0,
+               ordersCompletedCount: userAggregates[pNick].count || 0
+            });
+            updatedCount++;
+         }
+      }
+
+      // 3. Update Public Stats for Ranking & Hot Pokémons (Points 1 & 2)
+      // Rank calculation based strictly on order aggregates, ignoring profile boundaries
+      // This ensures all past data sets like Muniz are loaded beautifully.
+      const topTrainersFiltered = Object.entries(userAggregates)
+         .map(([_, data]: [string, any]) => ({
+            nick: data.rawNick || 'Veterano',
+            spent: data.spent || 0
+         }))
+         .sort((a, b) => b.spent - a.spent)
+         .slice(0, 15);
+
+      const hotCounts: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+         const d = doc.data();
+         if (d.pokemon && d.pokemon !== 'SUPORTE GERAL' && d.type !== 'support') {
+            hotCounts[d.pokemon] = (hotCounts[d.pokemon] || 0) + 1;
+         }
+      });
+      const hotList = Object.entries(hotCounts)
+         .map(([name, count]) => ({ name, count }))
+         .sort((a, b) => b.count - a.count)
+         .slice(0, 5);
+
+      await setDoc(doc(adminDb, 'public_stats', 'global'), {
+         topTrainers: topTrainersFiltered,
+         hotPokemon: hotList,
+         lastUpdate: serverTimestamp()
+      });
+      
+      alert(`Sincronização concluída. ${updatedCount} perfis atualizados e Ranking/Hot Pokemons sincronizados.`);
+    } catch (e) {
+      console.error("Rank Sync Error: ", e);
+      alert("Erro ao sincronizar rank. Verifique o console.");
+    } finally {
+      setIsSyncingRank(false);
+    }
+  };
+
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
     
@@ -185,97 +322,146 @@ export const AdminDashboard = () => {
       if ((newStatus === 'Finalizado' || newStatus === 'Entregue') && order) {
         await updateStock(order.pokemon, order.ivs, order.gender, order.nature);
         
-        // Award Glint Fragments and Order Count
-        try {
-          const userNick = (order.playerNick || '').toLowerCase().trim();
-          const userUid = order.playerUid;
-          let profileDoc: any = null;
-          let profileData: any = null;
+        // Award Glint Fragments and Order Count just once per order!
+        if (!order.glintsAwarded) {
+          try {
+            const userNick = (order.playerNick || '').toLowerCase().trim();
+            const userUid = order.playerUid;
+            let profileDoc: any = null;
+            let profileData: any = null;
 
-          if (userUid) {
-            const pDoc = await getDoc(doc(adminDb, 'trainer_profiles', userUid));
-            if (pDoc.exists()) {
-              profileDoc = pDoc;
-              profileData = pDoc.data();
-            }
-          }
-
-          if (!profileDoc && userNick) {
-            const profilesRef = collection(adminDb, 'trainer_profiles');
-            const q = query(profilesRef, where('nick_lowercase', '==', userNick), limit(1));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-              profileDoc = snap.docs[0];
-              profileData = profileDoc.data();
-            }
-          }
-          
-          if (profileDoc && profileData) {
-            const glints = profileData.glintFragments || {};
-            const pData = POKEMON_TYPE_DATA.find(p => p.name.toLowerCase() === order.pokemon.toLowerCase());
-            const glintType = pData?.types[0] || 'Normal';
-            const currentFrag = glints[glintType] || 0;
-            const newFrag = currentFrag + 0.25;
-            
-            const updateData: any = {
-              [`glintFragments.${glintType}`]: newFrag,
-              ordersCompletedCount: (profileData.ordersCompletedCount || 0) + 1,
-              lastOrderAt: serverTimestamp()
-            };
-            
-            if (newFrag >= 1) {
-              updateData[`glintFragments.${glintType}`] = 0;
-              const coll = (profileData.glintCollection || []).concat([{
-                id: Math.random().toString(36).substr(2, 9),
-                type: glintType,
-                acquiredAt: new Date().toISOString()
-              }]);
-              updateData.glintCollection = coll;
-            }
-            
-            await updateDoc(profileDoc.ref, updateData);
-
-            await addDoc(collection(adminDb, 'social_posts'), {
-              authorUid: 'SYSTEM',
-              authorNick: 'Valiant Bot',
-              content: `🥳 O treinador @${order.playerNick} acaba de receber seu ${order.pokemon}! A jornada continua crescendo!`,
-              type: 'achievement',
-              createdAt: serverTimestamp(),
-              likes: [],
-              metadata: {
-                 pokemon: order.pokemon,
-                 type: glintType,
-                 shardAwarded: true
+            if (userUid) {
+              const pDoc = await getDoc(doc(adminDb, 'trainer_profiles', userUid));
+              if (pDoc.exists()) {
+                profileDoc = pDoc;
+                profileData = pDoc.data();
               }
-            });
+            }
+
+            if (!profileDoc && userNick) {
+              const profilesRef = collection(adminDb, 'trainer_profiles');
+              const q = query(profilesRef, where('nick_lowercase', '==', userNick), limit(1));
+              const snap = await getDocs(q);
+              if (!snap.empty) {
+                profileDoc = snap.docs[0];
+                profileData = profileDoc.data();
+              }
+            }
+            
+            if (profileDoc && profileData) {
+              const glints: Record<string, number> = profileData.glintFragments || {};
+              const pokemonName = (order.pokemon || '').trim();
+              const pData = POKEMON_TYPE_DATA.find(p => p.name.toLowerCase() === pokemonName.toLowerCase());
+              
+              console.log(`[GLINT] Pokemon: "${pokemonName}" | Found: ${pData ? pData.name + ' [' + pData.types.join(', ') + ']' : 'NOT FOUND'}`);
+              
+              const typesToAwardAll = (pData && pData.types && pData.types.length > 0) 
+                ? pData.types.map(t => t.toLowerCase()) 
+                : ['normal'];
+              
+              // Only pick ONE random type from the available types
+              const glintType = typesToAwardAll[Math.floor(Math.random() * typesToAwardAll.length)];
+              const typesToAward = [glintType];
+              
+              console.log(`[GLINT] typesToAward (Randomized):`, typesToAward);
+              
+              // Build new glintFragments map (full rewrite - safer than dot-notation)
+              const newFragments: Record<string, number> = {};
+              // Copy all existing fragments with lowercase keys
+              for (const [k, v] of Object.entries(glints)) {
+                newFragments[k.toLowerCase()] = v as number;
+              }
+              
+              let newCollection = [...(profileData.glintCollection || [])];
+              
+              typesToAward.forEach(glintType => {
+                // Verificar se o usuário já possui o Glint deste tipo
+                const alreadyHasGlint = newCollection.some(g => g.type.toLowerCase() === glintType.toLowerCase());
+                
+                // Se já tem, o fragmento vai para o "Prismático" (Coringa)
+                const targetType = alreadyHasGlint ? 'prismático' : glintType;
+                
+                const prev = newFragments[targetType] || 0;
+                const next = prev + 0.25;
+                
+                console.log(`[GLINT] ${glintType} (Target: ${targetType}): ${prev} -> ${next} | Já possui? ${alreadyHasGlint}`);
+                
+                if (next >= 1) {
+                  newFragments[targetType] = 0;
+                  newCollection.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    type: targetType,
+                    acquiredAt: new Date().toISOString()
+                  });
+                } else {
+                  newFragments[targetType] = next;
+                }
+              });
+              
+              console.log(`[GLINT] Final fragments:`, JSON.stringify(newFragments));
+              
+              // Single atomic write with everything
+              await updateDoc(profileDoc.ref, {
+                glintFragments: newFragments,
+                glintCollection: newCollection,
+                ordersCompletedCount: (profileData.ordersCompletedCount || 0) + 1,
+                totalSpent: (profileData.totalSpent || 0) + (order.totalPrice || 0),
+                lastOrderAt: serverTimestamp()
+              });
+              await updateDoc(doc(adminDb, 'orders', orderId), { glintsAwarded: true });
+              
+              console.log(`[GLINT] Done! Awarded: ${typesToAward.join(', ')}`);
+            } else {
+              console.warn(`[GLINT] Profile NOT found! uid="${order.playerUid}" nick="${order.playerNick}"`);
+            }
+          } catch (socialErr) {
+            console.error("Social update error:", socialErr);
           }
-        } catch (socialErr) {
-          console.error("Social update error:", socialErr);
         }
       }
       
-      if (newStatus === 'Entregue' && order && order.assignedTo && !order.commissionPaid) {
-        const breederRef = doc(adminDb, 'breeder_profiles', order.assignedTo);
-        const bSnap = await getDoc(breederRef);
-        if (bSnap.exists()) {
-          const bData = bSnap.data();
-          const currentCount = bData.ordersCompleted || 0;
-          const currentWallet = bData.walletAmount || 0;
-          const currentRevenue = bData.totalRevenueGenerated || 0;
-          const rank = getBreederRank(currentCount, bData.rankOverride);
-          const commissionEarned = (order.totalPrice || 0) * rank.commissionRate;
-          
-          await updateDoc(breederRef, {
-            ordersCompleted: currentCount + 1,
-            walletAmount: currentWallet + commissionEarned,
-            totalRevenueGenerated: currentRevenue + (order.totalPrice || 0)
+      if (newStatus === 'Entregue' && order) {
+        // Create Social Post for 'Entregue' status
+        try {
+          await addDoc(collection(adminDb, 'social_posts'), {
+            authorUid: 'valiant_bot_system',
+            authorNick: 'Valiant Bot',
+            content: `🥳 O treinador @${order.playerNick} acaba de receber seu ${order.pokemon}! A jornada continua crescendo!`,
+            type: 'achievement',
+            createdAt: serverTimestamp(),
+            likes: [],
+            metadata: {
+               pokemon: order.pokemon,
+               deliveryAwarded: true
+            }
           });
-          
-          await updateDoc(doc(adminDb, 'orders', orderId), { 
-            status: newStatus,
-            commissionPaid: true 
-          });
-          return;
+        } catch (err) {
+          console.error("Error creating social post:", err);
+        }
+
+        if (order.assignedTo && !order.commissionPaid) {
+          const breederRef = doc(adminDb, 'breeder_profiles', order.assignedTo);
+          const bSnap = await getDoc(breederRef);
+          if (bSnap.exists()) {
+            const bData = bSnap.data();
+            const currentCount = bData.ordersCompleted || 0;
+            const currentWallet = bData.walletAmount || 0;
+            const currentRevenue = bData.totalRevenueGenerated || 0;
+            const rank = getBreederRank(currentCount, bData.rankOverride);
+            const commissionEarned = (order.totalPrice || 0) * rank.commissionRate;
+            
+            await updateDoc(breederRef, {
+              ordersCompleted: currentCount + 1,
+              walletAmount: currentWallet + commissionEarned,
+              totalRevenueGenerated: currentRevenue + (order.totalPrice || 0)
+            });
+            
+            await updateDoc(doc(adminDb, 'orders', orderId), { 
+              status: newStatus,
+              commissionPaid: true 
+            });
+            return;
+          }
         }
       }
 
@@ -372,6 +558,9 @@ export const AdminDashboard = () => {
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
+      // Optimistic update
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      
       await deleteDoc(doc(adminDb, 'orders', orderId));
       setDeleteConfirm(null);
     } catch (e) {
@@ -382,10 +571,14 @@ export const AdminDashboard = () => {
 
   const handleDeleteFeedback = async (id: string) => {
     try {
+      // Optimistic update
+      setFeedbacks(prev => prev.filter(fb => fb.id !== id));
+      
       await deleteDoc(doc(adminDb, 'ClientReviews', id));
       setDeleteConfirm(null);
     } catch (e) {
       console.error('Erro ao deletar feedback:', e);
+      alert('Falha ao deletar feedback.');
     }
   };
 
@@ -398,16 +591,25 @@ export const AdminDashboard = () => {
 
 
   useEffect(() => {
-    // 1. Auth Persistence check for Admin Only app
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (user && (ADMIN_CONFIG.adminEmails || []).includes(user.email || '')) {
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
-      }
+    // Set session-only persistence so admin is logged out when tab closes
+    setPersistence(auth, browserSessionPersistence).then(() => {
+      const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+        if (user && (ADMIN_CONFIG.adminEmails || []).includes(user.email || '')) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+        }
+        setIsInitialAuthCheck(false);
+      });
+      return () => unsubscribeAuth();
+    }).catch((err) => {
+      console.error('Session persistence error:', err);
+      setIsInitialAuthCheck(false);
     });
-
-    return () => unsubscribeAuth();
+    // Force logout when leaving the Admin route (Point 3)
+    return () => {
+       signOut(auth).catch(err => console.error("Logout on leave failed:", err));
+    };
   }, []);
 
   useEffect(() => {
@@ -492,37 +694,14 @@ export const AdminDashboard = () => {
     return unsubscribe;
   }, [isAuthenticated]);
 
+  const [orderCancellations, setOrderCancellations] = useState<any[]>([]);
   useEffect(() => {
     if (!isAuthenticated) return;
-    const q = query(collection(adminDb, 'inventory'));
+    const q = query(collection(adminDb, 'order_cancellations'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setInventory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setOrderCancellations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
-      console.error("Admin inventory stream error:", error);
-    });
-    return unsubscribe;
-  }, [isAuthenticated]);
-
-  // Listen to Chest Stock (Baús Lotados)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const q = query(collection(adminDb, 'chest_stock'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setChestStock(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Admin chest_stock stream error:", error);
-    });
-    return unsubscribe;
-  }, [isAuthenticated]);
-
-  // Listen to Chest Matches
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const q = query(collection(adminDb, 'chest_matches'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setChestMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Admin chest_matches stream error:", error);
+      console.error("Admin order_cancellations stream error:", error);
     });
     return unsubscribe;
   }, [isAuthenticated]);
@@ -550,105 +729,17 @@ export const AdminDashboard = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [deleteConfirm]);
 
-  // Auto-match: When a new Pendente order arrives, check chest_stock for matches
-  const processedMatchesRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!isAuthenticated || orders.length === 0 || chestStock.length === 0) return;
-
-    const pendingOrders = orders.filter(o => o.status === 'Pendente');
-    
-    pendingOrders.forEach(async (order) => {
-      const matchKey = `${order.id}`;
-      if (processedMatchesRef.current.has(matchKey)) return;
-      
-      // Check if this order was already matched
-      const alreadyMatched = chestMatches.some(m => m.orderId === order.id);
-      if (alreadyMatched) {
-        processedMatchesRef.current.add(matchKey);
-        return;
-      }
-
-      // Extract IV number from order IVs (e.g. "5 IVs (Breedable)" -> "5 IVs")
-      const orderIvBase = (order.ivs || '').replace(/\s*\(.*\)/, '').trim();
-
-      // Find matching chest stock doc (one per pokemon)
-      const matchingChest = chestStock.find(chest => {
-        if (chest.pokemon.toLowerCase() !== order.pokemon.toLowerCase()) return false;
-        const entries = chest.entries || [];
-        return entries.some((entry: any) => {
-          if ((entry.quantity || 0) <= 0) return false;
-          if (entry.ivs !== orderIvBase) return false;
-          if (order.gender !== 'Qualquer' && entry.gender !== order.gender) return false;
-          const orderAbility = getDisplayAbility(order);
-          if (orderAbility !== 'Qualquer' && orderAbility !== 'Qualquer Habilidade' && entry.ability.toLowerCase() !== orderAbility.toLowerCase()) return false;
-          return true;
-        });
-      });
-
-      if (matchingChest) {
-        const entries = matchingChest.entries || [];
-        const entryIdx = entries.findIndex((entry: any) => {
-          if ((entry.quantity || 0) <= 0) return false;
-          if (entry.ivs !== orderIvBase) return false;
-          if (order.gender !== 'Qualquer' && entry.gender !== order.gender) return false;
-          const orderAbility = getDisplayAbility(order);
-          if (orderAbility !== 'Qualquer' && orderAbility !== 'Qualquer Habilidade' && entry.ability.toLowerCase() !== orderAbility.toLowerCase()) return false;
-          return true;
-        });
-
-        if (entryIdx === -1) return;
-        const matchedEntry = entries[entryIdx];
-        processedMatchesRef.current.add(matchKey);
-        
-        try {
-          // Find which stock_room this pokemon is in
-          const roomsSnap = await getDocs(collection(adminDb, 'stock_rooms'));
-          let roomName = 'Não encontrada';
-          roomsSnap.docs.forEach(roomDoc => {
-            const roomData = roomDoc.data();
-            const pokemonList = (roomData.pokemonList || []) as string[];
-            if (pokemonList.some((p: string) => p.toLowerCase() === order.pokemon.toLowerCase())) {
-              roomName = roomData.name || 'Sem nome';
-            }
-          });
-
-          // Decrement chest stock entry quantity
-          const updatedEntries = [...entries];
-          updatedEntries[entryIdx] = { ...updatedEntries[entryIdx], quantity: (matchedEntry.quantity || 1) - 1 };
-          await updateDoc(doc(adminDb, 'chest_stock', matchingChest.id), {
-            entries: updatedEntries,
-            updatedAt: serverTimestamp()
-          });
-
-          // Create match record in Firestore
-          await addDoc(collection(adminDb, 'chest_matches'), {
-            orderId: order.id,
-            chestItemId: matchingChest.id,
-            pokemon: order.pokemon,
-            ivs: matchedEntry.ivs,
-            gender: matchedEntry.gender,
-            ability: matchedEntry.ability,
-            playerNick: order.playerNick || 'Desconhecido',
-            roomName: roomName,
-            matchedAt: serverTimestamp()
-          });
-        } catch (err) {
-          console.error('Erro ao processar match de baú:', err);
-          processedMatchesRef.current.delete(matchKey);
-        }
-      }
-    });
-  }, [isAuthenticated, orders, chestStock, chestMatches]);
 
   useEffect(() => {
-    if (!isAuthenticated || (orders.length === 0 && supportChats.length === 0 && chestMatches.length === 0)) return;
+    if (!isAuthenticated || (orders.length === 0 && supportChats.length === 0 && orderCancellations.length === 0)) return;
 
     const allItems: any[] = [];
     
-    // 1. New Order alerts (last 12 hours)
+    // 1. New Order alerts
     orders.forEach(order => {
       const orderTime = order.createdAt?.toMillis ? order.createdAt.toMillis() : Date.now();
-      if (Date.now() - orderTime < 43200000) { // 12 hours
+      
+      if (Date.now() - orderTime < 43200000 && order.status !== 'Cancelado pelo Cliente') { // 12 hours
         allItems.push({
           id: `new-${order.id}`,
           type: 'Pedido',
@@ -658,8 +749,19 @@ export const AdminDashboard = () => {
         });
       }
     });
+
+    // 2. Cancellation alerts (From separate collection order_cancellations)
+    orderCancellations.forEach(cancel => {
+      allItems.push({
+        id: `cancelled-${cancel.id}`,
+        type: 'Cancelamento',
+        order: cancel,
+        message: `ALERTA DE CANCELAMENTO: ${cancel.playerNick} cancelou o pedido do ${cancel.pokemon} (${cancel.ivs})!`,
+        time: cancel.cancelledAt
+      });
+    });
     
-    // 2. Support Message alerts (From separate collection)
+    // 3. Support Message alerts (From separate collection)
     supportChats.forEach(chat => {
       allItems.push({
         id: `support-${chat.id}`,
@@ -670,31 +772,7 @@ export const AdminDashboard = () => {
       });
     });
 
-    // 3. Low Stock alerts (Automatic)
-    inventory.forEach(item => {
-      if (item.quantity <= 3) {
-        allItems.push({
-          id: `low-stock-${item.id}-${item.quantity}`,
-          type: 'Stock',
-          item,
-          message: `AVISO DE BAIXO ESTOQUE: ${item.pokemon} (${item.ivs}) restam apenas ${item.quantity}!`,
-          time: item.updatedAt || serverTimestamp()
-        });
-      }
-    });
-
-    // 4. Chest Stock Match alerts
-    chestMatches.forEach(match => {
-      allItems.push({
-        id: `match-${match.id}`,
-        type: 'Match',
-        match,
-        message: `🎯 MATCH: ${match.pokemon} (${match.ivs}, ${match.gender}, ${match.ability}) — Encomenda de ${match.playerNick}. Sala: "${match.roomName}"`,
-        time: match.matchedAt
-      });
-    });
-
-    // Remove duplicates, sort by time, and FILTER out dismissed ones
+    // Sort by time, and FILTER out dismissed ones
     const uniqueNotifications = Array.from(new Map(allItems.map(item => [item.id, item])).values())
       .filter(n => !dismissedNotifIds.has(n.id))
       .sort((a, b) => {
@@ -704,7 +782,7 @@ export const AdminDashboard = () => {
       });
 
     setNotifications(uniqueNotifications);
-  }, [orders, supportChats, inventory, chestMatches, isAuthenticated, dismissedNotifIds]);
+  }, [orders, supportChats, orderCancellations, isAuthenticated, dismissedNotifIds]);
 
   const handleGoogleLogin = async () => {
     setIsLoadingAuth(true);
@@ -730,6 +808,14 @@ export const AdminDashboard = () => {
       setIsLoadingAuth(false);
     }
   };
+
+  if (isInitialAuthCheck) {
+    return (
+      <div className="flex items-center justify-center min-h-[100vh]">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -1015,12 +1101,6 @@ export const AdminDashboard = () => {
                 <Warehouse size={18} /> Salas do Estoque
               </button>
               <button 
-                onClick={() => setActiveTab('chest_stock')} 
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'chest_stock' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
-              >
-                <Archive size={18} /> Baús Lotados ({chestStock.length})
-              </button>
-              <button 
                 onClick={() => setActiveTab('feedbacks')} 
                 className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'feedbacks' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
               >
@@ -1048,7 +1128,7 @@ export const AdminDashboard = () => {
           </aside>
 
           <main className="lg:col-span-3 space-y-8">
-            {activeTab !== 'stock_rooms' && activeTab !== 'chest_stock' && activeTab !== 'comunidade' && activeTab !== 'feedbacks' && (
+            {activeTab !== 'stock_rooms' && activeTab !== 'comunidade' && activeTab !== 'feedbacks' && (
               <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
 
               <div className="flex justify-between items-center">
@@ -1248,7 +1328,7 @@ export const AdminDashboard = () => {
                     <div className="flex flex-col md:flex-row items-center gap-4">
                       {/* Filtros */}
                       <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/10">
-                        {(['Todos', 'Match', 'Pedido', 'Support'] as const).map(f => (
+                        {(['Todos', 'Cancelamento', 'Pedido', 'Support'] as const).map(f => (
                           <button
                             key={f}
                             onClick={() => setInboxFilter(f)}
@@ -1314,10 +1394,10 @@ export const AdminDashboard = () => {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4">
-                    {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' })), ...chestMatches.map(m => ({ ...m, type: 'match', playerNick: m.playerNick, createdAt: m.matchedAt }))]
+                    {[...orders.map(o => ({ ...o, type: 'order' })), ...supportChats.map(s => ({ ...s, type: 'support' })), ...orderCancellations.map(c => ({ ...c, type: 'cancelamento', playerNick: c.playerNick, createdAt: c.cancelledAt }))]
                       .filter(chat => {
                         if (dismissedNotifIds.has(chat.id)) return false;
-                        if (inboxFilter === 'Match') return chat.type === 'match';
+                        if (inboxFilter === 'Cancelamento') return chat.type === 'cancelamento';
                         if (inboxFilter === 'Pedido') return chat.type === 'order';
                         if (inboxFilter === 'Support') return chat.type === 'support';
                         return true;
@@ -1341,22 +1421,22 @@ export const AdminDashboard = () => {
                                 className="w-4 h-4 rounded appearance-none border-2 border-primary/20 checked:bg-primary checked:border-primary cursor-pointer transition-all"
                               />
                             )}
-                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'match' ? 'bg-green-500/10 border-green-500/20 text-green-400' : chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
-                              {chat.type === 'match' ? <Crosshair size={24} /> : chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105 ${chat.type === 'match' ? 'bg-green-500/10 border-green-500/20 text-green-400' : chat.type === 'cancelamento' ? 'bg-red-500/10 border-red-500/20 text-red-500' : chat.type === 'support' ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+                              {chat.type === 'match' ? <Crosshair size={24} /> : chat.type === 'cancelamento' ? <X size={24} /> : chat.type === 'support' ? <Headset size={24} /> : <ShoppingBag size={24} />}
                             </div>
                             
                             <div>
                                <div className="flex items-center gap-3 mb-1">
                                  <h4 className="font-black text-white text-lg uppercase tracking-tight">{chat.playerNick || 'Treinador'}</h4>
-                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${chat.type === 'match' ? 'text-green-400 border-green-500/30 bg-green-500/5' : chat.type === 'support' ? 'text-secondary border-secondary/30 bg-secondary/5' : 'text-primary border-primary/30 bg-primary/5'}`}>
-                                   {chat.type === 'match' ? `🎯 Match · ${chat.pokemon}` : chat.type === 'support' ? 'Suporte Geral' : `Pedido #${chat.id.slice(0,6)}`}
+                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${chat.type === 'cancelamento' ? 'text-red-400 border-red-500/30 bg-red-500/5' : chat.type === 'support' ? 'text-secondary border-secondary/30 bg-secondary/5' : 'text-primary border-primary/30 bg-primary/5'}`}>
+                                   {chat.type === 'cancelamento' ? `🚨 CANCELAMENTO · ${chat.pokemon}` : chat.type === 'support' ? 'Suporte Geral' : `Pedido #${chat.id.slice(0,6)}`}
                                  </span>
                                </div>
                                <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                                 {chat.type === 'match' ? (
+                                 {chat.type === 'cancelamento' ? (
                                    <>
-                                     <span className="flex items-center gap-1.5 text-green-400"><Crosshair size={10} /> {chat.ivs} · {chat.gender} · {getDisplayAbility(chat)}</span>
-                                     <span className="flex items-center gap-1.5 italic opacity-60">Sala: "{chat.roomName}"</span>
+                                     <span className="flex items-center gap-1.5 text-red-400"><Trash2 size={10} /> {chat.ivs} · {chat.gender} · {getDisplayAbility(chat)}</span>
+                                     <span className="flex items-center gap-1.5 italic opacity-60">Cancelado em: {chat.createdAt?.toMillis ? new Date(chat.createdAt.toMillis()).toLocaleString() : 'Recentemente'}</span>
                                    </>
                                  ) : (
                                    <>
@@ -1371,18 +1451,7 @@ export const AdminDashboard = () => {
                           </div>
 
                           <div className="flex items-center gap-3">
-                            {chat.type === 'match' ? (
-                              <button 
-                                onClick={() => {
-                                  setActiveTab('pedidos');
-                                  setSearchTerm(chat.playerNick || '');
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                className="px-8 py-3 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase hover:scale-105 transition-all shadow-lg shadow-green-600/20 flex items-center gap-2 group/btn"
-                              >
-                                VER PEDIDO <Crosshair size={14} className="group-hover/btn:translate-x-1 transition-transform" />
-                              </button>
-                            ) : chat.type === 'order' && !chat.hasChat ? (
+                            {chat.type === 'cancelamento' ? null : chat.type === 'order' && !chat.hasChat ? (
                               <button 
                                 onClick={() => {
                                   setActiveTab('pedidos');
@@ -1430,8 +1499,8 @@ export const AdminDashboard = () => {
                 <div className="p-8 space-y-8">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary">RANKING DE VENDAS</h3>
-                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Os pokémons mais solicitados pelos treinadores</p>
+                      <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-primary">RANKING DE VENDAS & SOCIAL</h3>
+                      <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-4">Estatísticas globais do servidor ValiantShop</p>
                     </div>
                     <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-xl">
                       <p className="text-[8px] font-black text-primary uppercase mb-1">Total de Pedidos</p>
@@ -1480,10 +1549,6 @@ export const AdminDashboard = () => {
                 <div className="space-y-12 pb-20">
                   <StockRoomsManager />
                 </div>
-              ) : activeTab === 'chest_stock' ? (
-                <div className="space-y-12 pb-20">
-                  <ChestStockManager />
-                </div>
               ) : activeTab === 'comunidade' ? (
                 <div className="space-y-10 animate-fade">
                   {/* Header Style like Breeders Tab */}
@@ -1525,7 +1590,7 @@ export const AdminDashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                      {/* Event Status Card */}
                      <div className="glow-card p-10 border-white/5 bg-black/40 relative overflow-hidden group">
-                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700" />
+                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
                         <div className="flex items-center justify-between mb-8">
                            <div className="flex items-center gap-4">
                               <Crosshair size={20} className="text-gray-500" />
@@ -1822,6 +1887,20 @@ export const AdminDashboard = () => {
                                   >
                                     <MessageSquare size={18} />
                                   </button>
+                                  {o.glintsAwarded && (
+                                    <button
+                                      onClick={async () => { await updateDoc(doc(adminDb, "orders", o.id), { glintsAwarded: false }); alert("Glints resetados! Mude o status para Finalizado novamente para testar."); }}
+                                      className="text-yellow-500 hover:text-yellow-300 p-1 text-base"
+                                      title="Resetar glintsAwarded para re-testar"
+                                    ></button>
+                                  )}
+                                  {o.glintsAwarded && (
+                                    <button
+                                      onClick={async () => { await updateDoc(doc(adminDb, 'orders', o.id), { glintsAwarded: false }); alert('Glints resetados! Mude o status para Finalizado novamente.'); }}
+                                      className="text-yellow-500 hover:text-yellow-300 p-1"
+                                      title="Resetar glintsAwarded para re-testar"
+                                    ></button>
+                                  )}
                                   <button 
                                     onClick={() => setDeleteConfirm({ 
                                       isOpen: true, 
@@ -2299,6 +2378,7 @@ export const AdminDashboard = () => {
                       isFloating={true}
                       onClose={() => closeChat(chat.id)}
                       collectionName={chat.type === 'support' ? 'support_chats' : 'orders'}
+                      customDb={adminDb}
                     />
                   </div>
                 ))}
@@ -2934,847 +3014,6 @@ const StockRoomsManager = () => {
   );
 };
 
-const ChestStockManager = () => {
-  const [items, setItems] = useState<any[]>([]);
-  const [chestSearchTerm, setChestSearchTerm] = useState('');
-  const [error, setError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [showPokemonList, setShowPokemonList] = useState(false);
-  const [pokemonSearch, setPokemonSearch] = useState('');
-  
-  // Salas de Estoque (para localização)
-  const [rooms, setRooms] = useState<any[]>([]);
-  
-  // Advanced Filters State
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    limitReached: false,
-    eggGroups: [] as string[]
-  });
-
-  const EGG_GROUPS = [
-    "Monster", "Human-Like", "Water 1", "Water 2", "Water 3", "Bug", "Mineral", 
-    "Flying", "Amorphous", "Field", "Fairy", "Grass", "Dragon", "Ditto"
-  ];
-
-  const pokemonSearchRef = useRef<HTMLDivElement>(null);
-
-  type Entry = { id: string, ivs: string, gender: string, ability: string, quantity: number };
-
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean, isEdit: boolean, id: string, pokemon: string, entries: Entry[], roomName: string
-  }>({
-    isOpen: false, isEdit: false, id: '', pokemon: '', entries: [], roomName: ''
-  });
-
-  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
-
-  useEffect(() => {
-    const q = query(collection(adminDb, 'chest_stock'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Chest stock stream error:", error);
-    });
-    return unsubscribe;
-  }, []);
-
-  // Listen to Stock Rooms for localization
-  useEffect(() => {
-    const q = query(collection(adminDb, 'stock_rooms'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Chest rooms stream error:", error);
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (pokemonSearchRef.current && !pokemonSearchRef.current.contains(event.target as Node)) {
-        setShowPokemonList(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filteredPokemonList = useMemo(() => {
-    if (!pokemonSearch || pokemonSearch.trim() === '') return [];
-    return POKEMON_DATA.filter(p => p.name.toLowerCase().includes(pokemonSearch.toLowerCase())).slice(0, 5);
-  }, [pokemonSearch]);
-
-  const selectedPokemonData = useMemo(() => {
-    return POKEMON_DATA.find(p => p.name.toLowerCase() === modalState.pokemon.toLowerCase());
-  }, [modalState.pokemon]);
-
-  const abilityOptions = useMemo(() => {
-    if (!selectedPokemonData) return [];
-    return [
-      ...selectedPokemonData.abilities,
-      ...(selectedPokemonData.hiddenAbility ? [selectedPokemonData.hiddenAbility] : [])
-    ];
-  }, [selectedPokemonData]);
-
-  const getAllowedGenders = (pokemonName: string) => {
-    const raw = pokemonName.toLowerCase().trim();
-    if (GENDERLESS_POKEMON.some(p => p.toLowerCase() === raw)) return ['---', 'Genderless'];
-    if (MALE_ONLY_POKEMON.some(p => p.toLowerCase() === raw)) return ['---', 'Macho'];
-    return ['---', 'Macho', 'Fêmea'];
-  };
-
-  const addEntry = () => {
-    setModalState(s => ({
-      ...s,
-      entries: [...s.entries, { id: crypto.randomUUID(), ivs: '---', gender: '---', ability: '---', quantity: 0 }]
-    }));
-    setError('');
-  };
-
-  const updateEntry = (id: string, field: keyof Entry, value: any) => {
-    setModalState(s => ({
-      ...s,
-      entries: s.entries.map(e => e.id === id ? { ...e, [field]: field === 'quantity' ? Math.max(0, parseInt(value) || 0) : value } : e)
-    }));
-    if (error) setError('');
-  };
-
-  const removeEntry = (id: string) => {
-    setModalState(s => ({ ...s, entries: s.entries.filter(e => e.id !== id) }));
-  };
-
-  const findRoomForPokemon = (pokemonName: string) => {
-    const raw = pokemonName.toLowerCase().trim();
-    const room = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === raw));
-    return room ? room.name : '';
-  };
-
-  const handleSelectPokemon = (name: string) => {
-    // If the owner wants "Same Specs" (Unique IV+Gender), changing pokemon should probably clear entries or reset them carefully.
-    // We'll reset entries here since abilities and spec rules change per species.
-    setModalState(s => ({
-      ...s,
-      pokemon: name,
-      entries: [] 
-    }));
-    setPokemonSearch(name);
-    setShowPokemonList(false);
-    setError('');
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setError('');
-
-    try {
-      if (!modalState.pokemon.trim()) {
-        setError("O nome do Pokémon é obrigatório!");
-        setIsSaving(false); return;
-      }
-      if (modalState.entries.length === 0) {
-        setError("O baú deve ter pelo menos uma variação!");
-        setIsSaving(false); return;
-      }
-
-      // Validação de Duplicidade (Só em novos, ou se mudou de nome)
-      const duplicate = items.find(i => i.pokemon.toLowerCase() === modalState.pokemon.trim().toLowerCase() && i.id !== modalState.id);
-      if (duplicate) {
-        setError("Já existe um baú para este Pokémon no sistema! Edite o baú existente em vez de criar outro.");
-        setIsSaving(false); return;
-      }
-
-      // Validação de Unique (IV + Gender + Ability) e Limite de 54 POR IV
-      const seencombos = new Set();
-      const ivTotals: Record<string, number> = { '4 IVs': 0, '5 IVs': 0, '6 IVs': 0 };
-      
-      for (const entry of modalState.entries) {
-        /*
-        if (entry.ivs === '---') {
-          setError(`Selecione um IV válido para todas as variações.`);
-          setIsSaving(false); return;
-        }
-        */
-
-        const combo = `${entry.ivs}-${entry.gender}-${entry.ability}`;
-        if (seencombos.has(combo)) {
-          setError(`Variação duplicada: ${entry.ivs} (${entry.gender}) com ${entry.ability}. Cada combinação de IV, Gênero e Habilidade deve ser única.`);
-          setIsSaving(false); return;
-        }
-        seencombos.add(combo);
-
-        /*
-        if (!entry.ability.trim()) {
-          setError("Todas as variações devem ter a ability (habilidade) preenchida!");
-          setIsSaving(false); return;
-        }
-        */
-        
-        if (ivTotals[entry.ivs] !== undefined) {
-          ivTotals[entry.ivs] += entry.quantity;
-        }
-      }
-
-      for (const iv in ivTotals) {
-        if (ivTotals[iv] > 54) {
-          setError(`O limite de 54 unidades foi excedido para ${iv} (Total atual: ${ivTotals[iv]}).`);
-          setIsSaving(false); return;
-        }
-      }
-
-      const finalEntries = modalState.entries.map(e => ({
-        id: e.id, ivs: e.ivs, gender: e.gender, ability: e.ability.trim(), quantity: e.quantity
-      }));
-
-      const data = {
-        pokemon: modalState.pokemon.trim(),
-        entries: finalEntries,
-        updatedAt: serverTimestamp()
-      };
-
-      // Sync Room logic
-      const currentRoomName = modalState.roomName.trim();
-      const oldRoomName = findRoomForPokemon(modalState.pokemon);
-
-      if (currentRoomName !== oldRoomName) {
-        // 1. Remove from all old rooms (safety first)
-        const pokemonToClean = modalState.pokemon.trim().toLowerCase();
-        for (const room of rooms) {
-          const list = (room.pokemonList || []).map((p: string) => p.toLowerCase());
-          if (list.includes(pokemonToClean)) {
-            const newList = (room.pokemonList || []).filter((p: string) => p.toLowerCase() !== pokemonToClean);
-            await updateDoc(doc(adminDb, 'stock_rooms', room.id), { pokemonList: newList, updatedAt: serverTimestamp() });
-          }
-        }
-
-        // 2. Add to new room
-        if (currentRoomName) {
-          const targetRoom = rooms.find(r => (r.name || '').toLowerCase() === currentRoomName.toLowerCase());
-          if (targetRoom) {
-            const list = Array.isArray(targetRoom.pokemonList) ? [...targetRoom.pokemonList] : [];
-            if (!list.map(p => p.toLowerCase()).includes(pokemonToClean)) {
-               list.push(modalState.pokemon.trim());
-               await updateDoc(doc(adminDb, 'stock_rooms', targetRoom.id), { pokemonList: list, updatedAt: serverTimestamp() });
-            }
-          } else {
-            // Option to create room if it doesn't exist? User said "poder editar manualmente", 
-            // but didn't explicitly say "auto-create". I'll stick to assignment for now to be safe, 
-            // but I'll add a check or just assume it's an existing room name to find.
-          }
-        }
-      }
-
-      if (modalState.isEdit && modalState.id) {
-        await updateDoc(doc(adminDb, 'chest_stock', modalState.id), data);
-      } else {
-        await addDoc(collection(adminDb, 'chest_stock'), {
-          ...data,
-          addedAt: serverTimestamp()
-        });
-      }
-      setModalState({ isOpen: false, isEdit: false, id: '', pokemon: '', entries: [], roomName: '' });
-      setPokemonSearch('');
-      setError('');
-    } catch (err) {
-      console.error("Erro ao salvar baú:", err);
-      setError("Erro ao salvar: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const filteredItems = items.filter(item => {
-    // 1. Termo de Pesquisa
-    const term = chestSearchTerm.toLowerCase();
-    const matchesSearch = !chestSearchTerm || 
-      (item.pokemon || '').toLowerCase().includes(term) ||
-      (item.entries || []).some((e: any) => 
-        (e.ability || '').toLowerCase().includes(term) ||
-        (e.gender || '').toLowerCase().includes(term) ||
-        (e.ivs || '').toLowerCase().includes(term)
-      );
-    if (!matchesSearch) return false;
-
-    // 2. Filtro de Limite Atingido (Pelo menos um IV com 54)
-    if (filters.limitReached) {
-      const entries = item.entries || [];
-      const hasLimit = ['4 IVs', '5 IVs', '6 IVs'].some(ivLabel => {
-        const total = entries.filter((e: any) => e.ivs === ivLabel).reduce((acc: number, e: any) => acc + (e.quantity || 0), 0);
-        return total >= 54;
-      });
-      if (!hasLimit) return false;
-    }
-
-    // 3. Filtro de Egg Groups
-    if (filters.eggGroups.length > 0) {
-      const pGroups = getEggGroups(item.pokemon);
-      const matchesEggGroup = filters.eggGroups.some(g => pGroups.includes(g));
-      if (!matchesEggGroup) return false;
-    }
-
-    return true;
-  }).sort((a, b) => {
-    const nameA_raw = a.pokemon?.toLowerCase() || '';
-    const nameB_raw = b.pokemon?.toLowerCase() || '';
-    const roomA = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === nameA_raw));
-    const roomB = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === nameB_raw));
-    
-    const roomNameA = roomA ? roomA.name : 'ZZZ - Sem Sala';
-    const roomNameB = roomB ? roomB.name : 'ZZZ - Sem Sala';
-    
-    // 1. Sort by Room Name (Numeric)
-    if (roomNameA !== roomNameB) {
-      return roomNameA.localeCompare(roomNameB, undefined, { numeric: true, sensitivity: 'base' });
-    }
-    
-    // 2. If same room, sort by index in pokemonList
-    if (roomA) {
-      const list = (roomA.pokemonList || []).map((p: string) => p.toLowerCase());
-      const idxA = list.indexOf(nameA_raw);
-      const idxB = list.indexOf(nameB_raw);
-      
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-    }
-    
-    // 3. Fallback to alphabetical
-    return nameA_raw.localeCompare(nameB_raw);
-  });
-
-  const totalChests = items.length;
-  const activeFilterCount = (filters.limitReached ? 1 : 0) + filters.eggGroups.length;
-
-  const toggleEggGroup = (group: string) => {
-    setFilters(prev => ({
-      ...prev,
-      eggGroups: prev.eggGroups.includes(group)
-        ? prev.eggGroups.filter(g => g !== group)
-        : [...prev.eggGroups, group]
-    }));
-  };
-
-  return (
-    <div className="p-8 space-y-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-green-500">BAÚS LOTADOS</h3>
-          <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">{totalChests} Baús Ativos</p>
-        </div>
-        
-        <div className="flex gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
-            <input 
-              placeholder="Pesquisar por Pokémon, Ability..." 
-              value={chestSearchTerm}
-              onChange={e => setChestSearchTerm(e.target.value)}
-              className="bg-black/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-xs outline-none focus:border-green-500 transition-all w-[300px]"
-            />
-          </div>
-
-          <button 
-            onClick={() => setIsFilterModalOpen(true)}
-            className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${activeFilterCount > 0 ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10'}`}
-          >
-            <Filter size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-inherit">Filtros</span>
-            {activeFilterCount > 0 && (
-              <span className="w-5 h-5 bg-green-500 text-black rounded-full flex items-center justify-center text-[10px] font-black">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          <button 
-            onClick={() => {
-              setModalState({ isOpen: true, isEdit: false, id: '', pokemon: '', entries: [], roomName: '' });
-              setPokemonSearch('');
-              setError('');
-            }}
-            className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-green-500 transition-all shadow-lg shadow-green-600/20"
-          >
-            <Plus size={16} /> Novo Baú
-          </button>
-        </div>
-      </div>
-
-      {createPortal(
-        <AnimatePresence>
-          {isFilterModalOpen && (
-            <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 animate-fade">
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsFilterModalOpen(false)} />
-              
-              <div className="relative w-full max-w-xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <Filter size={20} className="text-green-500" />
-                    <h3 className="text-lg font-black uppercase tracking-widest text-white">Filtros do Estoque</h3>
-                  </div>
-                  <button onClick={() => setIsFilterModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white">
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-                  {/* Limite Atingido */}
-                  <section>
-                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Estado do Baú</h4>
-                    <button 
-                      onClick={() => setFilters(prev => ({ ...prev, limitReached: !prev.limitReached }))}
-                      className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-between group ${filters.limitReached ? 'border-red-500 bg-red-500/10 text-red-500' : 'border-white/5 bg-white/5 text-gray-500 hover:border-white/10'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <AlertCircle size={18} className={filters.limitReached ? 'text-red-500' : 'text-gray-600'} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Limite Atingido (54 ovos)</span>
-                      </div>
-                      <div className={`w-10 h-5 rounded-full transition-all relative ${filters.limitReached ? 'bg-red-500' : 'bg-gray-800'}`}>
-                        <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${filters.limitReached ? 'left-6' : 'left-1'}`} />
-                      </div>
-                    </button>
-                  </section>
-
-                  {/* Grupos de Cruzamento */}
-                  <section>
-                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Grupos de Cruzamento (Egg Groups)</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {EGG_GROUPS.map(group => {
-                        const isSelected = filters.eggGroups.includes(group);
-                        return (
-                          <button
-                            key={group}
-                            onClick={() => toggleEggGroup(group)}
-                            className={`p-3 rounded-xl border text-[9px] font-black uppercase transition-all flex items-center justify-center ${isSelected ? 'border-green-500 bg-green-500/10 text-green-400' : 'border-white/5 bg-white/5 text-gray-500 hover:border-white/20'}`}
-                          >
-                            {group}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                </div>
-
-                <div className="p-6 border-t border-white/5 bg-white/5 flex gap-4">
-                  <button 
-                    onClick={() => setFilters({ limitReached: false, eggGroups: [] })}
-                    className="flex-1 py-4 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/5 transition-all"
-                  >
-                    Limpar Filtros
-                  </button>
-                  <button 
-                    onClick={() => setIsFilterModalOpen(false)}
-                    className="flex-1 py-4 bg-green-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)]"
-                  >
-                    Aplicar Filtros
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-
-      {createPortal(
-        <AnimatePresence>
-          {modalState.isOpen && (
-            <div 
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setModalState({ ...modalState, isOpen: false });
-              }}
-              className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            >
-              <motion.div 
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="glow-card max-w-4xl w-full max-h-[90vh] p-8 border-green-500/20 relative rounded-3xl overflow-y-auto bg-black flex flex-col"
-              >
-                <button 
-                  onClick={() => setModalState({ ...modalState, isOpen: false })}
-                  className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-all bg-white/5 rounded-lg z-10"
-                >
-                  <X size={20} />
-                </button>
-                <div className="flex items-center gap-4 mb-8 shrink-0">
-                  <div className="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center border border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
-                    <Archive size={24} className="text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="pixel-title text-xl text-white">{modalState.isEdit ? 'Editar Baú' : 'Criar Novo Baú'}</h3>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Selecione o Pokémon e gerencie suas variações e estoque</p>
-                  </div>
-                </div>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl mb-6 text-xs font-bold flex items-center gap-3 shadow-[0_0_15px_rgba(239,68,68,0.15)] shrink-0"
-                    >
-                      <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <form onSubmit={handleSave} className="space-y-6 flex-1 flex flex-col min-h-0">
-                  <div className="shrink-0 space-y-4">
-                    <div className="relative" ref={pokemonSearchRef}>
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Espécie do Pokémon</label>
-                      <div className="relative group">
-                        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${showPokemonList ? 'text-green-500' : 'text-gray-500'}`} size={16} />
-                        <input 
-                          autoFocus
-                          placeholder="Digite o nome do Pokémon..." 
-                          value={pokemonSearch}
-                          onFocus={() => setShowPokemonList(true)}
-                          onChange={e => {
-                            setPokemonSearch(e.target.value);
-                            setShowPokemonList(true);
-                          }}
-                          className={`w-full bg-black border ${showPokemonList ? 'border-green-500' : 'border-white/10'} rounded-xl pl-10 pr-4 py-4 text-base outline-none transition-all font-black text-white uppercase placeholder:text-gray-700 tracking-wider shadow-inner`}
-                        />
-                      </div>
-
-                      <div className="relative mt-4">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Sala do Pokémon (Localização)</label>
-                        <input 
-                          placeholder="Pesquise ou Digite a Sala (Ex: Sala 1, Gaveta A...)" 
-                          value={modalState.roomName}
-                          onChange={e => setModalState({...modalState, roomName: e.target.value})}
-                          list="available-rooms"
-                          className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-green-500 transition-all font-bold text-white uppercase"
-                        />
-                        <datalist id="available-rooms">
-                          {rooms.map(r => <option key={r.id} value={r.name} />)}
-                        </datalist>
-                        <p className="text-[9px] text-gray-600 mt-1 font-bold uppercase">Deixe em branco se não houver sala vinculada ainda.</p>
-                      </div>
-
-                      {/* Pokemon Dropdown */}
-                      <AnimatePresence>
-                        {showPokemonList && filteredPokemonList.length > 0 && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 5 }}
-                            className="absolute z-50 w-full mt-2 bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl py-1"
-                          >
-                            {filteredPokemonList.map((p: any) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => handleSelectPokemon(p.name)}
-                                className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-green-500/10 transition-colors group"
-                              >
-                                <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center text-gray-500 group-hover:text-green-400 group-hover:bg-green-500/10 transition-all border border-transparent group-hover:border-green-500/20">
-                                  <Package size={16} />
-                                </div>
-                                <div>
-                                  <span className="text-sm font-black text-white group-hover:text-green-400 uppercase tracking-wide">{p.name}</span>
-                                  <div className="flex gap-1 mt-0.5">
-                                    {p.abilities.slice(0, 1).map((a: string) => <span key={a} className="text-[8px] text-gray-500 uppercase font-black">{a}</span>)}
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {modalState.pokemon && (
-                      <div className="bg-green-500/5 border border-green-500/10 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/20">
-                             <span className="text-green-400 font-bold text-xl">{modalState.pokemon.charAt(0)}</span>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Pokémon Selecionado</p>
-                            <h4 className="text-lg font-black text-white uppercase">{modalState.pokemon}</h4>
-                          </div>
-                        </div>
-                        <div className="text-right flex-1 pl-4">
-                          <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Resumo por IV (Máx 54)</p>
-                          <div className="flex flex-col items-end gap-1.5">
-                            {['4 IVs', '5 IVs', '6 IVs'].map(iv => {
-                              const total = modalState.entries.filter(e => e.ivs === iv).reduce((acc, e) => acc + e.quantity, 0);
-                              return (
-                                <div key={iv} className="flex items-center gap-3 bg-white/5 px-3 py-1 rounded-lg border border-white/5">
-                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">F{iv.replace(' IVs', '')}</span>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`text-xs font-black ${total > 54 ? 'text-red-500' : total > 0 ? 'text-green-400' : 'text-gray-700'}`}>{total}</span>
-                                    <span className="text-[9px] font-black text-gray-800">/ 54</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                    {modalState.entries.map((entry) => {
-                      const allowedGendersForPokemon = getAllowedGenders(modalState.pokemon);
-                      return (
-                        <div key={entry.id} className="grid grid-cols-12 gap-3 items-end bg-white/[0.02] border border-white/10 p-3 rounded-xl relative group">
-                          <div className="col-span-12 md:col-span-4">
-                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Ability</label>
-                            <select 
-                              value={entry.ability}
-                              onChange={e => updateEntry(entry.id, 'ability', e.target.value)}
-                              className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-green-500 transition-all cursor-pointer uppercase"
-                            >
-                              <option value="---">---</option>
-                              {!abilityOptions.includes(entry.ability) && entry.ability !== '---' && <option value={entry.ability}>{entry.ability}</option>}
-                              {abilityOptions.map((a: string) => <option key={a} value={a}>{a}</option>)}
-                            </select>
-                          </div>
-                          <div className="col-span-4 md:col-span-3">
-                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">IV Rarity</label>
-                            <select 
-                              value={entry.ivs} 
-                              onChange={e => updateEntry(entry.id, 'ivs', e.target.value)}
-                              className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-green-500 transition-all cursor-pointer"
-                            >
-                              <option value="---">---</option>
-                              <option value="4 IVs">4 IVs</option>
-                              <option value="5 IVs">5 IVs</option>
-                              <option value="6 IVs">6 IVs</option>
-                            </select>
-                          </div>
-                          <div className="col-span-4 md:col-span-2">
-                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Gênero</label>
-                            <select 
-                              value={entry.gender} 
-                              onChange={e => updateEntry(entry.id, 'gender', e.target.value)}
-                              disabled={allowedGendersForPokemon.length === 1}
-                              className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-green-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {allowedGendersForPokemon.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                          </div>
-                          <div className="col-span-3 md:col-span-2">
-                            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Qtd.</label>
-                            <input 
-                              type="number"
-                              min={0} 
-                              value={entry.quantity}
-                              onChange={e => updateEntry(entry.id, 'quantity', e.target.value)}
-                              className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-xs font-black text-green-400 outline-none focus:border-green-500 transition-all text-center"
-                            />
-                          </div>
-                          <div className="col-span-1 md:col-span-1 flex justify-center pb-1.5">
-                            <button 
-                              type="button" 
-                              onClick={() => removeEntry(entry.id)}
-                              className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors border border-red-500/20"
-                              title="Remover variação"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {modalState.entries.length === 0 && modalState.pokemon && (
-                      <div className="text-center py-8 border-2 border-dashed border-white/5 rounded-3xl bg-white/[0.01]">
-                        <Package size={32} className="mx-auto text-gray-800 mb-3" />
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wide">Nenhuma variação para {modalState.pokemon}.</p>
-                        <p className="text-gray-700 text-[10px] mt-1 font-bold uppercase">Adicione estoque abaixo para processar vendas automáticas.</p>
-                      </div>
-                    )}
-                    
-                    {modalState.pokemon && (
-                      <button 
-                        type="button"
-                        onClick={addEntry}
-                        className="w-full py-4 bg-white/5 hover:bg-green-500/10 border border-white/5 hover:border-green-500/20 rounded-2xl text-green-400 text-[10px] font-black uppercase tracking-widest transition-all group flex items-center justify-center gap-2"
-                      >
-                        <Plus size={16} className="group-hover:scale-125 transition-transform" /> Adicionar Variação Ao Baú
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex gap-4 pt-6 border-t border-white/10 shrink-0">
-                    <button 
-                      type="button" 
-                      disabled={isSaving}
-                      onClick={() => setModalState({ ...modalState, isOpen: false })} 
-                      className="flex-[1] py-4 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="submit" 
-                      disabled={isSaving || !modalState.pokemon}
-                      className="flex-[2] py-4 bg-green-600 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-green-600/20 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                          Salvando...
-                        </>
-                      ) : (
-                        modalState.isEdit ? 'Salvar Baú' : 'Criar Baú'
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-
-
-      {/* Chests Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredItems.map(item => {
-          return (
-            <div key={item.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-5 hover:border-green-500/30 transition-all group flex flex-col">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-black border border-white/10 rounded-2xl flex items-center justify-center text-green-400 shadow-inner group-hover:border-green-500/30 transition-all">
-                    <Archive size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-white uppercase tracking-wider text-base">{item.pokemon}</h4>
-                    {(() => {
-                      const room = rooms.find(r => (r.pokemonList || []).some((p: string) => p.toLowerCase() === item.pokemon.toLowerCase()));
-                      return (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Warehouse size={11} className={room ? 'text-green-500' : 'text-gray-600'} />
-                          <span className={`text-[9px] font-black uppercase tracking-widest ${room ? 'text-green-500/80 shadow-[0_0_8px_rgba(34,197,94,0.3)]' : 'text-gray-600 italic'}`}>
-                            {room ? room.name : 'Sem Sala'}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <div className="flex gap-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={() => {
-                      setError('');
-                      setModalState({ 
-                         isOpen: true, isEdit: true, id: item.id,
-                         pokemon: item.pokemon, entries: item.entries || [],
-                         roomName: findRoomForPokemon(item.pokemon)
-                      });
-                      setPokemonSearch(item.pokemon);
-                    }}
-                    className="p-2 text-gray-500 hover:text-white transition-colors bg-white/5 rounded-xl hover:bg-white/10"
-                    title="Editar Baú"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                  <button 
-                    onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, name: `Deletar todo o baú de "${item.pokemon}"?` })}
-                    className="p-2 text-gray-500 hover:text-red-500 transition-colors bg-white/5 rounded-xl hover:bg-red-500/10"
-                    title="Deletar Baú"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 bg-black/40 rounded-2xl p-4 space-y-3 border border-white/5 max-h-[220px] overflow-y-auto custom-scrollbar">
-                {(() => {
-                  const entries = item.entries || [];
-                  if (entries.length === 0) return <p className="text-[10px] text-gray-600 font-bold italic text-center py-2">Baú vazio.</p>;
-
-                  // Grouping by IV for summary
-                  const ivGroups = ['4 IVs', '5 IVs', '6 IVs'].map(ivLabel => {
-                    const total = entries.filter((e: any) => e.ivs === ivLabel).reduce((acc: number, e: any) => acc + (e.quantity || 0), 0);
-                    return { label: ivLabel.replace(' IVs', ''), total, full: total >= 54 };
-                  });
-
-                  return ivGroups.map((g, i) => (
-                    <div key={i} className={`flex items-center justify-between p-3 rounded-xl border ${g.full ? 'bg-red-500/10 border-red-500/30' : 'bg-white/[0.02] border-white/5'}`}>
-                       <div className="flex items-center gap-3">
-                          <span className={`text-xs font-black px-2 py-1 rounded bg-black border ${g.full ? 'border-red-500/50 text-red-500' : 'border-white/10 text-gray-400'}`}>F{g.label}</span>
-                          {g.full && (
-                            <span className="text-[8px] font-black text-red-500 uppercase tracking-tighter bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 animate-pulse">
-                              LIMITE ATINGIDO
-                            </span>
-                          )}
-                       </div>
-                       <span className={`font-black text-sm ${g.full ? 'text-red-500' : 'text-secondary'}`}>x{g.total}</span>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-          );
-        })}
-        {filteredItems.length === 0 && (
-          <div className="col-span-full py-20 text-center bg-white/5 rounded-3xl border border-dashed border-white/10">
-            <Archive size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
-            <p className="text-gray-500 italic font-bold">Nenhum Baú Encontrado.</p>
-            <p className="text-gray-600 text-[10px] font-bold mt-2 uppercase tracking-widest">Clique em "Novo Baú" para cadastar Pokémon.</p>
-          </div>
-        )}
-      </div>
-
-      {createPortal(
-        <AnimatePresence>
-          {deleteConfirm?.isOpen && (
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm shadow-2xl"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                className="glow-card max-w-md w-full p-8 text-center space-y-6 bg-black border border-white/10 rounded-3xl"
-              >
-                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
-                  <Trash2 size={32} className="text-red-500" />
-                </div>
-                <div>
-                  <h3 className="pixel-title text-xl text-white mb-2">Destruir Baú?</h3>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                    {deleteConfirm.name}
-                    <br/>Aviso: Todas as {items.find(i => i.id === deleteConfirm.id)?.entries?.length || 0} variações dentro dele serão perdidas.
-                  </p>
-                </div>
-                <div className="flex gap-4 pt-4">
-                  <button 
-                    onClick={() => setDeleteConfirm(null)}
-                    className="flex-1 py-3 px-6 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      try {
-                        await deleteDoc(doc(adminDb, 'chest_stock', deleteConfirm.id));
-                        setDeleteConfirm(null);
-                      } catch (err) {
-                         console.error("Erro ao deletar baú:", err);
-                      }
-                    }}
-                    className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
-                  >
-                    Confirmar
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-    </div>
-  );
-};
 
 const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
   const [text, setText] = useState('');

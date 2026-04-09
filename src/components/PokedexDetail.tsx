@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Heart, Shield, Zap, Swords, Sword, Ruler, Weight, Globe, Calendar, BarChart3, Sparkles, ExternalLink, Trophy, CheckCircle2, Package, Clock, CloudRain } from 'lucide-react';
 import type { DetailedPokemon, Variation } from '../services/pokedexService';
 import { getDetailedPokemon, TYPE_TRADUCOES } from '../services/pokedexService';
@@ -154,8 +155,8 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
 
   const resolvedSprite = resolveSprite();
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 lg:p-12 animate-fade">
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-6 lg:p-12 animate-fade">
       <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={onClose} />
       
       <div className="relative w-full max-w-6xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,1)] flex flex-col md:flex-row max-h-[95vh] md:max-h-[90vh]">
@@ -625,7 +626,8 @@ export const PokedexDetail: React.FC<PokedexDetailProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

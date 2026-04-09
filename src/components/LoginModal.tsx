@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { X, User as UserIcon, MessageCircle, LogIn } from 'lucide-react';
@@ -26,8 +27,8 @@ export const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm"></motion.div>
       <motion.div 
         initial={{ scale: 0.9, opacity: 0, y: 20 }} 
@@ -81,6 +82,7 @@ export const LoginModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =
           </button>
         </form>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 };

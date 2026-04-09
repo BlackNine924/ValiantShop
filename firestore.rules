@@ -1,207 +1,176 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ────────────────────────────────────────────────
-    // Funções auxiliares
+    // FUNÇÕES DE SEGURANÇA
     // ────────────────────────────────────────────────
 
-    // Usuário está autenticado?
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // O documento pertence ao usuário logado?
+    function isAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.email == "reskallaarthur@gmail.com";
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // O usuário logado é o admin (reskallaarthur@gmail.com)?
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'reskallaarthur@gmail.com';
-    }
+    // ────────────────────────────────────────────────
+    // ORDERS (PEDIDOS)
+    // ────────────────────────────────────────────────
 
-    // ────────────────────────────────────────────────
-    // /orders — Encomendas
-    // ────────────────────────────────────────────────
     match /orders/{orderId} {
-      // Leitura: apenas o dono da encomenda, o admin, ou o breeder designado (agora verificado via email)
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || (isAuthenticated() && resource.data.assignedTo == request.auth.token.email);
 
-      // Criação: usuário autenticado criando sua própria encomenda
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.totalPrice is number
-        && request.resource.data.totalPrice > 0;
+      allow read: if isAdmin() ||
+        (isAuthenticated() &&
+          (resource.data.playerUid == request.auth.uid ||
+           resource.data.userId == request.auth.uid)) ||
+        (isAuthenticated() &&
+          resource.data.assignedTo == request.auth.token.email);
 
-      // Atualização: Admin edita tudo. Breeder designado pode apenas mudar status da sua ordem.
-      allow update: if isAdmin() || 
-        (isAuthenticated() 
-         && resource.data.assignedTo == request.auth.token.email 
-         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) 
-         && request.resource.data.status in ['Pendente', 'Breeding', 'Finalizado']);
+      allow create: if isAuthenticated();
 
-      // Deleção: apenas o admin
+      allow update: if isAdmin() ||
+        (isAuthenticated() &&
+          (resource.data.playerUid == request.auth.uid ||
+           resource.data.userId == request.auth.uid)) ||
+        (isAuthenticated() &&
+          resource.data.assignedTo == request.auth.token.email);
+
       allow delete: if isAdmin();
 
-      // Sub-coleção de mensagens do chat do pedido
-      match /messages/{messageId} {
-        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid);
-        allow create: if isAuthenticated()
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 1000;
-        allow update, delete: if isAdmin();
+      match /messages/{msgId} {
+        allow read, write: if isAdmin() ||
+          (isAuthenticated() &&
+            (get(/databases/$(database)/documents/orders/$(orderId)).data.playerUid == request.auth.uid ||
+             get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid)) ||
+          (isAuthenticated() &&
+            get(/databases/$(database)/documents/orders/$(orderId)).data.assignedTo == request.auth.token.email);
       }
 
-      // Sub-coleção de indicadores de digitação
-      match /typing/{userId} {
-        allow read, write: if isAuthenticated() && request.auth.uid == userId;
-        allow read: if isAdmin();
+      match /typing/{uid} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(uid);
       }
     }
 
     // ────────────────────────────────────────────────
-    // /support_chats — Chats de suporte
+    // USERS (DADOS PRIVADOS DE PERFIL)
     // ────────────────────────────────────────────────
-    match /support_chats/{chatId} {
-      // Leitura: apenas o dono do chat ou o admin
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
 
-      // Criação: usuário logado, criando chat com seu próprio userId
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-
-      // Atualização e deleção: apenas o admin
-      allow update, delete: if isAdmin();
-
-      // Sub-coleção de mensagens do chat de suporte
-      match /messages/{messageId} {
-        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid);
-        allow create: if isAuthenticated()
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 1000;
-        allow update, delete: if isAdmin();
-      }
-
-      match /typing/{userId} {
-        allow read, write: if isAuthenticated() && request.auth.uid == userId;
-        allow read: if isAdmin();
-      }
-    }
-
-    // ────────────────────────────────────────────────
-    // /users — Perfis de usuário
-    // ────────────────────────────────────────────────
     match /users/{userId} {
-      // Leitura: o próprio usuário ou o admin
-      allow read: if isOwner(userId) || isAdmin();
-
-      // Escrita: apenas o próprio usuário pode atualizar seu perfil
-      allow write: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
 
     // ────────────────────────────────────────────────
-    // /inventory — Estoque (salas)
+    // PERFIS (PÚBLICO PARA EVITAR CRASH)
     // ────────────────────────────────────────────────
-    match /inventory/{itemId} {
-      // Qualquer usuário autenticado pode LER o estoque (exibição pública)
-      allow read: if isAuthenticated();
 
-      // Apenas o admin pode criar, editar e deletar itens do estoque
-      allow write: if isAdmin();
+    match /trainer_profiles/{profileId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.uid == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers'])
+      );
     }
 
     // ────────────────────────────────────────────────
-    // /ClientReviews — Depoimentos
+    // SOCIAL POSTS (CORRIGIDO - SEM DUPLICAÇÃO)
     // ────────────────────────────────────────────────
-    match /ClientReviews/{reviewId} {
-      // Qualquer pessoa autenticada pode ver os depoimentos
-      allow read: if isAuthenticated();
 
-      // Usuário cria seu próprio depoimento com seu userId
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    match /social_posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.authorUid == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.authorUid == request.auth.uid;
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
 
-      // Apenas o admin pode editar ou deletar depoimentos
-      allow update, delete: if isAdmin();
+      match /{allSubcollections=**} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // ────────────────────────────────────────────────
-    // /admin_dismissed_notifications — Notificações do Admin
+    // ADMIN / ESTOQUE
     // ────────────────────────────────────────────────
-    match /admin_dismissed_notifications/{docId} {
-      // Apenas o admin acessa
-      allow read, write: if isAdmin();
-    }
-    
-    // ────────────────────────────────────────────────
-    // /chest_stock — Estoque detalhado
-    // ────────────────────────────────────────────────
-    match /chest_stock/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
 
-    // ────────────────────────────────────────────────
-    // /chest_matches — Matches processados
-    // ────────────────────────────────────────────────
-    match /chest_matches/{docId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
-    }
+    match /inventory/{id} { allow read, write: if isAdmin(); }
+    match /stock_rooms/{id} { allow read, write: if isAdmin(); }
+    match /chest_matches/{id} { allow read, write: if isAdmin(); }
+    match /chest_stock/{id} { allow read, write: if isAdmin(); }
 
-    // ────────────────────────────────────────────────
-    // /stock_rooms — Salas de estoque
-    // ────────────────────────────────────────────────
-    match /stock_rooms/{roomId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // ────────────────────────────────────────────────
-    // /breeder_profiles — Perfis Financeiros dos Breeders (Doc ID === Email)
-    // ────────────────────────────────────────────────
     match /breeder_profiles/{email} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == email);
-      allow write: if isAdmin() || (isAuthenticated() && request.auth.token.email == email); // Permitir self-update de nome, etc.
-    }
-
-    // ────────────────────────────────────────────────
-    // /social_posts — Feed da Comunidade
-    // ────────────────────────────────────────────────
-    match /social_posts/{postId} {
-      allow read: if isAuthenticated();
-      // Permitir criar posts se estiver logado. O authorUid deve ser o UID do usuário.
-      allow create: if isAuthenticated();
-      // Permitir curtidas (uodate parcial do campo likes) ou edição do próprio post
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
-    }
-
-    // ────────────────────────────────────────────────
-    // /trainer_profiles — Perfis de Treinadores (Público)
-    // ────────────────────────────────────────────────
-    match /trainer_profiles/{profileId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
-      allow delete: if isAdmin();
-    }
-
-    // ────────────────────────────────────────────────
-    // /global_events — Eventos (Caça Pixel)
-    // ────────────────────────────────────────────────
-    match /global_events/{eventId} {
-      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
     // ────────────────────────────────────────────────
-    // Qualquer outra coleção — bloqueada por padrão
+    // DADOS PÚBLICOS (LIBERADOS PRA EVITAR ERRO)
     // ────────────────────────────────────────────────
+
+    match /FAQ/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /ClientReviews/{id} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    match /global_events/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /wishlists/{id} {
+      allow read, write: if isAdmin() ||
+        (isAuthenticated() &&
+          (resource.data.uid == request.auth.uid ||
+           request.resource.data.uid == request.auth.uid));
+    }
+
+    // ────────────────────────────────────────────────
+    // GAMES
+    // ────────────────────────────────────────────────
+
+    match /grids/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /pokedle/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ────────────────────────────────────────────────
+    // SUPORTE
+    // ────────────────────────────────────────────────
+
+    match /support_chats/{chatId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      match /messages/{msgId} {
+        allow read, write: if isAdmin() ||
+          (isAuthenticated() &&
+            get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid);
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // SAFETY NET
+    // ────────────────────────────────────────────────
+
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
   }
 }

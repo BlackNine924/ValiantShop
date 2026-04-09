@@ -23,6 +23,7 @@ interface OrderChatProps {
   onClose: () => void;
   isFloating?: boolean;
   collectionName?: 'orders' | 'support_chats';
+  customDb?: any;
 }
 
 export const OrderChat = ({ 
@@ -33,8 +34,10 @@ export const OrderChat = ({
   isAdminView = false, 
   onClose, 
   isFloating = false,
-  collectionName = 'orders'
+  collectionName = 'orders',
+  customDb
 }: OrderChatProps) => {
+  const activeDb = customDb || db;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,7 +53,7 @@ export const OrderChat = ({
     }
 
     const q = query(
-      collection(db, collectionName, orderId, 'messages'),
+      collection(activeDb, collectionName, orderId, 'messages'),
       orderBy('createdAt', 'asc')
     );
 
@@ -73,12 +76,14 @@ export const OrderChat = ({
   useEffect(() => {
     if (!orderId) return;
 
-    const q = query(collection(db, collectionName, orderId, 'typing'));
+    const q = query(collection(activeDb, collectionName, orderId, 'typing'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const activeTyping = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() as any }))
         .filter(t => t.isTyping && t.id !== (currentUser.uid || currentUser.id));
       setTypingUsers(activeTyping);
+    }, (err) => {
+      console.error("Typing Indicator sync error:", err);
     });
 
     return unsubscribe;
@@ -87,7 +92,7 @@ export const OrderChat = ({
   const updateTypingStatus = async (isTyping: boolean) => {
     if (!orderId) return;
     const myUid = currentUser.uid || currentUser.id;
-    const typingRef = doc(db, collectionName, orderId, 'typing', myUid);
+    const typingRef = doc(activeDb, collectionName, orderId, 'typing', myUid);
 
     try {
       if (isTyping) {
@@ -157,11 +162,11 @@ export const OrderChat = ({
     };
 
     try {
-      await addDoc(collection(db, collectionName, orderId, 'messages'), messageData);
+      await addDoc(collection(activeDb, collectionName, orderId, 'messages'), messageData);
       
       // Mark parent as having chat
       try {
-        await updateDoc(doc(db, collectionName, orderId), {
+        await updateDoc(doc(activeDb, collectionName, orderId), {
           hasChat: true,
           lastMessageAt: serverTimestamp()
         });

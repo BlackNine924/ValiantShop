@@ -1,0 +1,71 @@
+[2026-04-07T18:32] Rookidee | Charmander_com_F | Breeding | glintsAwarded:undefined | uid:ZO0VmDBRfAgQoqdAL5lZ4LlLXMd2
+[2026-04-07T17:44] Bulbasaur | polarpao | Breeding | glintsAwarded:undefined | uid:RUiPK8G97NOuQPIJ0nl0lEX1OT42
+[2026-04-07T02:25] Hawlucha | Charmander_com_F | Breeding | glintsAwarded:undefined | uid:ZO0VmDBRfAgQoqdAL5lZ4LlLXMd2
+[2026-04-07T01:02] Fennekin | RyannBrZera | Breeding | glintsAwarded:undefined | uid:rNbyIXoz4XVc0xBJESskpGQlXCh1
+[2026-04-06T22:55] Timburr | mil | Breeding | glintsAwarded:undefined | uid:4628Ugi0s1gPixXCRG2CUPJASIX2
+[2026-04-06T21:57] Dreepy | Jonathan6815 | Breeding | glintsAwarded:undefined | uid:CnZi8ovCJpSxQ6oTH5am4KrR4ei1
+[2026-04-06T20:46] Koffing galar | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-04-06T20:46] Koffing galar | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-04-06T16:07] Bouffalant | Querty_0810000 | Breeding | glintsAwarded:undefined | uid:9N0ZWVBShURM9oL3wa9S6S4bTev2
+[2026-04-02T03:37] Rotom | MobeFlux | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-04-02T03:36] Mareanie | MobeFlux | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-04-02T03:34] Gastly | MobeFlux | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-04-02T01:24] Grookey | Ramonkkj | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-04-01T00:11] Piplup | MOB_GHSOT | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-30T21:46] Pincurchin | ViperBe16 | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-30T21:00] Eelektross | ShadowStar_Dust | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-03-30T18:21] Venipede | Josa | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-30T16:03] Shroomish | Muniz | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-03-30T16:03] Shroomish | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-30T03:36] Ralts | jorge102 | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-03-30T03:04] Pidove | Vazio09 | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-30T01:25] Ferroseed | Mimikyu001 | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-03-29T16:52] Pelipper | Mimikyu001 | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Grimer de Alola | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Flittle | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Grimer de Alola | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Wattrel | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Charmander | KawazakIlI | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Mankey | Muniz | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Vivillon | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Gligar | Muniz | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Wimpod | Muniz | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Togetic | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Gligar | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Tepig | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Flamigo | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Togetic | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Charcadet | Muniz | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Flittle | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Cyndaquil de Hisui | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Vivillon | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Cyndaquil de Hisui | Muniz | Entregue | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Wattrel | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Shellder | Angel001 | Finalizado | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Chansey | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Chansey | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Mankey | Muniz | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Gliscor | thomthom22 | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Rookidee | ZxcNNoh12 | Breeding | glintsAwarded:undefined | uid:undefined
+[2026-03-28T04:25] Wooper de Paldea | Snow_C9 | Entregue | glintsAwarded:undefined | uid:undefined
+
+== TOTAL: 50 orders ==
+
+== Reskalla Profile (FEelmy) ==
+nick: Arthur Reskalla
+glintFragments: {"Fire":0.25}
+glintCollection: []
+
+== ALL PROFILES ==
+  95LcduC4rrTXCV7a6Qw9ODkyIxy1 | "ValiantPro" | undefined
+  9N0ZWVBShURM9oL3wa9S6S4bTev2 | "querty0810000" | undefined
+  FEelmyfacYc42kn3mcBhT7tyWYG2 | "Arthur Reskalla" | {"Fire":0.25}
+  Hl8zA123R8T9XFb58cMXF6AzqKA3 | "Mimikyu001" | {"dark":0.25,"Grass":0.25}
+  OYtPMVmolAX2gznfMJEK0gH9MtN2 | "Song D Dia" | undefined
+  PC3RBwkwqwcQyROPqOCbmhwuNqK2 | "Mimikyu001" | undefined
+  VuLEs8GAftUG2n1JC0QkYFuDpue2 | "reskalla" | {"Fire":0,"grass":0,"Bug":0,"Ice":0}
+  ZO0VmDBRfAgQoqdAL5lZ4LlLXMd2 | "charmandercomf" | undefined
+  fIxIqEYDNDesZBQor2XWS5wGkx93 | "cafelmao" | undefined
+  hSIvTRTZKJblzUqf3pUGQ2JByUx1 | "dwauifhwaiopfwa" | {"Water":0.25}
+  jOSsAkPmqRcR7X4UVHBRtrH4sGT2 | "TesterJet123" | undefined
+  kxPjfCaISUaphow9QrUrnCwOPvm2 | "ViperBe16" | undefined

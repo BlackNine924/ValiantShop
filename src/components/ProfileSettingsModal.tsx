@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save, Camera, Lock, Unlock, Sparkles, User, LayoutGrid } from 'lucide-react';
 import { db } from '../firebase';
@@ -39,7 +40,7 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
@@ -180,6 +181,7 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Settings, LogOut, Shield, Zap, Tag, Eye, EyeOff, Copy, Check, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 interface SettingsModalProps {
@@ -94,7 +95,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
   const siteNick = user?.displayName || 'Treinador';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0 }} 
@@ -342,6 +343,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             </div>
         </motion.div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

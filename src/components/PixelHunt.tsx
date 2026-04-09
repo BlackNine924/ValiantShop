@@ -32,8 +32,9 @@ export const PixelHunt = () => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = onSnapshot(doc(db, 'global_events', 'pixel_hunt'), (docSnap) => {
-      if (!docSnap.exists()) return;
+      if (!isMounted || !docSnap.exists()) return;
 
       const data = docSnap.data() as PixelHuntEvent;
       const spawnKey = data.spawnTime?.toString() || 'no-spawn';
@@ -73,9 +74,14 @@ export const PixelHunt = () => {
       }
 
       setHunt(data);
+    }, (error) => {
+      console.warn("PixelHunt listener suppressed:", error);
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const handleCatch = async () => {

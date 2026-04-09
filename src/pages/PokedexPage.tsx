@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';
 import { PokedexCard } from '../components/PokedexCard';
 import { PokedexDetail } from '../components/PokedexDetail';
@@ -28,10 +28,19 @@ export const PokedexPage: React.FC = () => {
   const [caughtIds, setCaughtIds] = useState<number[]>([]);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
 
+  const isInitialLoadRequested = useRef(false);
+
   // Auto-open if redirected from admin with search
   useEffect(() => {
-    if (user?.displayName) {
-      loadPokedexState(user.displayName).then(setCaughtIds);
+    if (user?.displayName && !isInitialLoadRequested.current) {
+      isInitialLoadRequested.current = true;
+      loadPokedexState(user.displayName)
+        .then(ids => {
+          if (ids) setCaughtIds(ids);
+        })
+        .catch(err => {
+          console.error("Error loading pokedex state:", err);
+        });
     }
   }, [user]);
 

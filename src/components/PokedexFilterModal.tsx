@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Filter, Sparkles, Layers, Fingerprint, Target, Star, Anchor } from 'lucide-react';
 import { ALL_TYPES, TYPE_COLORS } from '../data/pokemonTypes';
 import { TYPE_TRADUCOES } from '../services/pokedexService';
@@ -82,8 +83,8 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
     "Flying", "Amorphous", "Field", "Fairy", "Grass", "Dragon", "Ditto"
   ];
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade">
+  return createPortal(
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 animate-fade">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       
       <div className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
@@ -198,6 +199,7 @@ export const PokedexFilterModal: React.FC<PokedexFilterModalProps> = ({ isOpen, 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

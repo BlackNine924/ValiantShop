@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Egg, CheckCircle2, Coins, TrendingUp, LogOut, Hourglass } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { adminAuth as auth, adminDb as db } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider, signOut, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { getBreederRank, getNextRankProgress } from '../config/breederConfig';
 import { POKEMON_DATA } from '../data/pokemonData';
@@ -14,6 +14,7 @@ import { getBasePokemonName } from '../utils/pokemonNameUtils';
 export const BreederDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
+  const [isInitialAuthCheck, setIsInitialAuthCheck] = useState(true);
   const [authError, setAuthError] = useState<{ email: string } | null>(null);
   const [user, setUser] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
@@ -33,6 +34,7 @@ export const BreederDashboard = () => {
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
+      await setPersistence(auth, browserSessionPersistence);
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -84,6 +86,21 @@ export const BreederDashboard = () => {
   };
 
   useEffect(() => {
+    const unsubscribeAuth = auth.onAuthStateChanged(() => {
+      // If a user is already logged in, we try to restore session
+      // but for privacy we don't automatically mark as 'authenticated' 
+      // until they confirm by clicking the button or we verify the DB record.
+      // However, we MUST mark the check as NOT loading anymore.
+      setIsInitialAuthCheck(false);
+    });
+
+    return () => {
+       unsubscribeAuth();
+       signOut(auth).catch(err => console.error("Logout on breeder leave failed:", err));
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || !user) return;
     
     // Listen to Breeder Profile (for Wallet and Completed Count)
@@ -129,6 +146,14 @@ export const BreederDashboard = () => {
       alert('Falha interna ao atualizar status.');
     }
   };
+
+  if (isInitialAuthCheck) {
+    return (
+      <div className="flex items-center justify-center min-h-[100vh]">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

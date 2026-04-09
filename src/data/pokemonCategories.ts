@@ -13,8 +13,31 @@ export const GENDERLESS_POKEMON = [
 ];
 
 export const MALE_ONLY_POKEMON = [
-  'Nidoran M', 'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
+  // True male-only (no female form exists at all)
+  'Nidorino', 'Nidoking', 'Tyrogue', 'Hitmonlee', 'Hitmonchan', 'Hitmontop', 
   'Volbeat', 'Mothim', 'Gallade', 'Throh', 'Sawk', 'Rufflet', 'Braviary', 
+  // Impidimp line is exclusively male with no female form
   'Impidimp', 'Morgrem', 'Grimmsnarl', 
-  'Basculegion', 'Basculegion Male', 'Oinkologne', 'Oinkologne Male'
+  'Basculegion Male', 'Oinkologne Male'
+];
+
+// Pokémon with a female form (can breed to produce either gender)
+// These are NOT genderless — they have a fixed female gender in game but breed normally
+export const FEMALE_FORM_POKEMON = [
+  'Nidorina', 'Nidoqueen',
+  'Illumise',
+  'Wormadam',
+  'Froslass',
+  'Vespiquen',
+  'Petilil', 'Lilligant',
+  'Gothita', 'Gothorita', 'Gothitelle',
+  'Feebas', 'Milotic',
+  'Flabébé', 'Floette', 'Florges',
+  'Bounsweet', 'Steenee', 'Tsareena',
+  'Comfey',
+  'Hatenna', 'Hattrem', 'Hatterene',
+  'Milcery', 'Alcremie',
+  'Enamorus',
+  'Basculegion', 'Oinkologne',
+  'Meowstic Female', 'Indeedee Female',
 ];
