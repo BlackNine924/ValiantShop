@@ -821,6 +821,7 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showFinishedNotification, setShowFinishedNotification] = useState<any>(null);
   const { user } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const rankingRef = useRef<HTMLDivElement>(null);
   const reviewsRef = useRef<HTMLDivElement>(null);

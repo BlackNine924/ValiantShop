@@ -99,38 +99,49 @@ export const FloatingSupport = () => {
 
       <motion.button
         onClick={toggleOpen}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl relative pointer-events-auto transition-all duration-500 overflow-hidden ${
-          isOpen ? 'bg-black border border-white/10 group' : 'bg-primary shadow-[0_0_20px_var(--primary-glow)]'
+        whileHover={{ scale: 1.1, rotate: 5 }}
+        whileTap={{ scale: 0.9 }}
+        className={`w-16 h-16 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] relative pointer-events-auto transition-all duration-500 overflow-hidden ${
+          isOpen 
+            ? 'bg-[#1a1a1a] border border-white/20 group' 
+            : 'bg-gradient-to-br from-primary via-primary/80 to-primary/40 shadow-[0_0_20px_var(--primary-glow)]'
         }`}
       >
+        {/* Particle Glow Effect */}
+        {!isOpen && (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.4)_0%,transparent_70%)] animate-pulse" />
+        )}
+
         <AnimatePresence mode="wait">
           {isOpen ? (
             <motion.div
               key="close"
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
+              initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
             >
-              <X size={28} className="text-gray-400 group-hover:text-white" />
+              <X size={24} className="text-white group-hover:text-primary transition-colors" />
             </motion.div>
           ) : (
             <motion.div
               key="open"
-              initial={{ rotate: 90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: -90, opacity: 0 }}
+              initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
               className="flex flex-col items-center"
             >
-              <MessageSquare size={28} className="text-black" />
+              <MessageSquare size={28} className="text-black drop-shadow-sm" fill="currentColor" />
             </motion.div>
           )}
         </AnimatePresence>
         
-        {/* Pulsing Ring when closed */}
+        {/* Pulsing Outer Ring when closed */}
         {!isOpen && (
-          <div className="absolute inset-0 border-4 border-white/20 rounded-full animate-ping" />
+          <motion.div 
+            animate={{ scale: [1, 1.4, 1], opacity: [0.5, 0, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-0 border-2 border-primary rounded-full pointer-events-none" 
+          />
         )}
       </motion.button>
     </div>

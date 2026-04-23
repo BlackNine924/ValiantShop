@@ -1,56 +1,96 @@
-# Inventário Completo de Sistemas - ValiantShop
+# 💠 ValiantShop | Inventário Técnico Detalhado & Exaustivo (v3.0)
 
-Este documento lista todas as funcionalidades, sistemas e módulos atualmente implementados no sistema ValiantShop, divididos por área de atuação.
-
----
-
-## 1. Interface do Usuário (Frontend)
-
-8.  **Perfil do Jogador (Settings):** Edição de nicks (Minecraft/Discord) e salvamento de preferências de navegação.
-9.  **Sistema de Avaliações (Review System):** Interface para que clientes deixem notas de 1 a 5 estrelas e comentários sobre a entrega.
-10. **Suporte Flutuante:** Atalho rápido para contato direto com a equipe administrativa.
+Este documento é a listagem definitiva de **absolutamente todos** os sistemas, módulos, funcionalidades e lógicas implementadas no **ValiantShop** até Abril de 2026. 
 
 ---
 
-## 2. Painel Administrativo (Admin Dashboard)
+### 1. 🏗️ Arquitetura, Core & Segurança
+*   **Autenticação Híbrida (Google OAuth)**: Sistema de login via Google integrado ao Firebase Auth com persistência de sessão.
+*   **Diferenciação de Roles**: Lógica de permissões para Administradores (`reskallaarthur@gmail.com`), Breeders e Treinadores comuns.
+*   **Dual-Login Engine**: Suporte a duas instâncias de login simultâneas (Admin via `adminApp` e User via `app`) em `firebase.ts`.
+*   **Global Error Boundary**: Captura de exceções em tempo real com interface de recuperação automática ("Reiniciar Interface").
+*   **Sincronização Firestore Snapshots**: Motor de atualização em tempo real para chats, pedidos e notificações.
+*   **Service Layer (PokeAPI)**: Camada de integração para busca de dados, tradução e sprites Pokémon.
+*   **Safe Storage Utility**: Wrapper de `localStorage` com tratamento de erros para persistência de carrinho, nicks e notificações.
 
-11. **Dash de Estatísticas:** Visão geral com métricas de volume de vendas e faturamento total.
-12. **Gestão de Pedidos (Order Manager):** Controle total do fluxo de produção (Pendente -> Breeding -> Finalizado -> Entregue).
-13. **Filtros e Busca de Pedidos:** Sistema de busca por nick e filtragem rápida por status de produção.
-14. **Baús Lotados (Chest Stock):** Controle de estoque pronto com separação por categorias de IV (F4, F5, F6) e limite de 54 unidades.
-15. **Salas de Estoque (Room Manager):** Organização física da localização dos Pokémon em gavetas e caixas dentro do servidor.
-16. **Gestão de Treinadores (CRM):** Agregação de dados por cliente, mostrando gasto total, histórico de compras e nicks vinculados.
-17. **Chat de Atendimento:** Central de comunicação em tempo real com o cliente para dúvidas e entregas.
-19. **Moderação de Feedbacks:** Painel central para visualizar e gerir as avaliações recebidas.
-20. **Bulk Actions:** Ações em massa para deleção e limpeza de registros históricos.
+### 2. 🛒 Sistema de Comércio & Encomendas
+*   **Gerador de Encomendas (OrderForm)**:
+    *   Busca inteligente de espécies com filtros de favoritos e tendências.
+    *   Seleção dinâmica de IVs (F4, F5, F6) com cálculo de preço automático.
+    *   Lógica de descontos para Pokémon castrados.
+    *   Suporte a Pokémon "Genderless" e "Male Only".
+    *   Campos de Nick do Destinatário (Presente) e Nick do Discord.
+    *   Sistema Anti-Spam (Cooldown de 30s) por IP/Sessão.
+*   **Carrinho de Compras (CartModal)**:
+    *   Gerenciamento de múltiplos itens com persistência.
+    *   Checkout em lote com criação de múltiplos documentos no Firestore.
+*   **Wishlist System**:
+    *   Salvamento de configurações de Pokémon para compra futura.
+    *   Aplicação rápida de itens da Wishlist diretamente no formulário de pedido.
+*   **Order Tracking (Status Page)**:
+    *   Acompanhamento visual do status da forja.
+    *   Histórico completo de pedidos passados.
+*   **Review Hub**:
+    *   Sistema de nota (estrelas) e comentário pós-entrega.
+    *   Feedback vinculado ao pedido para verificação de autenticidade.
+
+### 3. 🏛️ Painel Administrativo & Gestão Pro
+*   **Admin Dashboard Central**:
+    *   Métricas de faturamento total, ticket médio e volume de vendas.
+    *   Gestão de pedidos em tempo real.
+*   **Fluxo de Trabalho Kanban**: Organização visual de pedidos por colunas (Pendente, Breeding, Pronto, Entregue).
+*   **Edit Order Modal**: Ferramenta completa para alteração manual de atributos de pedidos ativos.
+*   **Equipe & Breeders**:
+    *   Sistema de convite e gestão de funcionários (Breeders).
+    *   Cálculo de comissões baseado em Ranks (BreederConfig).
+    *   Carteira digital do funcionário com histórico de pagamentos.
+*   **Inventory & Stock Rooms**:
+    *   Mapeamento físico de baús e gavetas no servidor.
+    *   Simulador visual de 54 slots por baú.
+    *   **Auto-Stock Sync**: Abatimento automático de estoque ao finalizar pedidos.
+*   **Inbox Administrativa**: Central de alertas para cancelamentos e novos chamados de suporte.
+
+### 4. 🧪 Ferramentas de Suporte & Comunicação
+*   **Order Chat Integrado**: Chat bilateral em tempo real entre cliente e staff dentro do pedido.
+*   **Floating Support System**: Chat de suporte flutuante (Ticket System) para dúvidas gerais.
+*   **Indicadores de Digitação**: Feedback visual de "Treinador digitando..." em todos os chats.
+*   **FAQ Interativa**: Portal de dúvidas frequentes gerenciável via Admin.
+
+### 5. ⚔️ Ecossistema Competitivo & VGC
+*   **VGC Consultoria System**:
+    *   Analisador de times (Synergy Scorer).
+    *   Leitor de exportação do Pokémon Showdown.
+    *   Meta Detection (Reg H / Meta 2025).
+*   **Pokedex Pro**:
+    *   Enciclopédia com filtros avançados (Egg Groups, Tipagem, Stats).
+    *   Suporte a dados técnicos de Cobblemon.
+
+### 6. 📱 Social & Fidelidade
+*   **Community Feed**: Rede social completa para posts, imagens e interações entre treinadores.
+*   **Trainer Profile 2.0**:
+    *   Perfis públicos personalizáveis (Bio, Banner, Avatar).
+    *   Exibição de conquistas e histórico de compras.
+*   **Glint Loyalty System**:
+    *   Acúmulo de fragmentos elementais por tipo de Pokémon comprado.
+    *   Lógica de Fragmentos Prismáticos (Joker) para coleções completas.
+*   **Ranking Global**: Leaderboard de gastos totais e fidelidade (Rich Trainers).
+
+### 7. 🎮 Gamificação & Eventos
+*   **Daily Minigames Engine**:
+    *   **PokeGrid**: Puzzle de tipos e gerações.
+    *   **Pokedle**: Adivinhação diária.
+    *   **PokeQuiz**: Quiz de conhecimentos gerais.
+    *   **Streak System**: Contador de dias seguidos jogando com salvamento em Cloud.
+*   **Pixel Hunt Event Engine**: Disparador global de eventos de caça com localização aleatória e sistema de vencedores.
+
+### 8. 🔌 Integrações & Automações
+*   **Discord Sync (Webhook v3)**:
+    *   Notificação de novos pedidos com menção ao Admin (@UID).
+    *   Embeds formatados com banner premium e informações inline.
+    *   Shorthand automático de IVs (F4, F5, F6) nos alertas.
+    *   Destaque automático para Hidden Abilities (HA).
+*   **Valiant Bot**: Automação de postagens no feed para grandes feitos da comunidade.
+*   **Global Rank Sync**: Atualização automática do rank global do usuário após cada compra.
 
 ---
-
-## 3. Consultório Competitivo (VGC 2025)
-
-O Consultório Competitivo é um módulo analítico que confere, prevê e avalia as sinergias das equipes montadas pelos usuários para o formato VGC e permite planejamento contundente.
-
-**Funcionalidades Atuais Implementadas:**
-- **Parser Nativo do Pokémon Showdown:** Leitura e tradução estruturada dos Textos de Exportação nativos do Pokémon Showdown (Habilidades, Tera Types, Golpes exatos, e Itens de segurar).
-- **Motor Analítico de Sinergia (Reg H):** Algoritmo de 100 pontos baseados em Cobertura de Tipos, Fake Out / Redirect check (pelos Golpes listados), presenças defensivas e Win-Conditions S/A-tier.
-- **Deteccão de "Cores" Meta:** Avisos textuais caso o usuário forme combinações conhecidas e eficazes perante ao cenário competitivo, como "FWG Core" (Fogo/Água/Grama) e "Fantasy Core" (Fada/Aço/Dragão).
-- **Sprites Renderizados Pela PokeAPI:** Interação gráfica substituindo simples textos por imagens pixel-art ricas que retratam em tempo real os 6 escolhidos do time.
-
-### Futuras Inovações (15 Ideias de Aperfeiçoamento Mapeadas)
-1.  **Speed Tier Timeline Visual:** Em vez de apenas dizer se tem "Tailwind", mostrar um gráfico horizontal ("Timeline") prevendo quem atacará primeiro contra os 10 Pokémon mais usados do VGC (ex: Gholdengo Choice Scarf vs seu time em Tailwind).
-2.  **Matchup Simulado (The "Top 10" Test):** Computar se o seu time apanha automaticamente contra arquétipos clássicos e dominantes atuais (Ex: Rain Archaludon ou Dondozo-Tatsugiri).
-3.  **Draft & Veto Simulador (Bo3 Open Team Sheet):** Uma simulação minigame de qual Pokémon o oponente meta com certeza baniria ("Veto") baseados nos counters diretos.
-4.  **Otimizador de EVs Focais:** Dizer se aquele status no EV de Defesa salva de um *Sucker Punch* específico do Kingambit ou se é um valor irrelevante pro formato atual. O sistema sugere "Puxe 12 pontos para Def para aguentar XYZ".
-5.  **Sincronização Pikalytics/Smogon API:** Abandonar o dicionário estático (hoje `META_STAPLES`) para varrer os servidores da Smogon mensalmente para definir quem se torna S-Tier sem trabalho manual do administrador.
-6.  **Gerador de Formato "Rental/Poképaste":** Gerar automático o link (Exportação visualizada via Poképaste) para publicizar o time ou compartilhar com a comunidade de clientes se receber rank 'S'.
-7.  **Medidor de Dano (Damage Calc Tooltip):** Ao passar o mouse pelo retrato de um atacante do seu time, pular um tooltip com o cálculo de "Ele dá 80%~95% num Amoonguss usando Flare Blitz".
-8.  **Tera Type Hot-Swapper:** Botões rápidos ao lado de um monstrinho fraco para o jogador testar "e se ele virar Tera Ghost?". Ao clicar, recalcula em tempo real a pontuação dos 100 pontos do ranking com a sinergia readequada.
-9.  **Visualizador de Ligações Node-Graph:** Um mapa interativo conectando com linhas brilhantes quais membros da equipe dão buff explícitos uns nos outros (Ex: Linha de Pelipper de Drizzle ativando Swift Swim do parceiro).
-10. **Motor de Sugestão Trocável em Clique (1-Click Switch):** No lugar de receber só um texto de "Adicione Tornadus", clicar no botão de uma sugestão já plota a Sprite na vaga vazia e pisca na tela quantos pontos de Rank aquilo lhe custou ou beneficiou.
-11. **Histórico Evolutivo (Tournament Mode):** Uma aba do cliente salvando sua equipe mês após mês para que ele entenda o que alterou para as copas atuais.
-12. **Filtro de Ameaça Cruzada (Cross-counters):** Buscar: "Nenhum de meus 6 Pokemon mata Archaludon" emitindo alerta crítico e vermelho vibrante na interface. Foco explícito nos "muros impassáveis".
-13. **Role Overlap Warnings:** Avisar visualmente ao detectar "Role Overlap" e "Diminushing Returns" (Passou de 3 membros full-suportes? Aviso visual: "Pouca Ameaça Ofensiva - Risco de passividade alta!").
-14. **Previsão Ativa de Climas/Terrenos (Weather Simulator):** Um Checkbox lateral para o usuário ticar: "Chuva Ativa". Todo o time relata visualmente, aplicando debuff para os de fogo, boost e Swift Swim. 
-15. **Link com "ValiantShop" Direto (Conversão Direta):** Já que o time alcançou RANK S+, habilitar o botão premium que magicamente preenche o formulário da sua Loja encomendando o "Time 1:1 Oficial e Pró-treinado" para o Breeder colocar no carrinho sem o cliente errar uma Natureza no Google Forms convencional!
-
----
+> *Inventário atualizado e validado em 23 de Abril de 2026.*

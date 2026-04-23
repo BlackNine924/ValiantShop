@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  MessageSquare, Heart, Send, X, Trophy, Sparkles, Trash2, User
+  MessageSquare, Heart, Send, X, Trophy, Sparkles, Trash2, User,
+  Image as ImageIcon, Video as VideoIcon, Loader2, Pin, Search
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -14,6 +15,7 @@ import { getRankInfo } from '../utils/rankUtils';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { NotificationModal } from '../components/NotificationModal';
 
 interface SocialPost {
   id: string;
@@ -26,6 +28,8 @@ interface SocialPost {
   likes: string[];
   commentCount: number;
   type?: 'post' | 'achievement';
+  imageUrl?: string;
+  videoUrl?: string;
   metadata?: any;
 }
 
@@ -36,7 +40,15 @@ export const CommunityFeed = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filter, setFilter] = useState<'all' | 'achievements'>('all');
   const [selectedPostForThread, setSelectedPostForThread] = useState<SocialPost | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
+  // Media states
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
   // Modal state for deletions
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -50,6 +62,22 @@ export const CommunityFeed = () => {
     onConfirm: () => {}
   });
 
+  const [pinNotification, setPinNotification] = useState<{isOpen: boolean, isUnpinning: boolean} | null>(null);
+  const [currentUserPinnedPostId, setCurrentUserPinnedPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setCurrentUserPinnedPostId(null);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, 'trainer_profiles', user.uid), (snap) => {
+      if (snap.exists()) {
+        setCurrentUserPinnedPostId(snap.data().pinnedPostId || null);
+      }
+    });
+    return unsub;
+  }, [user]);
+
   useEffect(() => {
     const q = query(
       collection(db, 'social_posts'),
@@ -61,10 +89,95 @@ export const CommunityFeed = () => {
     return unsubscribe;
   }, []);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMediaType(type);
+    setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setMediaPreview(url);
+  };
+
+  const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimensions
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Quality: 0.7 for good balance
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedBase64);
+        };
+      };
+    });
+  };
+
+  const uploadToDiscord = async (file: File): Promise<string> => {
+    const webhookUrl = "https://discord.com/api/webhooks/1490163865902907466/Zu625E8zcImq6PJVExAjX6Uq5YAwNcNfv88kQXDVGQHv3kzh-CRA_rK8p6Kf5u-KgOwm";
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('payload_json', JSON.stringify({ content: "🎥 Novo vídeo do Feed ValiantShop" }));
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) throw new Error("Falha ao enviar vídeo ao Discord");
+    
+    // Discord webhook doesn't return the message object by default unless we add ?wait=true
+    const waitResponse = await fetch(webhookUrl + "?wait=true", {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await waitResponse.json();
+    return data.attachments[0].url;
+  };
+
   const handleCreatePost = async () => {
-    if (!user || !newPostContent.trim()) return;
+    if (!user || (!newPostContent.trim() && !selectedFile)) return;
     setIsSubmitting(true);
     try {
+      let imageUrl = '';
+      let videoUrl = '';
+
+      if (selectedFile) {
+        if (mediaType === 'image') {
+          imageUrl = await compressImage(selectedFile);
+        } else if (mediaType === 'video') {
+          videoUrl = await uploadToDiscord(selectedFile);
+        }
+      }
+
       await addDoc(collection(db, 'social_posts'), {
         authorUid: user.uid,
         authorNick: profile?.nick_lowercase || user.displayName || 'Treinador',
@@ -74,11 +187,18 @@ export const CommunityFeed = () => {
         createdAt: serverTimestamp(),
         likes: [],
         commentCount: 0,
-        type: 'post'
+        type: 'post',
+        imageUrl,
+        videoUrl
       });
+      
       setNewPostContent('');
+      setSelectedFile(null);
+      setMediaPreview(null);
+      setMediaType(null);
     } catch (e) {
       console.error("Error creating post:", e);
+      alert("Erro ao publicar: " + (e as any).message);
     } finally {
       setIsSubmitting(false);
     }
@@ -117,9 +237,33 @@ export const CommunityFeed = () => {
     });
   };
 
-  const filteredPosts = filter === 'achievements' 
-    ? posts.filter(p => p.type === 'achievement' || p.authorUid === 'SYSTEM' || p.authorUid === 'valiant_bot_system')
-    : posts.filter(p => p.type !== 'achievement' && p.authorUid !== 'SYSTEM' && p.authorUid !== 'valiant_bot_system');
+  const handlePinPost = async (postId: string) => {
+    if (!user || !profile) return;
+    try {
+      const profileRef = doc(db, 'trainer_profiles', user.uid);
+      const isUnpinning = currentUserPinnedPostId === postId;
+      await updateDoc(profileRef, {
+        pinnedPostId: isUnpinning ? null : postId
+      });
+      setPinNotification({ isOpen: true, isUnpinning });
+    } catch (e) {
+      console.error("Error pinning post:", e);
+    }
+  };
+
+  const filteredPosts = posts.filter(p => {
+    const matchesFilter = filter === 'achievements' 
+      ? (p.type === 'achievement' || p.authorUid === 'SYSTEM' || p.authorUid === 'valiant_bot_system')
+      : (p.type !== 'achievement' && p.authorUid !== 'SYSTEM' && p.authorUid !== 'valiant_bot_system');
+    
+    if (!searchTerm.trim()) return matchesFilter;
+
+    const term = searchTerm.toLowerCase();
+    const contentMatch = p.content.toLowerCase().includes(term);
+    const authorMatch = p.authorNick.toLowerCase().includes(term);
+    
+    return matchesFilter && (contentMatch || authorMatch);
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-24 pb-20 space-y-12">
@@ -133,6 +277,29 @@ export const CommunityFeed = () => {
         <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.3em] max-w-lg mx-auto leading-relaxed">
           Conecte-se com a Elite Valiant. Compartilhe sua jornada Pokémon em tempo real com toda a comunidade.
         </p>
+
+        {/* Search Bar */}
+        <div className="max-w-md mx-auto relative mt-8 group">
+          <div className="absolute inset-0 bg-primary/5 blur-xl rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity" />
+          <div className="relative flex items-center bg-black/40 border border-white/10 rounded-2xl px-4 py-3 focus-within:border-primary/40 transition-all">
+            <Search size={18} className="text-gray-600 group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Pesquisar posts ou treinadores..."
+              className="flex-1 bg-transparent border-none outline-none text-white text-xs font-bold px-3 placeholder:text-gray-700"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="text-gray-600 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Editor Area */}
@@ -155,16 +322,73 @@ export const CommunityFeed = () => {
               className="flex-1 bg-transparent border-none text-white font-bold placeholder:text-gray-700 outline-none resize-none min-h-[80px] pt-2"
             />
           </div>
+
+          {/* Media Preview */}
+          <AnimatePresence>
+            {mediaPreview && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="relative w-full max-h-64 rounded-2xl overflow-hidden border border-white/10 bg-black/40 group"
+              >
+                {mediaType === 'image' ? (
+                  <img src={mediaPreview} className="w-full h-full object-contain" alt="Preview" />
+                ) : (
+                  <video src={mediaPreview} className="w-full h-full object-contain" controls />
+                )}
+                <button 
+                  onClick={() => { setSelectedFile(null); setMediaPreview(null); setMediaType(null); }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex justify-between items-center pt-4 border-t border-white/5">
             <div className="flex gap-2">
-              {/* Future: Image Upload, Emoji, etc */}
+              <input 
+                type="file" 
+                ref={imageInputRef} 
+                accept="image/*" 
+                className="hidden" 
+                onChange={(e) => handleFileSelect(e, 'image')}
+              />
+              <input 
+                type="file" 
+                ref={videoInputRef} 
+                accept="video/*" 
+                className="hidden" 
+                onChange={(e) => handleFileSelect(e, 'video')}
+              />
+              <button 
+                onClick={() => imageInputRef.current?.click()}
+                className="p-2 hover:bg-white/5 text-gray-500 hover:text-primary rounded-xl transition-all flex items-center gap-2"
+                title="Adicionar Imagem"
+              >
+                <ImageIcon size={18} />
+              </button>
+              <button 
+                onClick={() => videoInputRef.current?.click()}
+                className="p-2 hover:bg-white/5 text-gray-500 hover:text-secondary rounded-xl transition-all flex items-center gap-2"
+                title="Adicionar Vídeo"
+              >
+                <VideoIcon size={18} />
+              </button>
             </div>
             <button 
               onClick={handleCreatePost}
-              disabled={isSubmitting || !newPostContent.trim()}
-              className="px-8 py-2.5 bg-primary text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-primary-glow disabled:opacity-30 disabled:scale-100"
+              disabled={isSubmitting || (!newPostContent.trim() && !selectedFile)}
+              className="px-8 py-2.5 bg-primary text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-primary-glow disabled:opacity-30 disabled:scale-100 flex items-center gap-2"
             >
-              {isSubmitting ? 'PUBLICANDO...' : 'POSTAR'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  {mediaType === 'video' ? 'ENVIANDO VÍDEO...' : 'PUBLICANDO...'}
+                </>
+              ) : 'POSTAR'}
             </button>
           </div>
         </div>
@@ -202,6 +426,8 @@ export const CommunityFeed = () => {
             onLike={() => handleLike(post.id, post.likes)} 
             onOpenThread={() => setSelectedPostForThread(post)}
             onDelete={() => handleDeletePost(post.id)}
+            onPin={() => handlePinPost(post.id)}
+            isPinned={currentUserPinnedPostId === post.id}
           />
         ))}
 
@@ -229,11 +455,19 @@ export const CommunityFeed = () => {
         onConfirm={confirmModal.onConfirm}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
+
+      <NotificationModal 
+        isOpen={!!pinNotification?.isOpen}
+        onClose={() => setPinNotification(null)}
+        title={pinNotification?.isUnpinning ? "POST DESAFIXADO" : "POST FIXADO"}
+        message={pinNotification?.isUnpinning ? "O post foi removido dos seus destaques" : "O post agora é o destaque do seu perfil"}
+        icon={pinNotification?.isUnpinning ? "unpin" : "pin"}
+      />
     </div>
   );
 };
 
-const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: SocialPost, user: any, onLike: () => void, onOpenThread: () => void, onDelete: () => void }) => {
+const PostCard = ({ post, user, onLike, onOpenThread, onDelete, onPin, isPinned }: { post: SocialPost, user: any, onLike: () => void, onOpenThread: () => void, onDelete: () => void, onPin: () => void, isPinned: boolean }) => {
   const { profile } = useAuth();
   const [authorProfile, setAuthorProfile] = useState<any>(null);
   const isSystem = post.authorUid === 'SYSTEM' || post.authorUid === 'valiant_bot_system';
@@ -241,6 +475,20 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: Social
   const isAdmin = user?.email === 'reskallaarthur@gmail.com' || profile?.rank === 'ADMIN' || profile?.rankOverride === 'ADMIN / SYSTEM';
   const isAuthor = user && post.authorUid === user.uid;
   const canDelete = isAuthor || isAdmin;
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+    const profileRef = doc(db, 'trainer_profiles', user.uid);
+    const unsubscribe = onSnapshot(profileRef, (snap) => {
+      if (snap.exists()) {
+        setProfile({ id: snap.id, ...snap.data() });
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     if (!post.authorUid || isSystem) return;
@@ -271,7 +519,7 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: Social
 
       <div className="flex gap-4">
         <div className="shrink-0">
-          <Link to={`/perfil/${post.authorNick}`}>
+          <Link to={`/perfil/${post.authorUid || post.authorNick}`}>
             <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:border-primary/40 transition-all overflow-hidden relative group">
                 <img 
                   src={authorAvatar} 
@@ -288,7 +536,7 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: Social
         <div className="flex-1 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
               <div className="flex items-center gap-2">
-                 <Link to={isSystem ? '#' : `/perfil/${(authorProfile?.nick_lowercase || post.authorNick)}`} className="text-[11px] font-black text-white hover:text-primary transition-colors tracking-widest uppercase">
+                 <Link to={isSystem ? '#' : `/perfil/${post.authorUid || post.authorNick}`} className="text-[11px] font-black text-white hover:text-primary transition-colors tracking-widest uppercase">
                    {isSystem ? 'VALIANT BOT' : (authorProfile?.nick_lowercase || post.authorNick || 'Treinador')}
                  </Link>
                  {authorRank && (
@@ -316,6 +564,18 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: Social
             {post.content}
           </p>
 
+          {/* Media Content */}
+          {(post.imageUrl || post.videoUrl) && (
+            <div className="mt-4 rounded-2xl overflow-hidden border border-white/5 bg-black/20">
+              {post.imageUrl && (
+                <img src={post.imageUrl} className="w-full max-h-[500px] object-contain" alt="Post" />
+              )}
+              {post.videoUrl && (
+                <video src={post.videoUrl} className="w-full max-h-[500px]" controls />
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-6 pt-4 border-t border-white/5">
              <button 
                onClick={onLike}
@@ -331,6 +591,16 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete }: { post: Social
                 <MessageSquare size={16} />
                 <span className="text-[10px] font-black">{post.commentCount || 0}</span>
              </button>
+             {user && (
+               <button 
+                 onClick={(e) => { e.stopPropagation(); onPin(); }}
+                 className={`flex items-center gap-2 transition-all ${isPinned ? 'text-primary' : 'text-gray-600 hover:text-white'}`}
+                 title={isPinned ? "Desafixar do Perfil" : "Fixar no Perfil"}
+               >
+                  <Pin size={16} fill={isPinned ? 'currentColor' : 'none'} />
+                  <span className="text-[10px] font-black">{isPinned ? 'FIXADO' : 'FIXAR'}</span>
+               </button>
+             )}
           </div>
         </div>
       </div>
@@ -455,6 +725,18 @@ const PostThreadModal = ({ post, user, profile: currentUserProfile, onClose, set
                     </div>
                   </div>
                   <p className="text-gray-300 font-bold text-sm bg-black/20 p-4 rounded-2xl border border-white/5">{post.content}</p>
+                  
+                  {/* Media Content in Thread */}
+                  {(post.imageUrl || post.videoUrl) && (
+                    <div className="mt-4 rounded-2xl overflow-hidden border border-white/5 bg-black/20">
+                      {post.imageUrl && (
+                        <img src={post.imageUrl} className="w-full max-h-[400px] object-contain" alt="Post" />
+                      )}
+                      {post.videoUrl && (
+                        <video src={post.videoUrl} className="w-full max-h-[400px]" controls />
+                      )}
+                    </div>
+                  )}
                </div>
 
                {/* Comments List */}
@@ -556,7 +838,7 @@ const CommentRow = ({ comment, postId, setConfirmModal, setComments }: { comment
       className="flex gap-4 group/comment"
     >
       <div className="shrink-0 w-10 h-10 rounded-lg bg-white/5 border border-white/10 overflow-hidden shadow-lg">
-         <Link to={isSystem ? '#' : `/perfil/${(commentProfile?.nick_lowercase || comment.authorNick)}`}>
+         <Link to={isSystem ? '#' : `/perfil/${comment.authorUid || commentProfile?.uid || commentProfile?.nick_lowercase || comment.authorNick}`}>
            <img 
              src={authorAvatar} 
              className={`w-full h-full object-cover ${isSystem ? 'scale-90 p-0' : ''}`} 
@@ -570,7 +852,7 @@ const CommentRow = ({ comment, postId, setConfirmModal, setComments }: { comment
       <div className="flex-1 space-y-1">
          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-               <Link to={isSystem ? '#' : `/perfil/${(commentProfile?.nick_lowercase || comment.authorNick)}`} className="text-[10px] font-black text-white hover:text-primary transition-colors tracking-widest uppercase">
+               <Link to={isSystem ? '#' : `/perfil/${comment.authorUid || commentProfile?.uid || commentProfile?.nick_lowercase || comment.authorNick}`} className="text-[10px] font-black text-white hover:text-primary transition-colors tracking-widest uppercase">
                  {isSystem ? 'VALIANT BOT' : (commentProfile?.nick_lowercase || comment.authorNick || 'Treinador')}
                </Link>
                {authorRank && (

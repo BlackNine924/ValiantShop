@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ────────────────────────────────────────────────
-    // FUNÇÕES DE SEGURANÇA
+    // FUNÇÕES DE SEGURANÇA GLOBAIS
     // ────────────────────────────────────────────────
 
     function isAuthenticated() {
@@ -20,38 +20,42 @@ service cloud.firestore {
     }
 
     // ────────────────────────────────────────────────
-    // ORDERS (PEDIDOS)
+    // SISTEMA DE ENCOMENDAS (ORDERS)
     // ────────────────────────────────────────────────
 
     match /orders/{orderId} {
+      // Leitura: admin, dono da encomenda ou responsável atribuído
+      allow read: if isAdmin() || 
+        (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.playerUid == request.auth.uid)) ||
+        (isAuthenticated() && resource.data.assignedTo == request.auth.token.email);
 
-      allow read: if isAdmin() ||
-        (isAuthenticated() &&
-          (resource.data.playerUid == request.auth.uid ||
-           resource.data.userId == request.auth.uid)) ||
-        (isAuthenticated() &&
-          resource.data.assignedTo == request.auth.token.email);
+      // Criação: usuário autenticado criando sua própria encomenda com validações básicas
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.totalPrice is number &&
+        request.resource.data.totalPrice >= 0;
 
-      allow create: if isAuthenticated();
-
-      allow update: if isAdmin() ||
-        (isAuthenticated() &&
-          (resource.data.playerUid == request.auth.uid ||
-           resource.data.userId == request.auth.uid)) ||
-        (isAuthenticated() &&
-          resource.data.assignedTo == request.auth.token.email);
+      // Atualização: admin ou dono (com campos limitados se necessário)
+      allow update: if isAdmin() || 
+        (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.playerUid == request.auth.uid)) ||
+        (isAuthenticated() && resource.data.assignedTo == request.auth.token.email);
 
       allow delete: if isAdmin();
 
-      match /messages/{msgId} {
-        allow read, write: if isAdmin() ||
-          (isAuthenticated() &&
-            (get(/databases/$(database)/documents/orders/$(orderId)).data.playerUid == request.auth.uid ||
-             get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid)) ||
-          (isAuthenticated() &&
-            get(/databases/$(database)/documents/orders/$(orderId)).data.assignedTo == request.auth.token.email);
+      // Sub-coleção de mensagens do chat do pedido
+      match /messages/{messageId} {
+        allow read: if isAdmin() || 
+          (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid) ||
+          (isAuthenticated() && get(/databases/$(database)/documents/orders/$(orderId)).data.assignedTo == request.auth.token.email);
+        
+        allow create: if isAuthenticated() &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() <= 2000;
+          
+        allow update, delete: if isAdmin();
       }
 
+      // Sub-coleção de indicadores de digitação
       match /typing/{uid} {
         allow read: if isAuthenticated();
         allow write: if isOwner(uid);
@@ -59,29 +63,57 @@ service cloud.firestore {
     }
 
     // ────────────────────────────────────────────────
-    // USERS (DADOS PRIVADOS DE PERFIL)
+    // ECOSSISTEMA DE SUPORTE (SUPPORT CHATS)
     // ────────────────────────────────────────────────
 
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
+    match /support_chats/{chatId} {
+      // Leitura: apenas o dono do chat ou o admin
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Criação: usuário logado, criando chat com seu próprio userId
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Atualização e deleção: admin ou dono do chat
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+
+      // Sub-coleção de mensagens do chat de suporte
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid);
+        allow create: if isAuthenticated() &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() <= 2000;
+        allow update, delete: if isAdmin();
+      }
+
+      match /typing/{userId} {
+        allow read, write: if isOwner(userId);
+        allow read: if isAdmin();
+      }
     }
 
     // ────────────────────────────────────────────────
-    // PERFIS (PÚBLICO PARA EVITAR CRASH)
+    // PERFIS E DADOS SOCIAIS
     // ────────────────────────────────────────────────
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
 
     match /trainer_profiles/{profileId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuthenticated() && (
         resource.data.uid == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers', 'friends'])
       );
-    }
 
-    // ────────────────────────────────────────────────
-    // SOCIAL POSTS (CORRIGIDO - SEM DUPLICAÇÃO)
-    // ────────────────────────────────────────────────
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow delete: if isAdmin() || (isAuthenticated() && (resource.data.authorUid == request.auth.uid || get(/databases/$(database)/documents/trainer_profiles/$(profileId)).data.uid == request.auth.uid));
+      }
+    }
 
     match /social_posts/{postId} {
       allow read: if true;
@@ -89,27 +121,51 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.authorUid == request.auth.uid;
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
 
+      // Subcoleções como comentários e curtidas
       match /{allSubcollections=**} {
         allow read, write: if isAuthenticated();
       }
     }
 
+    // Sistema de Amizades
+    match /friend_requests/{requestId} {
+      allow read: if isAuthenticated() && (
+        resource.data.fromUid == request.auth.uid || 
+        resource.data.toUid == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.fromUid == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && (
+        (resource.data.toUid == request.auth.uid && request.resource.data.status == 'accepted') ||
+        isAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.fromUid == request.auth.uid || 
+        resource.data.toUid == request.auth.uid
+      );
+    }
+
     // ────────────────────────────────────────────────
-    // ADMIN / ESTOQUE
+    // ADMINISTRAÇÃO, ESTOQUE E LOGS
     // ────────────────────────────────────────────────
 
-    match /inventory/{id} { allow read, write: if isAdmin(); }
+    match /inventory/{id} { 
+      allow read: if isAuthenticated(); // Leitura pública/autenticada para o hub
+      allow write: if isAdmin(); 
+    }
     match /stock_rooms/{id} { allow read, write: if isAdmin(); }
     match /chest_matches/{id} { allow read, write: if isAdmin(); }
     match /chest_stock/{id} { allow read, write: if isAdmin(); }
-
+    match /admin_dismissed_notifications/{id} { allow read, write: if isAdmin(); }
+    
     match /breeder_profiles/{email} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == email);
       allow write: if isAdmin();
     }
 
     // ────────────────────────────────────────────────
-    // DADOS PÚBLICOS (LIBERADOS PRA EVITAR ERRO)
+    // DADOS PÚBLICOS E UTILITÁRIOS
     // ────────────────────────────────────────────────
 
     match /FAQ/{id} {
@@ -123,50 +179,24 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    match /global_events/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    match /global_stats/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /global_events/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /public_stats/{id} { allow read: if true; allow write: if isAdmin(); }
 
     match /wishlists/{id} {
-      allow read, write: if isAdmin() ||
-        (isAuthenticated() &&
-          (resource.data.uid == request.auth.uid ||
-           request.resource.data.uid == request.auth.uid));
+      allow read, delete: if isAdmin() || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow create, update: if isAdmin() || (isAuthenticated() && request.resource.data.uid == request.auth.uid);
     }
 
     // ────────────────────────────────────────────────
-    // GAMES
+    // MINI-GAMES
     // ────────────────────────────────────────────────
 
-    match /grids/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /pokedle/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    match /grids/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /pokedle/{id} { allow read: if true; allow write: if isAdmin(); }
 
     // ────────────────────────────────────────────────
-    // SUPORTE
-    // ────────────────────────────────────────────────
-
-    match /support_chats/{chatId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-
-      match /messages/{msgId} {
-        allow read, write: if isAdmin() ||
-          (isAuthenticated() &&
-            get(/databases/$(database)/documents/support_chats/$(chatId)).data.userId == request.auth.uid);
-      }
-    }
-
-    // ────────────────────────────────────────────────
-    // SAFETY NET
+    // SAFETY NET (BLOQUEIO GLOBAL)
     // ────────────────────────────────────────────────
 
     match /{document=**} {

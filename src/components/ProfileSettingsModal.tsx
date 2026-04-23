@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Camera, Lock, Unlock, Sparkles, User, LayoutGrid } from 'lucide-react';
+import { X, Save, Camera, Lock, Unlock, Sparkles, User, LayoutGrid, Trophy, Check, Eye, EyeOff, Image as ImageIcon, MessageCircle, Pin } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { ACHIEVEMENTS } from '../data/achievementsData';
 
 interface ProfileSettingsModalProps {
   isOpen: boolean;
@@ -17,17 +18,79 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || '');
   const [bannerUrl, setBannerUrl] = useState(profile.bannerUrl || '');
   const [isPrivate, setIsPrivate] = useState(profile.isPrivate || false);
+  const [highlightedAchievements, setHighlightedAchievements] = useState<string[]>(profile.highlightedAchievements || []);
+  const [displayName, setDisplayName] = useState(profile.displayName || '');
+  const [nickError, setNickError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [widgetsConfig, setWidgetsConfig] = useState({
+    showPinnedPosts: true,
+    showRecentActivity: true,
+    showFavoriteTeam: true,
+    allowComments: true,
+    customImage: { 
+      enabled: false, 
+      url: '', 
+      title: '', 
+      subtitle: '' 
+    },
+    ...profile.widgetsConfig,
+    // Garantir que customImage seja um objeto mesmo se profile.widgetsConfig existir mas não o contiver
+    customImage: {
+      enabled: false,
+      url: '',
+      title: '',
+      subtitle: '',
+      ...(profile.widgetsConfig?.customImage || {})
+    }
+  });
+
+  const updateWidget = (id: string, value: any) => {
+    const newConfig = { ...widgetsConfig };
+    if (id === 'customImage') {
+      newConfig.customImage = { 
+        enabled: false, 
+        url: '', 
+        title: '',
+        subtitle: '',
+        ...newConfig.customImage, 
+        ...value 
+      };
+    } else {
+      (newConfig as any)[id] = value;
+    }
+    setWidgetsConfig(newConfig);
+    onUpdate({ widgetsConfig: newConfig });
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
+    setNickError(null);
     try {
+      // Validação de unicidade de Nick se ele mudou
+      if (displayName.toLowerCase() !== (profile.displayName || '').toLowerCase()) {
+        const nickCheck = await getDocs(query(
+          collection(db, 'trainer_profiles'),
+          where('nick_lowercase', '==', displayName.toLowerCase()),
+          limit(1)
+        ));
+        
+        if (!nickCheck.empty) {
+          setNickError('Este Nick já está sendo usado por outro treinador!');
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const profileRef = doc(db, 'trainer_profiles', profile.id);
       const updateData = {
+        displayName: displayName.trim(),
+        nick_lowercase: displayName.trim().toLowerCase(),
         bio,
         avatarUrl,
         bannerUrl,
         isPrivate,
+        highlightedAchievements,
+        widgetsConfig,
         updatedAt: new Date().toISOString()
       };
       await updateDoc(profileRef, updateData);
@@ -43,7 +106,7 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -70,6 +133,26 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
             </div>
 
             <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {/* Nickname Picker */}
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <User size={14} /> SEU NICK (PÚBLICO)
+                </label>
+                <div className="space-y-2">
+                  <input 
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={`w-full bg-white/5 border ${nickError ? 'border-red-500' : 'border-white/10'} rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-primary transition-all`}
+                    placeholder="Ex: Red, Blue..."
+                    maxLength={20}
+                  />
+                  {nickError && (
+                    <p className="text-[9px] text-red-500 font-bold uppercase italic">{nickError}</p>
+                  )}
+                </div>
+              </div>
+
               {/* Avatar Picker */}
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -147,6 +230,164 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
                 <div className="flex justify-end">
                    <span className="text-[8px] font-black text-gray-700 uppercase">{bio.length}/160</span>
                 </div>
+              </div>
+
+              {/* Achievements Picker */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                    <Trophy size={14} /> DESTAQUES DE CONQUISTAS
+                  </label>
+                  <span className="text-[8px] font-black text-primary uppercase">{highlightedAchievements.length}/3 Selecionadas</span>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-52 overflow-y-auto custom-scrollbar p-1">
+                  {ACHIEVEMENTS.map(ach => {
+                    const isUnlocked = ach.condition(profile);
+                    const isSelected = highlightedAchievements.includes(ach.id);
+                    
+                    return (
+                      <button
+                        key={ach.id}
+                        type="button"
+                        disabled={!isUnlocked}
+                        onClick={() => {
+                          if (isSelected) {
+                            setHighlightedAchievements(prev => prev.filter(id => id !== ach.id));
+                          } else {
+                            if (highlightedAchievements.length >= 3) {
+                              alert("Você só pode destacar 3 conquistas ao mesmo tempo!");
+                              return;
+                            }
+                            setHighlightedAchievements(prev => [...prev, ach.id]);
+                          }
+                        }}
+                        className={`relative rounded-xl border p-3 flex flex-col items-center gap-2 text-center transition-all ${
+                          isUnlocked 
+                            ? isSelected 
+                              ? `bg-white/10 border-primary ${ach.glowClass} scale-105` 
+                              : `bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10`
+                            : 'bg-black/40 border-white/5 grayscale opacity-40 cursor-not-allowed'
+                        }`}
+                        title={isUnlocked ? ach.description : ''}
+                      >
+                         <div className={`p-2 rounded-lg ${isUnlocked ? ach.colorClass : 'bg-gray-800 text-gray-500'}`}>
+                           {isUnlocked ? ach.icon : <Lock size={16} />}
+                         </div>
+                         <span className="text-[8px] font-black text-white uppercase leading-tight line-clamp-2 min-h-6">
+                           {isUnlocked ? ach.name : '???'}
+                         </span>
+                         
+                         {isSelected && (
+                           <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-black rounded-full flex items-center justify-center shadow-lg">
+                             <Check size={10} className="stroke-[4]" />
+                           </div>
+                         )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Widgets Config */}
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <LayoutGrid size={14} /> WIDGETS E LAYOUT DO PERFIL
+                </label>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                   {[
+                     { id: 'showPinnedPosts', label: 'POSTS FIXADOS', icon: <Pin size={16} /> },
+                     { id: 'showRecentActivity', label: 'ATIVIDADE', icon: <Sparkles size={16} /> },
+                     { id: 'showFavoriteTeam', label: 'TIME FAVORITO', icon: <Trophy size={16} /> },
+                     { id: 'allowComments', label: 'COMENTÁRIOS', icon: <MessageCircle size={16} /> },
+                     { id: 'customImage', label: 'FOTO DESTAQUE', icon: <ImageIcon size={16} /> },
+                   ].map(widget => {
+                     const isActive = widget.id === 'customImage' 
+                       ? (widgetsConfig.customImage?.enabled ?? false) 
+                       : (widgetsConfig as any)[widget.id];
+                     
+                     return (
+                       <button
+                         key={widget.id}
+                         onClick={() => {
+                           if (widget.id === 'customImage') {
+                             updateWidget('customImage', { enabled: !widgetsConfig.customImage.enabled });
+                           } else {
+                             updateWidget(widget.id, !isActive);
+                           }
+                         }}
+                         className={`p-4 rounded-xl border flex flex-col items-center gap-3 text-center transition-all ${
+                           isActive 
+                             ? 'bg-primary/10 border-primary text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]' 
+                             : 'bg-white/[0.02] border-white/5 text-gray-500 hover:border-white/20'
+                         }`}
+                       >
+                          <div className={`p-2 rounded-lg ${isActive ? 'bg-primary text-black' : 'bg-white/5'}`}>
+                            {widget.icon}
+                          </div>
+                          <span className="text-[8px] font-black uppercase tracking-tighter leading-tight">
+                            {widget.label}
+                          </span>
+                       </button>
+                     );
+                   })}
+                </div>
+
+                {/* Input for Custom Image URL if enabled */}
+                <AnimatePresence>
+                  {widgetsConfig.customImage.enabled && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden space-y-3 pt-2"
+                    >
+                       <input 
+                          type="text"
+                          value={widgetsConfig.customImage?.url || ''}
+                          onChange={(e) => updateWidget('customImage', { url: e.target.value })}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[10px] font-bold text-white outline-none focus:border-primary transition-all"
+                          placeholder="Cole aqui a URL da sua foto de destaque (GIFs aceitos)..."
+                       />
+                       <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                             <label className="text-[8px] font-black text-gray-600 uppercase">Título na Imagem</label>
+                             <input 
+                                type="text"
+                                value={widgetsConfig.customImage?.title || ''}
+                                onChange={(e) => updateWidget('customImage', { title: e.target.value })}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold text-white outline-none focus:border-primary transition-all"
+                                placeholder="Ex: Meu Perfil"
+                             />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[8px] font-black text-gray-600 uppercase">Subtítulo</label>
+                             <input 
+                                type="text"
+                                value={widgetsConfig.customImage?.subtitle || ''}
+                                onChange={(e) => updateWidget('customImage', { subtitle: e.target.value })}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold text-white outline-none focus:border-primary transition-all"
+                                placeholder="Ex: A Jornada Continua"
+                             />
+                          </div>
+                       </div>
+
+                       {widgetsConfig.customImage?.url && (
+                         <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-black/40">
+                            <img 
+                              src={widgetsConfig.customImage.url} 
+                              className="w-full h-full object-cover" 
+                              alt="Preview"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop';
+                              }}
+                            />
+                         </div>
+                       )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Privacy */}

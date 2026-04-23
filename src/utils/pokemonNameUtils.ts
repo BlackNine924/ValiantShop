@@ -10,7 +10,8 @@
 export const getBasePokemonName = (name: string): string => {
   if (!name) return '';
   return name
-    .replace(/\s+de\s+(Hisui|Alola|Galar|Paldea)$/i, '')
+    .replace(/\s+(de|of)?\s+(Hisui|Alola|Galar|Paldea)$/i, '')
+    .replace(/^(Hisuian|Alolan|Galarian|Paldean)\s+/i, '')
     .trim();
 };
 

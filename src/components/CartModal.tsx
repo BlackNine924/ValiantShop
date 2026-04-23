@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useState } from 'react';
 import { updateGlobalRank } from '../utils/rankUtils';
+import { notifyNewOrder } from '../utils/discordNotify';
 
 export const CartModal = () => {
   const { cart, removeFromCart, clearCart, isCartOpen, setIsCartOpen } = useCart();
@@ -51,6 +52,15 @@ export const CartModal = () => {
       if (user.displayName) {
         await updateGlobalRank(user.displayName, cartTotal);
       }
+
+      // Notify Discord for each item
+      cart.forEach(item => {
+        notifyNewOrder({
+          ...item,
+          playerNick: user.displayName,
+          totalPrice: item.price
+        });
+      });
 
       clearCart();
       setSuccess(true);

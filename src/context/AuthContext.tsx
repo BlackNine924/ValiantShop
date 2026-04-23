@@ -8,7 +8,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, onSnapshot, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, query, where, getDocs, serverTimestamp, limit } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
 
 interface UserProfile {
@@ -26,6 +26,7 @@ interface UserProfile {
   displayName?: string;
   totalSpent?: number;
   ordersCompletedCount?: number;
+  pinnedPostId?: string;
 }
 
 interface AuthContextType {
@@ -81,10 +82,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Trainer Profile check (Single one-off check)
         const trainerProfileRef = doc(db, 'trainer_profiles', user.uid);
-        const trainerSnap = await getDocs(query(collection(db, 'trainer_profiles'), where('uid', '==', user.uid)));
+        const trainerProfilesRef = collection(db, 'trainer_profiles');
+        const trainerSnap = await getDocs(query(trainerProfilesRef, where('uid', '==', user.uid)));
         
         if (trainerSnap.empty) {
-          const nick = user.displayName || user.email?.split('@')[0] || 'Treinador';
+          let nick = user.displayName || user.email?.split('@')[0] || 'Treinador';
+          const nickBase = nick;
+          
+          // Verificação de unicidade de Nick
+          const nickCheck = await getDocs(query(
+            trainerProfilesRef, 
+            where('nick_lowercase', '==', nick.toLowerCase()),
+            limit(1)
+          ));
+          
+          if (!nickCheck.empty) {
+            // Nick já em uso por outro UID! Gerar um alternativo
+            nick = `${nickBase}_${Math.floor(1000 + Math.random() * 9000)}`;
+          }
+
           await setDoc(trainerProfileRef, {
             uid: user.uid,
             displayName: nick,
@@ -96,14 +112,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             glintCollection: [],
             favoriteTeam: [],
             createdAt: serverTimestamp(),
-            isPrivate: false
+            isPrivate: false,
+            friends: [] // Inicializa lista de amigos vazia
           }, { merge: true });
         }
 
         if (!isMounted) return;
 
         // Now start the listener for read-only sync
-        unsubscribeProfile = onSnapshot(userRef, (docSnap) => {
+        unsubscribeProfile = onSnapshot(trainerProfileRef, (docSnap) => {
           if (isMounted && docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
             setLoading(false);

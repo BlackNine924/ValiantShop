@@ -1,16 +1,17 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, MessageSquare } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { MALE_ONLY_POKEMON, GENDERLESS_POKEMON } from '../data/pokemonCategories';
-import { collection, addDoc, serverTimestamp, doc, getDocs, query, orderBy, limit, updateDoc, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDocs, query, limit, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
 import { useCart } from '../context/CartContext';
 import { safeStorage } from '../utils/storageUtils';
 import { updateGlobalRank } from '../utils/rankUtils';
 import { createPortal } from 'react-dom';
+import { notifyNewOrder } from '../utils/discordNotify';
 
 type IVOption = '4' | '5' | '6';
 
@@ -28,7 +29,7 @@ const HA_FEE = 15000;
 
 export const OrderForm = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // usado no botão 'Ver Meu Histórico'
+
   const { addToCart, setIsCartOpen } = useCart();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,7 +81,7 @@ export const OrderForm = () => {
       const raw = sessionStorage.getItem('repeat_order_data');
       if (raw) {
         const s = JSON.parse(raw);
-        sessionStorage.removeItem('repeat_order_data'); // Limpa imediatamente — one-shot
+        // Não remover aqui para permitir que o 'search' state também leia
         if (s && s.pokemon) {
           const isCastrated = s.ivs?.includes('Castrado');
           const ivValue = s.ivs?.includes('4') ? '4' : s.ivs?.includes('5') ? '5' : '6';
@@ -162,6 +163,14 @@ export const OrderForm = () => {
       }
     };
     fetchHotPokemon();
+  }, []);
+
+  useEffect(() => {
+    // Limpa os dados de repetição após o mount inicial para não persistir em F5
+    const timer = setTimeout(() => {
+      sessionStorage.removeItem('repeat_order_data');
+    }, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   const [search, setSearch] = useState(() => {
@@ -354,6 +363,14 @@ export const OrderForm = () => {
       setForm(initialForm);
       setSearch('');
       setStep(4);
+      
+      // Notify Discord
+      notifyNewOrder({
+        ...form,
+        playerNick: user.displayName,
+        totalPrice: totalPrice,
+        nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
+      });
     } catch (e) {
       console.error(e);
       alert('Erro ao enviar pedido direto. Tente novamente.');
@@ -752,7 +769,7 @@ export const OrderForm = () => {
                           key={stat}
                           onClick={() => {
                             if (isSelected) {
-                              setForm({ ...form, ignoredIvs: form.ignoredIvs.filter(i => i !== stat) });
+                              setForm({ ...form, ignoredIvs: form.ignoredIvs.filter((i: string) => i !== stat) });
                             } else {
                               if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
                                 setForm({ ...form, ignoredIvs: [...form.ignoredIvs, stat] });

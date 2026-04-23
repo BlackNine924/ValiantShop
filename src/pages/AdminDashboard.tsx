@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap, Sparkles, History
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap, Sparkles
 } from 'lucide-react';
 import { adminDb, adminAuth as auth } from '../firebase';
-import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { getEggGroups } from '../data/eggGroups';
 import { EVOLUTION_LINES } from '../data/evolutionLines';
@@ -16,7 +16,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { OrderChat } from '../components/OrderChat';
 import { KanbanBoard } from '../components/KanbanBoard';
 import { GENDERLESS_POKEMON, MALE_ONLY_POKEMON } from '../data/pokemonCategories';
-import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';import { getBasePokemonName } from '../utils/pokemonNameUtils';
+import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';
+import { getBasePokemonName } from '../utils/pokemonNameUtils';
+import { EditOrderModal } from '../components/EditOrderModal';
+import { EditTrainerModal } from '../components/EditTrainerModal';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -38,9 +41,12 @@ export const AdminDashboard = () => {
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [inboxFilter, setInboxFilter] = useState<'Todos' | 'Cancelamento' | 'Pedido' | 'Support'>('Todos');
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<any | null>(null);
+  const [selectedTrainerForEdit, setSelectedTrainerForEdit] = useState<any | null>(null);
   const [expandedTrainerNick, setExpandedTrainerNick] = useState<string | null>(null);
   const [showTrainerHistory, setShowTrainerHistory] = useState(false);
-  const [isSyncingRank, setIsSyncingRank] = useState(false);
+  // isSyncingRank commented out
+  // const [isSyncingRank, setIsSyncingRank] = useState(false);
   
   const getDisplayAbility = (item: any) => {
     if (!item || !item.pokemon) return item?.ability;
@@ -177,8 +183,8 @@ export const AdminDashboard = () => {
     }
   };
 
-  // ONE-TIME ADMIN TOOL: Merge duplicate profiles
-  const handleMergeProfiles = async () => {
+  // ONE-TIME ADMIN TOOL: Merge duplicate profiles (commented out due to unused)
+  /* const handleMergeProfiles = async () => {
     const MAIN_UID = 'FEelmyfacYc42kn3mcBhT7tyWYG2'; // Real Google Auth UID
     const OLD_UID  = 'VuLEs8GAftUG2n1JC0QkYFuDpue2'; // Old duplicate profile
 
@@ -237,9 +243,9 @@ export const AdminDashboard = () => {
       console.error('Merge error:', e);
       alert('Erro ao mesclar: ' + e.message);
     }
-  };
+  }; */
 
-  const handleSyncRank = async () => {
+  /* const handleSyncRank = async () => {
     if (!window.confirm("Essa operação varrerá todos os pedidos e sincronizará os totais exatos gastos nos perfis públicos. Tem certeza?")) return;
     setIsSyncingRank(true);
     try {
@@ -311,9 +317,9 @@ export const AdminDashboard = () => {
       console.error("Rank Sync Error: ", e);
       alert("Erro ao sincronizar rank. Verifique o console.");
     } finally {
-      setIsSyncingRank(false);
+      // setIsSyncingRank(false);
     }
-  };
+  }; */
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
@@ -566,6 +572,28 @@ export const AdminDashboard = () => {
     } catch (e) {
       console.error('Erro ao deletar encomenda:', e);
       alert('Falha ao deletar encomenda.');
+    }
+  };
+
+  const handleUpdateOrder = async (orderId: string, updatedData: any) => {
+    try {
+      await updateDoc(doc(adminDb, 'orders', orderId), updatedData);
+    } catch (err) {
+      console.error("Erro ao atualizar pedido:", err);
+      throw err;
+    }
+  };
+
+  const handleUpdateTrainer = async (trainerNick: string, updatedData: any) => {
+    try {
+       if (selectedTrainerForEdit?.uid) {
+         await updateDoc(doc(adminDb, 'trainer_profiles', selectedTrainerForEdit.uid), updatedData);
+       } else {
+         throw new Error("UID do treinador não encontrado.");
+       }
+    } catch (err) {
+      console.error("Erro ao atualizar treinador:", err);
+      throw err;
     }
   };
 
@@ -998,6 +1026,7 @@ export const AdminDashboard = () => {
       if (!acc.has(nick)) {
         acc.set(nick, { 
           nick, 
+          uid: o.uid || 'N/A',
           discordNick: o.discordNick || 'N/A',
           totalSpent: 0, 
           orderCount: 0, 
@@ -1023,6 +1052,7 @@ export const AdminDashboard = () => {
       return acc;
     }, new Map<string, { 
       nick: string; 
+      uid: string;
       discordNick: string; 
       totalSpent: number; 
       orderCount: number; 
@@ -1030,8 +1060,9 @@ export const AdminDashboard = () => {
       lastOrder: number; 
     }>())
     .values()
-  ).filter((t: any) => t.nick.toLowerCase().includes(trainersSearch.toLowerCase()))
-   .sort((a: any, b: any) => b.totalSpent - a.totalSpent);
+  ).sort((a: any, b: any) => b.totalSpent - a.totalSpent)
+   .map((t: any, idx: number) => ({ ...t, sequentialId: String(idx + 1).padStart(5, '0') }))
+   .filter((t: any) => t.nick.toLowerCase().includes(trainersSearch.toLowerCase()));
 
   const salesRanking = Array.from(
     validEconomyOrders.reduce((acc, o) => {
@@ -1887,6 +1918,13 @@ export const AdminDashboard = () => {
                                   >
                                     <MessageSquare size={18} />
                                   </button>
+                                  <button 
+                                    onClick={() => setSelectedOrderForEdit(o)}
+                                    className="text-gray-500 hover:text-secondary transition-all p-1"
+                                    title="Editar Encomenda"
+                                  >
+                                    <Edit2 size={18} />
+                                  </button>
                                   {o.glintsAwarded && (
                                     <button
                                       onClick={async () => { await updateDoc(doc(adminDb, "orders", o.id), { glintsAwarded: false }); alert("Glints resetados! Mude o status para Finalizado novamente para testar."); }}
@@ -1946,7 +1984,7 @@ export const AdminDashboard = () => {
                                   <div className={`p-1 rounded bg-primary/20 transition-transform ${expandedTrainerNick === t.nick ? 'rotate-180' : ''}`}>
                                     <ChevronDown size={12} className="text-primary" />
                                   </div>
-                                  <span className="text-gray-600 text-[10px] uppercase font-black">#{i+1}</span>
+                                  <span className="text-gray-600 text-[10px] uppercase font-black">ID: {t.sequentialId}</span>
                                   {t.nick}
                                 </td>
                                 <td className="px-8 py-6 text-sm font-black text-secondary tracking-tight">{t.discordNick}</td>
@@ -1971,12 +2009,21 @@ export const AdminDashboard = () => {
                                           <p className="text-xl font-black text-primary">{t.totalSpent / 1000}k</p>
                                         </div>
                                         <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
-                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Primeira Encomenda</p>
-                                          <p className="text-sm font-black text-white">{t.firstOrder > 0 ? new Date(t.firstOrder).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">ID do Treinador</p>
+                                          <p className="text-sm font-black text-white">{t.sequentialId}</p>
+                                           <p className="text-[8px] text-gray-600 font-bold truncate opacity-40" title={t.uid}>{t.uid}</p>
                                         </div>
                                         <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-2">
                                           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Última Encomenda</p>
                                           <p className="text-sm font-black text-white">{t.lastOrder > 0 ? new Date(t.lastOrder).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/5 flex items-center justify-center">
+                                          <button 
+                                            onClick={() => setSelectedTrainerForEdit(t)}
+                                            className="px-6 py-3 bg-secondary text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                                          >
+                                            <Edit2 size={14} /> Editar Perfil
+                                          </button>
                                         </div>
                                       </div>
 
@@ -2218,6 +2265,21 @@ export const AdminDashboard = () => {
           </main>
         </div>
       </div>
+
+      <EditOrderModal 
+        isOpen={!!selectedOrderForEdit}
+        onClose={() => setSelectedOrderForEdit(null)}
+        order={selectedOrderForEdit}
+        onSave={handleUpdateOrder}
+      />
+
+      <EditTrainerModal 
+        isOpen={!!selectedTrainerForEdit}
+        onClose={() => setSelectedTrainerForEdit(null)}
+        trainer={selectedTrainerForEdit}
+        onSave={handleUpdateTrainer}
+      />
+
       <AnimatePresence>
         {deleteConfirm?.isOpen && (
           <motion.div 
@@ -2732,8 +2794,9 @@ const StockRoomsManager = () => {
     if (!room.name) return false;
     
     if (!roomSearchTerm) return true;
+    const safePokemonList = Array.isArray(room.pokemonList) ? room.pokemonList : typeof room.pokemonList === 'string' ? room.pokemonList.split(',').map((p:string)=>p.trim()).filter(Boolean) : [];
     const nameMatch = room.name.toLowerCase().includes(roomSearchTerm.toLowerCase());
-    const pokemonMatch = room.pokemonList?.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase()));
+    const pokemonMatch = safePokemonList.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase()));
     return nameMatch || pokemonMatch;
   }).sort((a, b) => {
     const numA = parseInt((a.name || '').replace(/\D/g, ''), 10);
@@ -2874,7 +2937,9 @@ const StockRoomsManager = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRooms.map(room => (
+        {filteredRooms.map(room => {
+          const safePokemonList = Array.isArray(room.pokemonList) ? room.pokemonList : typeof room.pokemonList === 'string' ? room.pokemonList.split(',').map((p:string)=>p.trim()).filter(Boolean) : [];
+          return (
           <div key={room.id} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-primary/30 transition-all group flex flex-col h-full justify-between">
             <div>
               <div className="flex justify-between items-start mb-6">
@@ -2884,8 +2949,8 @@ const StockRoomsManager = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-white uppercase tracking-tighter text-lg">{room.name}</h4>
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${(room.pokemonList?.length || 0) >= 11 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                      {room.pokemonList?.length || 0}/11 Ocupados
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${safePokemonList.length >= 11 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                      {safePokemonList.length}/11 Ocupados
                     </span>
                   </div>
                 </div>
@@ -2893,7 +2958,7 @@ const StockRoomsManager = () => {
                   <button 
                     onClick={() => {
                       setError('');
-                      setModalState({ isOpen: true, isEdit: true, id: room.id, name: room.name, pokemonText: (room.pokemonList || []).join(', ') });
+                      setModalState({ isOpen: true, isEdit: true, id: room.id, name: room.name, pokemonText: safePokemonList.join(', ') });
                     }}
                     className="p-2 text-gray-600 hover:text-white transition-colors bg-white/5 rounded-lg sm:opacity-0 group-hover:opacity-100 flex items-center justify-center"
                     title="Editar Sala"
@@ -2911,8 +2976,8 @@ const StockRoomsManager = () => {
               </div>
 
               <div className="flex flex-wrap gap-2 mb-6">
-                 {(room.pokemonList || []).length > 0 ? (
-                    room.pokemonList.map((p: string, i: number) => {
+                 {safePokemonList.length > 0 ? (
+                    safePokemonList.map((p: string, i: number) => {
                       const handlePokedexNavigation = () => {
                         const low = p.toLowerCase();
                         let search = p;
@@ -2945,14 +3010,14 @@ const StockRoomsManager = () => {
               </div>
             </div>
             
-            {roomSearchTerm && room.pokemonList?.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase())) && (
+            {roomSearchTerm && safePokemonList.some((p: string) => p.toLowerCase().includes(roomSearchTerm.toLowerCase())) && (
               <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl flex items-center gap-3 mt-4">
                 <Search size={14} className="text-primary" />
                 <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Pokémon correspondente nesta sala!</p>
               </div>
             )}
           </div>
-        ))}
+        );})}
         {filteredRooms.length === 0 && (
           <div className="col-span-full py-20 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
             <Warehouse size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
