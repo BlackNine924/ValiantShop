@@ -4,13 +4,14 @@ import { X, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface EditTrainerModalProps {
+  isOpen: boolean;
   trainer: any;
   onClose: () => void;
   onSave: (trainerNick: string, updatedData: any) => Promise<void>;
 }
 
-export const EditTrainerModal: React.FC<EditTrainerModalProps> = ({ trainer, onClose, onSave }) => {
-  if (!trainer) return null;
+export const EditTrainerModal: React.FC<EditTrainerModalProps> = ({ isOpen, trainer, onClose, onSave }) => {
+  if (!isOpen || !trainer) return null;
 
   const [formData, setFormData] = useState({
     discordNick: trainer.discordNick || '',

@@ -478,13 +478,13 @@ const PostCard = ({ post, user, onLike, onOpenThread, onDelete, onPin, isPinned 
 
   useEffect(() => {
     if (!user) {
-      setProfile(null);
+      setAuthorProfile(null);
       return;
     }
     const profileRef = doc(db, 'trainer_profiles', user.uid);
     const unsubscribe = onSnapshot(profileRef, (snap) => {
       if (snap.exists()) {
-        setProfile({ id: snap.id, ...snap.data() });
+        setAuthorProfile({ id: snap.id, ...snap.data() });
       }
     });
     return () => unsubscribe();

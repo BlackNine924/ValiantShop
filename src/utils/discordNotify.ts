@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { POKEMON_DATA } from '../data/pokemonData';
+import { EGG_GROUPS_MAP } from '../data/eggGroups';
 
 // User ID to be mentioned in notifications
 const USER_ID = "650763941462671394";
@@ -30,6 +31,11 @@ export const notifyNewOrder = async (order: any) => {
     const isHA = order.hasHA || (pokemonInfo?.hiddenAbility === order.ability && order.ability);
     const abilityDisplay = isHA ? `${order.ability} (HA)` : (order.ability || "N/A");
 
+    // Format Egg Group
+    const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const eggGroupsData = EGG_GROUPS_MAP[normalizeName(order.pokemon || "")];
+    const eggGroupDisplay = eggGroupsData ? eggGroupsData.join(", ") : "N/A";
+
     // Format price
     const priceFormatted = `${(order.totalPrice || 0) / 1000}k`;
 
@@ -48,11 +54,11 @@ export const notifyNewOrder = async (order: any) => {
         { name: "👤 Treinador", value: `\`${order.playerNick || "Desconhecido"}\``, inline: true },
         { name: "👾 Pokémon", value: `\`${order.pokemon || "N/A"}\``, inline: true },
         { name: "📊 IVs", value: `\`${ivFormatted}\``, inline: true },
-        { name: "🌿 Nature", value: `\`${order.nature || "Aleatória"}\``, inline: true },
         { name: "🧪 Ability", value: `\`${abilityDisplay}\``, inline: true },
         { name: "🧬 Gênero", value: `\`${order.gender || "N/A"}\``, inline: true },
         { name: "💬 Discord", value: `\`${order.discordNick || "Não informado"}\``, inline: true },
         { name: "📝 Observações", value: `\`${order.observations || "Nenhum"}\``, inline: true },
+        { name: "🥚 Egg Group", value: `\`${eggGroupDisplay}\``, inline: true },
         { name: "💰 Valor Total", value: `**${priceFormatted}**`, inline: true },
       ],
       timestamp: new Date().toISOString(),

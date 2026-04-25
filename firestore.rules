@@ -40,7 +40,8 @@ service cloud.firestore {
         (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.playerUid == request.auth.uid)) ||
         (isAuthenticated() && resource.data.assignedTo == request.auth.token.email);
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || 
+        (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.playerUid == request.auth.uid));
 
       // Sub-coleção de mensagens do chat do pedido
       match /messages/{messageId} {
@@ -60,6 +61,12 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isOwner(uid);
       }
+    }
+
+    match /order_cancellations/{cancelId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
     // ────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import {
   onSnapshot, doc, setDoc, updateDoc, arrayUnion, arrayRemove, 
   serverTimestamp, getDoc, addDoc, deleteDoc
 } from 'firebase/firestore';
-import { Shield, Settings, LayoutGrid, Heart, MessageSquare, X, LogOut, Sparkles, Trophy, User, Flame, Droplet, Leaf, Zap, Snowflake, Mountain, Wind, Ghost, Skull, Star, Swords, Eye, CircleHelp, LockKeyhole, Scan, Package, Crosshair, Bug, Gem, Pin, Trash2, Loader2, Send, Check, Moon, Circle, Dna, Image as ImageIcon } from 'lucide-react';
+import { Shield, Settings, LayoutGrid, Heart, MessageSquare, X, LogOut, Sparkles, User, Flame, Droplet, Leaf, Zap, Snowflake, Mountain, Wind, Ghost, Skull, Star, Swords, Eye, CircleHelp, LockKeyhole, Scan, Package, Crosshair, Bug, Gem, Pin, Trash2, Loader2, Send, Check, Moon, Circle, Dna } from 'lucide-react';
 import { getRankInfo } from '../utils/rankUtils';
 import { useAuth } from '../context/AuthContext';
 import { ProfileSettingsModal } from '../components/ProfileSettingsModal';
@@ -590,7 +590,7 @@ export const TrainerProfile = () => {
           onClose={() => setRequestSentModal(false)}
           title="CONVITE ENVIADO"
           message="Sua solicitação para seguir este treinador foi enviada com sucesso!"
-          icon="check"
+          icon="success"
         />
       </div>
     );
@@ -749,7 +749,9 @@ export const TrainerProfile = () => {
       {/* Main Content Grid - Adaptive Layout */}
       {hasAnyTopContent && (
         <div className={`max-w-6xl mx-auto px-6 py-8 lg:py-12 grid grid-cols-1 gap-6 ${
-           hasTopLeftContent && hasTopRightContent ? 'lg:grid-cols-3' : 'lg:grid-cols-1 max-w-2xl'
+           hasTopLeftContent && hasTopRightContent 
+             ? 'lg:grid-cols-3' 
+             : 'lg:grid-cols-1 max-w-4xl mx-auto'
         }`}>
           
           {/* Left Column (Stats & Glints) */}
@@ -817,7 +819,7 @@ export const TrainerProfile = () => {
 
               {/* Glints Card */}
               {hasGlints && (
-                <div className="glow-card p-5 border-primary/20 bg-black/40">
+                <div className={`glow-card p-5 border-primary/20 bg-black/40 ${!hasTopRightContent ? 'max-w-2xl mx-auto' : ''}`}>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="pixel-title text-[10px] text-primary flex items-center gap-2 font-black">
                       <Sparkles size={14} /> ÁLBUM DE GLINTS
@@ -897,7 +899,7 @@ export const TrainerProfile = () => {
             <div className={`${hasTopLeftContent ? 'lg:col-span-2' : 'max-w-4xl mx-auto w-full'} space-y-6`}>
                {/* Time Favorito */}
                {hasFavoriteTeam && (
-                 <div className="glow-card p-6 border-secondary/20 bg-black/40">
+                 <div className={`glow-card p-6 border-secondary/20 bg-black/40 ${!hasTopLeftContent ? 'max-w-2xl mx-auto' : ''}`}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="pixel-title text-[10px] text-secondary flex items-center gap-2 font-black">
                       <Heart size={16} className="text-secondary" /> TIME FAVORITO
@@ -1009,7 +1011,11 @@ export const TrainerProfile = () => {
                initial={{ opacity: 0, y: 30 }}
                whileInView={{ opacity: 1, y: 0 }}
                viewport={{ once: true }}
-               className="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 shadow-[0_0_50px_rgba(var(--primary-rgb),0.1)] relative group"
+               className={`w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 shadow-[0_0_50px_rgba(var(--primary-rgb),0.1)] relative group ${
+                  (!hasAnyTopContent && !((profile.widgetsConfig?.allowComments ?? true) || comments.length > 0)) 
+                  ? 'max-w-3xl mx-auto' 
+                  : ''
+               }`}
             >
                <img 
                   src={profile.widgetsConfig.customImage.url} 
@@ -1056,7 +1062,7 @@ export const TrainerProfile = () => {
                {/* Comment Input Box */}
                {(profile.widgetsConfig?.allowComments ?? true) && (
                   user ? (
-                     <div className="glow-card p-6 bg-black/40 border-white/5 relative overflow-hidden group">
+                     <div className="glow-card p-6 bg-black/40 border-white/5 relative overflow-hidden group max-w-4xl mx-auto w-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5 -rotate-12 pointer-events-none">
                            <MessageSquare size={80} className="text-primary" />
                         </div>
@@ -1090,7 +1096,7 @@ export const TrainerProfile = () => {
                )}
 
                {/* Large Comments List */}
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className={`grid grid-cols-1 gap-4 ${comments.length > 1 ? 'sm:grid-cols-2' : 'max-w-2xl mx-auto w-full'}`}>
                   {comments.map((comment) => (
                      <ProfileCommentRow 
                         key={comment.id}
@@ -1131,7 +1137,7 @@ export const TrainerProfile = () => {
         onClose={() => setRequestSentModal(false)}
         title="CONVITE ENVIADO"
         message="Sua solicitação para seguir este treinador foi enviada com sucesso!"
-        icon="check"
+        icon="success"
       />
     </div>
   );

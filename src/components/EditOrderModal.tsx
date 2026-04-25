@@ -16,13 +16,14 @@ const HA_FEE = 15000;
 
 
 interface EditOrderModalProps {
+  isOpen: boolean;
   order: any;
   onClose: () => void;
   onSave: (orderId: string, updatedData: any) => Promise<void>;
 }
 
-export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, onClose, onSave }) => {
-  if (!order) return null;
+export const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, order, onClose, onSave }) => {
+  if (!isOpen || !order) return null;
   
   const [formData, setFormData] = useState({
     pokemon: order.pokemon || '',

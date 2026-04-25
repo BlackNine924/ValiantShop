@@ -27,12 +27,6 @@ export const ProfileSettingsModal = ({ isOpen, onClose, profile, onUpdate }: Pro
     showRecentActivity: true,
     showFavoriteTeam: true,
     allowComments: true,
-    customImage: { 
-      enabled: false, 
-      url: '', 
-      title: '', 
-      subtitle: '' 
-    },
     ...profile.widgetsConfig,
     // Garantir que customImage seja um objeto mesmo se profile.widgetsConfig existir mas não o contiver
     customImage: {
