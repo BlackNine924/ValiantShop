@@ -584,7 +584,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateTrainer = async (trainerNick: string, updatedData: any) => {
+  const handleUpdateTrainer = async (_trainerNick: string, updatedData: any) => {
     try {
        if (selectedTrainerForEdit?.uid) {
          await updateDoc(doc(adminDb, 'trainer_profiles', selectedTrainerForEdit.uid), updatedData);
@@ -1974,7 +1974,7 @@ export const AdminDashboard = () => {
                           {trainersData.length === 0 && (
                             <tr><td colSpan={5} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum treinador encontrado...</td></tr>
                           )}
-                          {trainersData.map((t: any, i: number) => (
+                          {trainersData.map((t: any, _i: number) => (
                             <Fragment key={t.nick}>
                               <tr 
                                 className={`hover:bg-white/[0.03] transition-colors cursor-pointer border-b border-white/5 last:border-0 ${expandedTrainerNick === t.nick ? 'bg-primary/5' : ''}`}

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { POKEMON_DATA } from '../data/pokemonData';
 import { BOT_CONFIG } from '../config/botConfig';
 import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { 
-  collection, query, where, getDocs, limit, orderBy, 
+  collection, query, where, getDocs, limit, 
   onSnapshot, doc, setDoc, updateDoc, arrayUnion, arrayRemove, 
   serverTimestamp, getDoc, addDoc, deleteDoc
 } from 'firebase/firestore';
@@ -602,8 +602,7 @@ export const TrainerProfile = () => {
   const hasRecentActivity = profile.widgetsConfig?.showRecentActivity ?? true;
   const hasFavoriteTeam = profile.widgetsConfig?.showFavoriteTeam ?? true;
   const hasPinnedPosts = profile.widgetsConfig?.showPinnedPosts ?? true;
-  const hasComments = (profile.widgetsConfig?.allowComments ?? true) || comments.length > 0;
-  const hasFeaturedImage = profile.widgetsConfig?.customImage?.enabled && profile.widgetsConfig?.customImage?.url;
+  // Removed unused hasComments and hasFeaturedImage
 
   // Stats só aparece se houver algo para mostrar ou se for o dono (para ver solicitações)
   const hasStats = profile.widgetsConfig?.showStats ?? true; 

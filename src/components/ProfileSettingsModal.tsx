@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Camera, Lock, Unlock, Sparkles, User, LayoutGrid, Trophy, Check, Eye, EyeOff, Image as ImageIcon, MessageCircle, Pin } from 'lucide-react';
+import { X, Save, Camera, Lock, Unlock, Sparkles, User, LayoutGrid, Trophy, Check, Image as ImageIcon, MessageCircle, Pin } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { ACHIEVEMENTS } from '../data/achievementsData';
