@@ -6,10 +6,10 @@ import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { MALE_ONLY_POKEMON, GENDERLESS_POKEMON } from '../data/pokemonCategories';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, limit, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, query, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
 import { useCart } from '../context/CartContext';
 import { safeStorage } from '../utils/storageUtils';
-import { updateGlobalRank } from '../utils/rankUtils';
+import { updateUserStats } from '../utils/rankUtils';
 import { createPortal } from 'react-dom';
 import { notifyNewOrder } from '../utils/discordNotify';
 
@@ -137,29 +137,15 @@ export const OrderForm = () => {
   useEffect(() => {
     const fetchHotPokemon = async () => {
       try {
-        let snap;
-        try {
-          // Fallback Fetch: sem orderBy para evitar erro de Missing Index
-          snap = await getDocs(query(collection(db, 'orders'), limit(150)));
-        } catch (e) {
-          console.warn("Hot Pokemon fetch failed:", e);
-          return;
+        // Lê de public_stats (allow read: if true) — sem problemas de permissão
+        const statsDoc = await getDoc(doc(db, 'public_stats', 'global'));
+        if (statsDoc.exists()) {
+          const hot = statsDoc.data().hotPokemon || [];
+          setHotPokemon(hot.slice(0, 3));
         }
-        
-        const counts: Record<string, number> = {};
-        snap.docs.forEach(doc => {
-          const name = doc.data().pokemon;
-          if (name) counts[name] = (counts[name] || 0) + 1;
-        });
-
-        const sorted = Object.entries(counts)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 3);
-          
-        setHotPokemon(sorted);
       } catch (err) {
-        console.warn("Hot Pokemon calculation error:", err);
+        // Não crítico — apenas suprime silenciosamente
+        setHotPokemon([]);
       }
     };
     fetchHotPokemon();
@@ -352,9 +338,9 @@ export const OrderForm = () => {
         createdAt: serverTimestamp()
       });
       
-      // Update global rank automatically!
-      if (user.displayName) {
-        await updateGlobalRank(user.displayName, totalPrice);
+      // Atualiza stats do próprio perfil (usuário tem permissão de escrita)
+      if (user.uid) {
+        await updateUserStats(user.uid, totalPrice);
       }
 
       // Notify Discord e salvar messageId no Firestore

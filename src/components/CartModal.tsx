@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { updateGlobalRank } from '../utils/rankUtils';
+import { updateUserStats } from '../utils/rankUtils';
 import { notifyNewOrder } from '../utils/discordNotify';
 
 export const CartModal = () => {
@@ -49,9 +49,9 @@ export const CartModal = () => {
         })
       ));
 
-      // 2. Update global rank
-      if (user.displayName) {
-        await updateGlobalRank(user.displayName, cartTotal);
+      // 2. Update user's own profile stats (has write permission)
+      if (user.uid) {
+        await updateUserStats(user.uid, cartTotal);
       }
 
       // 3. Send Discord notification for each item and save messageId to Firestore

@@ -57,6 +57,29 @@ export const getRankInfo = (spent: number = 0) => {
   };
 };
 
+/**
+ * Atualiza o totalSpent do próprio perfil do usuário quando ele coloca um pedido.
+ * Usa trainer_profiles/{uid}, onde o usuário tem permissão de escrita.
+ * O sync do Admin Dashboard lê desses perfis para montar o public_stats/global.
+ */
+export const updateUserStats = async (userUid: string, addedSpent: number) => {
+  if (!userUid) return;
+  try {
+    const profileRef = doc(db, 'trainer_profiles', userUid);
+    const snap = await getDoc(profileRef);
+    if (!snap.exists()) return; // Perfil ainda não criado, ignorar silenciosamente
+    const currentSpent = snap.data().totalSpent || 0;
+    await updateDoc(profileRef, { totalSpent: currentSpent + addedSpent });
+  } catch (err: any) {
+    // Não crítico: o Admin Sync corrige os valores depois
+    console.warn('[Rank] Não foi possível atualizar stats do perfil:', err?.message ?? err);
+  }
+};
+
+/**
+ * @deprecated Use updateUserStats para fluxos de cliente.
+ * Esta função só deve ser chamada pelo Admin Dashboard (tem permissão de escrita em public_stats).
+ */
 export const updateGlobalRank = async (userNick: string, addedSpent: number) => {
   try {
     const statsRef = doc(db, 'public_stats', 'global');
