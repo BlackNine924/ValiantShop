@@ -327,9 +327,16 @@ export const AdminDashboard = () => {
     
     // Helper local: atualiza embed do Discord sempre ao final
     const syncDiscordEmbed = async () => {
-      if (order?.discordMessageId) {
-        await updateOrderEmbed(order.discordMessageId, order, newStatus);
+      if (!order) {
+        console.warn('[Discord] syncDiscordEmbed: pedido não encontrado no state local.');
+        return;
       }
+      if (!order.discordMessageId) {
+        console.warn(`[Discord] syncDiscordEmbed: pedido "${order.pokemon}" não tem discordMessageId salvo. Foi criado antes da integração ou o salvamento falhou.`);
+        return;
+      }
+      console.log(`[Discord] Tentando atualizar embed | messageId: ${order.discordMessageId} | novoStatus: ${newStatus}`);
+      await updateOrderEmbed(order.discordMessageId, order, newStatus);
     };
 
     try {

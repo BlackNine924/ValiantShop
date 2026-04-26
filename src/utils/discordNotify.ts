@@ -31,14 +31,17 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const discordRequest = async (fn: () => Promise<any>, retries = 3): Promise<any> => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await fn();
+      const result = await fn();
+      return result;
     } catch (err: any) {
       const status = err?.response?.status;
+      const discordMsg = err?.response?.data?.message ?? 'sem detalhes';
       if (status === 429 && attempt < retries - 1) {
         const retryAfter = (err?.response?.data?.retry_after ?? 1) * 1000;
-        console.warn(`[Discord] Rate limit (429). Aguardando ${retryAfter}ms antes de tentar novamente...`);
+        console.warn(`[Discord] Rate limit (429). Aguardando ${retryAfter}ms...`);
         await sleep(retryAfter);
       } else {
+        console.error(`[Discord] Erro HTTP ${status ?? 'rede'}: "${discordMsg}"`, err?.response?.data ?? err?.message);
         throw err;
       }
     }
@@ -150,18 +153,30 @@ export const updateOrderEmbed = async (
   order: any,
   newStatus: string
 ): Promise<void> => {
-  if (!WEBHOOK_URL || !messageId) return;
+  if (!WEBHOOK_URL) {
+    console.error('[Discord] updateOrderEmbed: WEBHOOK_URL não configurada no .env!');
+    return;
+  }
+  if (!messageId) {
+    console.error('[Discord] updateOrderEmbed: messageId vazio ou nulo. O pedido foi criado antes da integração?');
+    return;
+  }
+
+  const patchUrl = `${WEBHOOK_URL}/messages/${messageId}`;
+  console.log(`[Discord] PATCH -> ${patchUrl} | status: ${newStatus}`);
 
   try {
-    await discordRequest(() =>
-      axios.patch(`${WEBHOOK_URL}/messages/${messageId}`, {
+    const response = await discordRequest(() =>
+      axios.patch(patchUrl, {
         content: `🔔 **Status Atualizado** | <@${USER_ID}>`,
         embeds: [buildEmbed(order, newStatus)],
       })
     );
-    console.log(`[Discord] Embed atualizada para status: ${newStatus}`);
-  } catch (error) {
-    console.error('[Discord] Erro ao atualizar embed:', error);
+    console.log(`[Discord] ✅ Embed atualizada para "${newStatus}" | HTTP ${response?.status}`);
+  } catch (error: any) {
+    const httpStatus = error?.response?.status;
+    const detail = JSON.stringify(error?.response?.data ?? error?.message);
+    console.error(`[Discord] ❌ Falha ao atualizar embed | HTTP ${httpStatus} | Detalhe: ${detail}`);
   }
 };
 

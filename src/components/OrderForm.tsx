@@ -6,7 +6,7 @@ import { POKEMON_DATA, NATURES } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { MALE_ONLY_POKEMON, GENDERLESS_POKEMON } from '../data/pokemonCategories';
-import { collection, addDoc, serverTimestamp, doc, getDocs, query, limit, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, limit, arrayUnion, arrayRemove, onSnapshot, where, deleteDoc, setDoc } from 'firebase/firestore';
 import { useCart } from '../context/CartContext';
 import { safeStorage } from '../utils/storageUtils';
 import { updateGlobalRank } from '../utils/rankUtils';
@@ -333,7 +333,7 @@ export const OrderForm = () => {
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'orders'), {
+      const orderRef = await addDoc(collection(db, 'orders'), {
         pokemon: form.pokemon,
         nature: (form.nature && form.nature.trim() !== '') ? form.nature.charAt(0).toUpperCase() + form.nature.slice(1).toLowerCase() : 'Aleatória',
         ability: form.ability,
@@ -357,20 +357,23 @@ export const OrderForm = () => {
         await updateGlobalRank(user.displayName, totalPrice);
       }
 
+      // Notify Discord e salvar messageId no Firestore
+      const messageId = await notifyNewOrder({
+        ...form,
+        playerNick: user.displayName,
+        totalPrice: totalPrice,
+        nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
+      });
+      if (messageId) {
+        await updateDoc(doc(db, 'orders', orderRef.id), { discordMessageId: messageId });
+      }
+
       localStorage.setItem('valiant_order_cooldown', (Date.now() + 30000).toString());
       setCooldown(30);
       safeStorage.setItem('valiant_discord_nick', form.discordNick);
       setForm(initialForm);
       setSearch('');
       setStep(4);
-      
-      // Notify Discord
-      notifyNewOrder({
-        ...form,
-        playerNick: user.displayName,
-        totalPrice: totalPrice,
-        nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
-      });
     } catch (e) {
       console.error(e);
       alert('Erro ao enviar pedido direto. Tente novamente.');
