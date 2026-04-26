@@ -3,7 +3,7 @@ import { X, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { updateGlobalRank } from '../utils/rankUtils';
 import { notifyNewOrder } from '../utils/discordNotify';
@@ -27,7 +27,8 @@ export const CartModal = () => {
 
     setIsSubmitting(true);
     try {
-      await Promise.all(cart.map(item => 
+      // 1. Create all orders in Firestore and collect their refs
+      const orderRefs = await Promise.all(cart.map(item =>
         addDoc(collection(db, 'orders'), {
           pokemon: item.pokemon,
           nature: item.nature || 'Aleatória',
@@ -47,20 +48,25 @@ export const CartModal = () => {
           createdAt: serverTimestamp()
         })
       ));
-      
-      // Update global rank automatically with cart Total!
+
+      // 2. Update global rank
       if (user.displayName) {
         await updateGlobalRank(user.displayName, cartTotal);
       }
 
-      // Notify Discord for each item
-      cart.forEach(item => {
-        notifyNewOrder({
+      // 3. Send Discord notification for each item and save messageId to Firestore
+      await Promise.all(cart.map(async (item, idx) => {
+        const orderRef = orderRefs[idx];
+        const payload = {
           ...item,
           playerNick: user.displayName,
-          totalPrice: item.price
-        });
-      });
+          totalPrice: item.price,
+        };
+        const messageId = await notifyNewOrder(payload);
+        if (messageId && orderRef) {
+          await updateDoc(doc(db, 'orders', orderRef.id), { discordMessageId: messageId });
+        }
+      }));
 
       clearCart();
       setSuccess(true);

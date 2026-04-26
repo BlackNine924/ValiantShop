@@ -10,6 +10,7 @@ import { ReviewModal } from '../components/ReviewModal';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
+import { deleteOrderEmbed } from '../utils/discordNotify';
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
@@ -157,6 +158,11 @@ export const Status = () => {
           userUid: user?.uid,
           userEmail: user?.email
         });
+
+        // Apagar embed do Discord se existir
+        if (orderToCancel.discordMessageId) {
+          await deleteOrderEmbed(orderToCancel.discordMessageId);
+        }
       }
 
       // Optimistic update

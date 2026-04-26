@@ -20,6 +20,7 @@ import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';
 import { getBasePokemonName } from '../utils/pokemonNameUtils';
 import { EditOrderModal } from '../components/EditOrderModal';
 import { EditTrainerModal } from '../components/EditTrainerModal';
+import { updateOrderEmbed, deleteOrderEmbed } from '../utils/discordNotify';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -472,6 +473,11 @@ export const AdminDashboard = () => {
       }
 
       await updateDoc(doc(adminDb, 'orders', orderId), { status: newStatus });
+
+      // Atualizar embed do Discord com nova cor e status
+      if (order?.discordMessageId) {
+        await updateOrderEmbed(order.discordMessageId, order, newStatus);
+      }
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Falha ao atualizar status no banco de dados.');
@@ -564,6 +570,13 @@ export const AdminDashboard = () => {
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
+      const order = orders.find(o => o.id === orderId);
+
+      // Apagar embed do Discord antes de deletar
+      if (order?.discordMessageId) {
+        await deleteOrderEmbed(order.discordMessageId);
+      }
+
       // Optimistic update
       setOrders(prev => prev.filter(o => o.id !== orderId));
       
