@@ -22,6 +22,29 @@ const STATUS_CONFIG: Record<string, { color: number; label: string }> = {
 // ─────────────────────────────────────────────────────────────
 const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Executa uma chamada axios respeitando o rate limit do Discord (429).
+ * Em caso de 429, aguarda o tempo indicado pelo header retry_after e tenta novamente.
+ */
+const discordRequest = async (fn: () => Promise<any>, retries = 3): Promise<any> => {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 429 && attempt < retries - 1) {
+        const retryAfter = (err?.response?.data?.retry_after ?? 1) * 1000;
+        console.warn(`[Discord] Rate limit (429). Aguardando ${retryAfter}ms antes de tentar novamente...`);
+        await sleep(retryAfter);
+      } else {
+        throw err;
+      }
+    }
+  }
+};
+
 /**
  * Formata IVs no padrão: "F5 -atk -spa"
  */
@@ -97,13 +120,14 @@ export const notifyNewOrder = async (order: any): Promise<string | null> => {
   }
 
   try {
-    // ?wait=true faz o Discord retornar o objeto da mensagem com o id
-    const response = await axios.post(`${WEBHOOK_URL}?wait=true`, {
-      content: `🔔 **Aviso de Venda** | <@${USER_ID}>`,
-      embeds: [buildEmbed(order, 'Pendente')],
-    });
+    const response = await discordRequest(() =>
+      axios.post(`${WEBHOOK_URL}?wait=true`, {
+        content: `🔔 **Aviso de Venda** | <@${USER_ID}>`,
+        embeds: [buildEmbed(order, 'Pendente')],
+      })
+    );
 
-    const messageId: string | null = response.data?.id ?? null;
+    const messageId: string | null = response?.data?.id ?? null;
     console.log('[Discord] Mensagem criada, messageId:', messageId);
     return messageId;
   } catch (error) {
@@ -129,10 +153,12 @@ export const updateOrderEmbed = async (
   if (!WEBHOOK_URL || !messageId) return;
 
   try {
-    await axios.patch(`${WEBHOOK_URL}/messages/${messageId}`, {
-      content: `🔔 **Status Atualizado** | <@${USER_ID}>`,
-      embeds: [buildEmbed(order, newStatus)],
-    });
+    await discordRequest(() =>
+      axios.patch(`${WEBHOOK_URL}/messages/${messageId}`, {
+        content: `🔔 **Status Atualizado** | <@${USER_ID}>`,
+        embeds: [buildEmbed(order, newStatus)],
+      })
+    );
     console.log(`[Discord] Embed atualizada para status: ${newStatus}`);
   } catch (error) {
     console.error('[Discord] Erro ao atualizar embed:', error);
@@ -150,7 +176,7 @@ export const deleteOrderEmbed = async (messageId: string): Promise<void> => {
   if (!WEBHOOK_URL || !messageId) return;
 
   try {
-    await axios.delete(`${WEBHOOK_URL}/messages/${messageId}`);
+    await discordRequest(() => axios.delete(`${WEBHOOK_URL}/messages/${messageId}`));
     console.log('[Discord] Embed deletada, messageId:', messageId);
   } catch (error) {
     console.error('[Discord] Erro ao deletar embed:', error);

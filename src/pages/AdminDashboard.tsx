@@ -325,6 +325,13 @@ export const AdminDashboard = () => {
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
     
+    // Helper local: atualiza embed do Discord sempre ao final
+    const syncDiscordEmbed = async () => {
+      if (order?.discordMessageId) {
+        await updateOrderEmbed(order.discordMessageId, order, newStatus);
+      }
+    };
+
     try {
       if ((newStatus === 'Finalizado' || newStatus === 'Entregue') && order) {
         await updateStock(order.pokemon, order.ivs, order.gender, order.nature);
@@ -366,15 +373,12 @@ export const AdminDashboard = () => {
                 ? pData.types.map(t => t.toLowerCase()) 
                 : ['normal'];
               
-              // Only pick ONE random type from the available types
               const glintType = typesToAwardAll[Math.floor(Math.random() * typesToAwardAll.length)];
               const typesToAward = [glintType];
               
               console.log(`[GLINT] typesToAward (Randomized):`, typesToAward);
               
-              // Build new glintFragments map (full rewrite - safer than dot-notation)
               const newFragments: Record<string, number> = {};
-              // Copy all existing fragments with lowercase keys
               for (const [k, v] of Object.entries(glints)) {
                 newFragments[k.toLowerCase()] = v as number;
               }
@@ -382,12 +386,8 @@ export const AdminDashboard = () => {
               let newCollection = [...(profileData.glintCollection || [])];
               
               typesToAward.forEach(glintType => {
-                // Verificar se o usuário já possui o Glint deste tipo
                 const alreadyHasGlint = newCollection.some(g => g.type.toLowerCase() === glintType.toLowerCase());
-                
-                // Se já tem, o fragmento vai para o "Prismático" (Coringa)
                 const targetType = alreadyHasGlint ? 'prismático' : glintType;
-                
                 const prev = newFragments[targetType] || 0;
                 const next = prev + 0.25;
                 
@@ -407,7 +407,6 @@ export const AdminDashboard = () => {
               
               console.log(`[GLINT] Final fragments:`, JSON.stringify(newFragments));
               
-              // Single atomic write with everything
               await updateDoc(profileDoc.ref, {
                 glintFragments: newFragments,
                 glintCollection: newCollection,
@@ -428,7 +427,6 @@ export const AdminDashboard = () => {
       }
       
       if (newStatus === 'Entregue' && order) {
-        // Create Social Post for 'Entregue' status
         try {
           await addDoc(collection(adminDb, 'social_posts'), {
             authorUid: 'valiant_bot_system',
@@ -467,6 +465,8 @@ export const AdminDashboard = () => {
               status: newStatus,
               commissionPaid: true 
             });
+            // FIX: chama Discord ANTES do return para não pular a atualização
+            await syncDiscordEmbed();
             return;
           }
         }
@@ -475,9 +475,7 @@ export const AdminDashboard = () => {
       await updateDoc(doc(adminDb, 'orders', orderId), { status: newStatus });
 
       // Atualizar embed do Discord com nova cor e status
-      if (order?.discordMessageId) {
-        await updateOrderEmbed(order.discordMessageId, order, newStatus);
-      }
+      await syncDiscordEmbed();
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Falha ao atualizar status no banco de dados.');
