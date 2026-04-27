@@ -20,7 +20,7 @@ import { POKEMON_TYPE_DATA } from '../data/pokemonTypes';
 import { getBasePokemonName } from '../utils/pokemonNameUtils';
 import { EditOrderModal } from '../components/EditOrderModal';
 import { EditTrainerModal } from '../components/EditTrainerModal';
-import { updateOrderEmbed, deleteOrderEmbed } from '../utils/discordNotify';
+import { updateOrderEmbed, deleteOrderEmbed, notifyDeleteOrder } from '../utils/discordNotify';
 
 export const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -581,6 +581,9 @@ export const AdminDashboard = () => {
       if (order?.discordMessageId) {
         await deleteOrderEmbed(order.discordMessageId);
       }
+      
+      // NEW: Notificar cancelamento no canal específico
+      await notifyDeleteOrder(order);
 
       // Optimistic update
       setOrders(prev => prev.filter(o => o.id !== orderId));
@@ -596,6 +599,11 @@ export const AdminDashboard = () => {
   const handleUpdateOrder = async (orderId: string, updatedData: any) => {
     try {
       await updateDoc(doc(adminDb, 'orders', orderId), updatedData);
+      const originalOrder = orders.find(o => o.id === orderId);
+      if (originalOrder && originalOrder.discordMessageId) {
+        const fullOrderForDiscord = { ...originalOrder, ...updatedData };
+        await updateOrderEmbed(originalOrder.discordMessageId, fullOrderForDiscord, updatedData.status || originalOrder.status);
+      }
     } catch (err) {
       console.error("Erro ao atualizar pedido:", err);
       throw err;

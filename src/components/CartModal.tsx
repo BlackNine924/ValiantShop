@@ -62,7 +62,8 @@ export const CartModal = () => {
           playerNick: user.displayName,
           totalPrice: item.price,
         };
-        const messageId = await notifyNewOrder(payload);
+        // Passa o orderId para que os botões da embed apontem para o pedido correto
+        const messageId = await notifyNewOrder(payload, orderRef?.id);
         if (messageId && orderRef) {
           await updateDoc(doc(db, 'orders', orderRef.id), { discordMessageId: messageId });
         }

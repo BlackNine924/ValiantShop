@@ -306,11 +306,6 @@ export const OrderForm = () => {
   };
 
   const handleBuyNow = async () => {
-    if (cooldown > 0) {
-      alert(`Anti-Spam ativado. Aguarde ${cooldown} segundos antes de enviar outra encomenda.`);
-      return;
-    }
-
     if (!user || !user.displayName) {
       alert('Você precisa estar logado com seu Nick para fazer uma encomenda!');
       return;
@@ -349,13 +344,11 @@ export const OrderForm = () => {
         playerNick: user.displayName,
         totalPrice: totalPrice,
         nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
-      });
+      }, orderRef.id);
       if (messageId) {
         await updateDoc(doc(db, 'orders', orderRef.id), { discordMessageId: messageId });
       }
 
-      localStorage.setItem('valiant_order_cooldown', (Date.now() + 30000).toString());
-      setCooldown(30);
       safeStorage.setItem('valiant_discord_nick', form.discordNick);
       setForm(initialForm);
       setSearch('');

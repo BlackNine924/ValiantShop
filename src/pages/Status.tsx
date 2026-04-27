@@ -10,7 +10,7 @@ import { ReviewModal } from '../components/ReviewModal';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
-import { deleteOrderEmbed } from '../utils/discordNotify';
+import { deleteOrderEmbed, notifyDeleteOrder } from '../utils/discordNotify';
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
@@ -163,6 +163,9 @@ export const Status = () => {
         if (orderToCancel.discordMessageId) {
           await deleteOrderEmbed(orderToCancel.discordMessageId);
         }
+
+        // NEW: Notificar cancelamento no canal específico
+        await notifyDeleteOrder(orderToCancel);
       }
 
       // Optimistic update

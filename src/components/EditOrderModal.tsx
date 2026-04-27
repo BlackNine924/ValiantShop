@@ -5,10 +5,10 @@ import { motion } from 'framer-motion';
 import { POKEMON_DATA } from '../data/pokemonData';
 import { GENDERLESS_POKEMON, MALE_ONLY_POKEMON } from '../data/pokemonCategories';
 
-const IV_DETAILS: Record<string, { price: number }> = {
-  '4': { price: 40000 },
-  '5': { price: 80000 },
-  '6': { price: 100000 }
+const IV_DETAILS: Record<string, { price: number; numIgnored: number }> = {
+  '4': { price: 40000, numIgnored: 2 },
+  '5': { price: 80000, numIgnored: 1 },
+  '6': { price: 100000, numIgnored: 0 }
 };
 
 const CASTRATED_DISCOUNT = 10000;
@@ -113,13 +113,27 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, order, o
     }
   };
 
+  useEffect(() => {
+    const baseIv = formData.ivs.split(' ')[0];
+    const maxIgnored = IV_DETAILS[baseIv]?.numIgnored || 0;
+    if (formData.ignoredIvs.length > maxIgnored) {
+      setFormData(prev => ({ ...prev, ignoredIvs: prev.ignoredIvs.slice(0, maxIgnored) }));
+    }
+  }, [formData.ivs, formData.ignoredIvs.length]);
+
   const toggleIgnoredIv = (stat: string) => {
-    setFormData(prev => ({
-      ...prev,
-      ignoredIvs: prev.ignoredIvs.includes(stat)
-        ? prev.ignoredIvs.filter((s: string) => s !== stat)
-        : [...prev.ignoredIvs, stat]
-    }));
+    const baseIv = formData.ivs.split(' ')[0];
+    const maxIgnored = IV_DETAILS[baseIv]?.numIgnored || 0;
+
+    setFormData(prev => {
+      if (prev.ignoredIvs.includes(stat)) {
+        return { ...prev, ignoredIvs: prev.ignoredIvs.filter((s: string) => s !== stat) };
+      }
+      if (prev.ignoredIvs.length >= maxIgnored) {
+        return prev;
+      }
+      return { ...prev, ignoredIvs: [...prev.ignoredIvs, stat] };
+    });
   };
 
   const modalContent = (

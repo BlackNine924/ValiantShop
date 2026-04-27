@@ -2,87 +2,73 @@ import axios from 'axios';
 import { POKEMON_DATA } from '../data/pokemonData';
 import { EGG_GROUPS_MAP } from '../data/eggGroups';
 
-// User ID to be mentioned in notifications
-const USER_ID = "650763941462671394";
-
-const WEBHOOK_URL = import.meta.env.VITE_DISCORD_WEBHOOK_ORDERS || "";
+// ─────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────
+const USER_ID      = '650763941462671394';
+const WORKER_URL   = 'https://valiantshop-discord-bot.reskallaarthur.workers.dev';
+const SITE_KEY     = 'V@liant-ProxY-2025-Secure-Key-99';
 
 // ─────────────────────────────────────────────────────────────
-// STATUS CONFIG — cor e emoji por status
+// STATUS CONFIG
 // ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { color: number; label: string }> = {
-  'Pendente':   { color: 0xF97316, label: '🟠 Pendente' },
-  'Breeding':   { color: 0x9B59B6, label: '🟣 Breeding' },   // roxo — diferente de "Entregue"
+  'Pendente':   { color: 0xF97416, label: '🟠 Pendente' },
+  'Breeding':   { color: 0x9B59B6, label: '🟣 Breeding' },
   'Finalizado': { color: 0x22C55E, label: '🟢 Finalizado' },
-  'Entregue':   { color: 0x06B6D4, label: '🔵 Entregue' },   // ciano — bem diferente de roxo
+  'Entregue':   { color: 0x427BD0, label: '🔵 Entregue' },
 };
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
 const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Executa uma chamada axios respeitando o rate limit do Discord (429).
- * Em caso de 429, aguarda o tempo indicado pelo header retry_after e tenta novamente.
- */
-const discordRequest = async (fn: () => Promise<any>, retries = 3): Promise<any> => {
+const workerRequest = async (data: any, retries = 3): Promise<any> => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const result = await fn();
-      return result;
+      const response = await axios.post(WORKER_URL, data, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Valiant-Key': SITE_KEY
+        }
+      });
+      return response.data;
     } catch (err: any) {
       const status = err?.response?.status;
-      const discordMsg = err?.response?.data?.message ?? 'sem detalhes';
       if (status === 429 && attempt < retries - 1) {
         const retryAfter = (err?.response?.data?.retry_after ?? 1) * 1000;
-        console.warn(`[Discord] Rate limit (429). Aguardando ${retryAfter}ms...`);
         await sleep(retryAfter);
       } else {
-        console.error(`[Discord] Erro HTTP ${status ?? 'rede'}: "${discordMsg}"`, err?.response?.data ?? err?.message);
+        console.error(`[Discord Worker] Erro ${status ?? 'rede'}:`, err?.response?.data ?? err?.message);
         throw err;
       }
     }
   }
 };
 
-/**
- * Formata IVs no padrão: "F5 -atk -spa"
- */
 const formatIVs = (ivs: string, ignoredIvs: string[]): string => {
   const ivRaw = ivs || '';
   const ivNum = ivRaw.includes('4') ? 'F4' : ivRaw.includes('5') ? 'F5' : ivRaw.includes('6') ? 'F6' : ivRaw;
-
   if (!ignoredIvs || ignoredIvs.length === 0) return ivNum;
-
-  const ignoredStr = ignoredIvs
-    .map((iv: string) => `-${iv.toLowerCase()}`)
-    .join(' ');
-  return `${ivNum} ${ignoredStr}`;
+  return `${ivNum} ${ignoredIvs.map((iv: string) => `-${iv.toLowerCase()}`).join(' ')}`;
 };
 
-/**
- * Constrói o objeto embed para uma encomenda
- */
+// ─────────────────────────────────────────────────────────────
+// EMBED BUILDER
+// ─────────────────────────────────────────────────────────────
 const buildEmbed = (order: any, status: string = 'Pendente') => {
   const pokemonInfo = POKEMON_DATA.find(p => p.name.toLowerCase() === (order.pokemon || '').toLowerCase());
   const pokeId = pokemonInfo?.id || 0;
-
   const ivFormatted = formatIVs(order.ivs || '', order.ignoredIvs || []);
-
   const isHA = order.hasHA || (pokemonInfo?.hiddenAbility === order.ability && order.ability);
   const abilityDisplay = isHA ? `${order.ability} (HA)` : (order.ability || 'N/A');
-
   const eggGroupsData = EGG_GROUPS_MAP[normalizeName(order.pokemon || '')];
   const eggGroupDisplay = eggGroupsData ? eggGroupsData.join(', ') : 'N/A';
-
   const priceFormatted = `${(order.totalPrice || 0) / 1000}k`;
-
   const cinematicBanner = 'https://wallpapers-clan.com/wp-content/uploads/2024/08/ash-pikachu-adventure-pokemon-desktop-wallpaper-cover.jpg';
   const thumbUrl = pokeId > 0 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokeId}.png` : '';
-
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG['Pendente'];
 
   return {
@@ -111,89 +97,80 @@ const buildEmbed = (order: any, status: string = 'Pendente') => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// CRIAR notificação — retorna o messageId do Discord
+// EXPORTS
 // ─────────────────────────────────────────────────────────────
-/**
- * Envia a embed de nova encomenda e retorna o messageId para armazenar no Firestore.
- */
-export const notifyNewOrder = async (order: any): Promise<string | null> => {
-  if (!WEBHOOK_URL) {
-    console.warn('ERRO: VITE_DISCORD_WEBHOOK_ORDERS não encontrada no .env');
+
+import { GENDERLESS_POKEMON, MALE_ONLY_POKEMON } from '../data/pokemonCategories';
+import { getEggGroups } from '../data/eggGroups';
+
+const enrichOrder = (order: any) => {
+  const eggGroup = GENDERLESS_POKEMON.includes(order.pokemon) || MALE_ONLY_POKEMON.includes(order.pokemon) 
+    ? 'Ditto' 
+    : getEggGroups(order.pokemon).join(', ');
+  return { ...order, eggGroup };
+};
+
+export const notifyNewOrder = async (order: any, orderId?: string): Promise<string | null> => {
+  if (!orderId) {
+    console.warn('[Discord] notifyNewOrder: Sem orderId, impossível gerar botões.');
     return null;
   }
-
+  
   try {
-    const response = await discordRequest(() =>
-      axios.post(`${WEBHOOK_URL}?wait=true`, {
-        content: `🔔 **Aviso de Venda** | <@${USER_ID}>`,
-        embeds: [buildEmbed(order, 'Pendente')],
-      })
-    );
-
-    const messageId: string | null = response?.data?.id ?? null;
-    console.log('[Discord] Mensagem criada, messageId:', messageId);
-    return messageId;
+    const enrichedOrder = enrichOrder(order);
+    const embed = buildEmbed(enrichedOrder, 'Pendente');
+    const result = await workerRequest({
+      action: 'send',
+      orderId,
+      order: enrichedOrder,
+      content: `🔔 **Aviso de Venda** | <@${USER_ID}>`,
+      embeds: [embed]
+    });
+    
+    console.log('[Discord Worker] ✅ Mensagem enviada via Worker:', result?.id);
+    return result?.id || null;
   } catch (error) {
-    console.error('[Discord] Erro ao enviar notificação:', error);
+    console.error('[Discord Worker] Erro ao enviar pedido:', error);
     return null;
   }
 };
 
-// ─────────────────────────────────────────────────────────────
-// ATUALIZAR embed quando o status mudar
-// ─────────────────────────────────────────────────────────────
-/**
- * Edita a embed existente no Discord com a nova cor e status.
- * @param messageId  ID da mensagem do Discord (guardado no Firestore)
- * @param order      Dados completos da encomenda
- * @param newStatus  Novo status ('Pendente' | 'Breeding' | 'Finalizado' | 'Entregue')
- */
 export const updateOrderEmbed = async (
   messageId: string,
   order: any,
   newStatus: string
 ): Promise<void> => {
-  if (!WEBHOOK_URL) {
-    console.error('[Discord] updateOrderEmbed: WEBHOOK_URL não configurada no .env!');
-    return;
-  }
-  if (!messageId) {
-    console.error('[Discord] updateOrderEmbed: messageId vazio ou nulo. O pedido foi criado antes da integração?');
-    return;
-  }
-
-  const patchUrl = `${WEBHOOK_URL}/messages/${messageId}`;
-  console.log(`[Discord] PATCH -> ${patchUrl} | status: ${newStatus}`);
+  if (!messageId) return;
 
   try {
-    const response = await discordRequest(() =>
-      axios.patch(patchUrl, {
-        content: `🔔 **Status Atualizado** | <@${USER_ID}>`,
-        embeds: [buildEmbed(order, newStatus)],
-      })
-    );
-    console.log(`[Discord] ✅ Embed atualizada para "${newStatus}" | HTTP ${response?.status}`);
-  } catch (error: any) {
-    const httpStatus = error?.response?.status;
-    const detail = JSON.stringify(error?.response?.data ?? error?.message);
-    console.error(`[Discord] ❌ Falha ao atualizar embed | HTTP ${httpStatus} | Detalhe: ${detail}`);
+    const orderId = order.id || order.orderId || '';
+    await workerRequest({
+      action: 'update',
+      messageId,
+      orderId,
+      status: newStatus,
+      order: enrichOrder(order)
+    });
+    console.log(`[Discord Worker] ✅ Status atualizado para "${newStatus}"`);
+  } catch (error) {
+    console.error('[Discord Worker] Falha ao atualizar embed:', error);
   }
 };
 
-// ─────────────────────────────────────────────────────────────
-// DELETAR embed quando a encomenda for cancelada
-// ─────────────────────────────────────────────────────────────
-/**
- * Apaga a mensagem do Discord correspondente à encomenda cancelada.
- * @param messageId  ID da mensagem do Discord
- */
 export const deleteOrderEmbed = async (messageId: string): Promise<void> => {
-  if (!WEBHOOK_URL || !messageId) return;
-
+  if (!messageId) return;
   try {
-    await discordRequest(() => axios.delete(`${WEBHOOK_URL}/messages/${messageId}`));
-    console.log('[Discord] Embed deletada, messageId:', messageId);
+    await workerRequest({ action: 'delete', messageId });
+    console.log('[Discord Worker] ✅ Embed deletada');
   } catch (error) {
-    console.error('[Discord] Erro ao deletar embed:', error);
+    console.error('[Discord Worker] Erro ao deletar embed:', error);
+  }
+};
+
+export const notifyDeleteOrder = async (order: any) => {
+  try {
+    await workerRequest({ action: 'cancel', order: enrichOrder(order) });
+  } catch (error) {
+    console.error('[Discord] Falha ao notificar cancelamento:', error);
   }
 };
