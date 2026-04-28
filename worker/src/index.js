@@ -710,7 +710,7 @@ export default {
                              "• **Modo Manutenção:** Bloqueia comandos para usuários não-administradores.\n" +
                              "• **Limpeza de Cache:** Força a atualização de variáveis locais e tokens.",
                 color: 0xef4444,
-                fields: [
+                fields: [{ name: "Modo Manutenção", value: s.maintenance ? "⚠️ O bot está em modo de manutenção." : "✅ O bot está operando normalmente." }]
               };
               components = [{
                 type: 1,
@@ -1030,17 +1030,6 @@ export default {
            }
         }
         if (cid === 'modal_config_logchannel') {
-           return jsonResponse({ type: 6 }); // Already handled by unified handler above or redundant
-        }
-                 { type: 2, label: '🛠️ Manutenção', style: s.maintenance ? 3 : 4, custom_id: 'config_toggle_maint' }
-               ]},
-               { type: 1, components: [
-                 { type: 2, label: '📺 Set Log Channel', style: 2, custom_id: 'config_set_logchannel' },
-                 { type: 2, label: '⬅️ Voltar', style: 2, custom_id: 'menu_back_home' }
-               ]}
-             ];
-             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed], components } ) });
-           })());
            return jsonResponse({ type: 6 });
         }
 
