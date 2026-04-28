@@ -32,7 +32,7 @@ export const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
   const [newBreederEmail, setNewBreederEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade' | 'ferramentas'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [breeders, setBreeders] = useState<any[]>([]);
   const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
