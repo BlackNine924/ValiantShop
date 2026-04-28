@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap, Sparkles
 } from 'lucide-react';
 import { adminDb, adminAuth as auth } from '../firebase';
 import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
@@ -32,7 +32,7 @@ export const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
   const [newBreederEmail, setNewBreederEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade' | 'ferramentas'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [breeders, setBreeders] = useState<any[]>([]);
   const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
@@ -158,7 +158,31 @@ export const AdminDashboard = () => {
     }
   };
 
+  const handleTriggerHunt = async (pokemonName: string) => {
+    if (!pokemonName) return;
+    try {
+      await setDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
+        pokemonName,
+        isActive: true,
+        spawnTime: Date.now(), // Use current timestamp as unique session ID for state resets
+        winners: [],
+        location: 'random'
+      });
+      alert(`Caça ao ${pokemonName} disparada com sucesso!`);
+    } catch (error) {
+      console.error("Error triggering hunt:", error);
+    }
+  };
 
+  const handleStopHunt = async () => {
+    try {
+      await updateDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
+        isActive: false
+      });
+    } catch (error) {
+      console.error("Error stopping hunt:", error);
+    }
+  };
 
   // ONE-TIME ADMIN TOOL: Merge duplicate profiles (commented out due to unused)
   /* const handleMergeProfiles = async () => {
@@ -1595,23 +1619,22 @@ export const AdminDashboard = () => {
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
-                          <MessageSquare size={20} />
+                          <ShoppingBag size={20} />
                         </div>
-                        <h4 className="font-bold uppercase tracking-wider text-sm">Informações do Pedido</h4>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Dados do Pedido</h4>
                       </div>
                       <div className="space-y-3">
                         {[
-                          { v: '{pokemon}', d: 'Espécie do Pokémon.' },
-                          { v: '{ivs}', d: 'Status de IVs (ex: 6 IVs).' },
-                          { v: '{ability}', d: 'Habilidade escolhida.' },
+                          { v: '{pokemon}', d: 'Espécie do Pokémon encomendado.' },
+                          { v: '{ivs}', d: 'Status de IVs (ex: 6 IVs, F5).' },
+                          { v: '{ability}', d: 'Habilidade (Ability) escolhida.' },
                           { v: '{genero}', d: 'Macho, Fêmea ou Genderless.' },
-                          { v: '{obs}', d: 'Observações do pedido.' },
-                          { v: '{sprite}', d: 'Link do GIF/Imagem do Pokémon.' },
-                          { v: '{total}', d: 'Valor total do pedido.' }
+                          { v: '{total}', d: 'Valor da encomenda atual (ex: 100k).' },
+                          { v: '{obs}', d: 'Observações extras do pedido.' }
                         ].map(item => (
-                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
-                            <code className="text-blue-400 font-bold text-[10px] shrink-0">{item.v}</code>
-                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl group hover:bg-white/[0.05] transition-all">
+                            <code className="text-blue-400 font-bold text-xs shrink-0">{item.v}</code>
+                            <p className="text-[10px] text-gray-400 font-medium leading-relaxed">{item.d}</p>
                           </div>
                         ))}
                       </div>
@@ -1619,23 +1642,23 @@ export const AdminDashboard = () => {
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
-                          <Users size={20} />
+                        <div className="p-2 bg-primary/20 rounded-lg text-primary">
+                          <DollarSign size={20} />
                         </div>
-                        <h4 className="font-bold uppercase tracking-wider text-sm">Informações do Cliente</h4>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Financeiro & Stats</h4>
                       </div>
                       <div className="space-y-3">
                         {[
-                          { v: '{treinador}', d: 'Nick do cliente no jogo.' },
-                          { v: '{nick}', d: 'Nick do cliente no site.' },
-                          { v: '{id}', d: 'ID único do cliente no sistema.' },
-                          { v: '{discord}', d: 'Menção ao Discord do cliente.' },
-                          { v: '{gasto}', d: 'Total gasto pelo cliente na loja.' },
-                          { v: '{historico}', d: 'Lista resumida de últimos pedidos.' }
+                          { v: '{caixa}', d: 'Lucro acumulado total da ValiantShop.' },
+                          { v: '{total_dia}', d: 'Lucro gerado nas últimas 24 horas.' },
+                          { v: '{pendente}', d: 'Pedidos aguardando produção.' },
+                          { v: '{breeding}', d: 'Pedidos em fase de breeding.' },
+                          { v: '{finalizado}', d: 'Pedidos prontos para entrega.' },
+                          { v: '{sprite}', d: 'URL da imagem/GIF do Pokémon.' }
                         ].map(item => (
-                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
-                            <code className="text-purple-400 font-bold text-[10px] shrink-0">{item.v}</code>
-                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl group hover:bg-white/[0.05] transition-all">
+                            <code className="text-primary font-bold text-xs shrink-0">{item.v}</code>
+                            <p className="text-[10px] text-gray-400 font-medium leading-relaxed">{item.d}</p>
                           </div>
                         ))}
                       </div>
@@ -1644,23 +1667,21 @@ export const AdminDashboard = () => {
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 bg-secondary/20 rounded-lg text-secondary">
-                          <Zap size={20} />
+                          <Users size={20} />
                         </div>
-                        <h4 className="font-bold uppercase tracking-wider text-sm">Financeiro & Sistema</h4>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Perfil do Cliente</h4>
                       </div>
                       <div className="space-y-3">
                         {[
-                          { v: '{caixa}', d: 'Lucro acumulado total da ValiantShop.' },
-                          { v: '{total_dia}', d: 'Lucro gerado no dia de hoje.' },
-                          { v: '{pendente}', d: 'Pedidos aguardando produção.' },
-                          { v: '{breeding}', d: 'Pedidos em fase de breeding.' },
-                          { v: '{finalizado}', d: 'Pedidos prontos para entrega.' },
-                          { v: '{entregue}', d: 'Total de pedidos já entregues.' },
-                          { v: '{tabela}', d: 'Link para a tabela de preços oficial.' }
+                          { v: '{treinador}', d: 'Nome/Nick do cliente que fez o pedido.' },
+                          { v: '{discord}', d: 'Nick ou ID do Discord vinculado.' },
+                          { v: '{gasto}', d: 'Total gasto pelo cliente na loja.' },
+                          { v: '{historico}', d: 'Resumo de pedidos anteriores.' },
+                          { v: '{rank}', d: 'Ranking social do cliente no servidor.' }
                         ].map(item => (
-                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
-                            <code className="text-secondary font-bold text-[10px] shrink-0">{item.v}</code>
-                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl group hover:bg-white/[0.05] transition-all">
+                            <code className="text-secondary font-bold text-xs shrink-0">{item.v}</code>
+                            <p className="text-[10px] text-gray-400 font-medium leading-relaxed">{item.d}</p>
                           </div>
                         ))}
                       </div>

@@ -498,7 +498,7 @@ export default {
         pokemon: 'Pikachu', playerNick: 'Treinador', ivs: 'F6', gender: 'Macho', ability: 'Static', totalPrice: 100000, observations: 'Nenhuma', discordNick: 'User',
         Pendente: '5', Breeding: '3', Finalizado: '2', Entregue: '10', total: '1.5kk',
         nick: 'ValiantUser', id: '123456789012345678', gasto: '500k', historico: '• Pikachu (Finalizado) - 100k\n• Charizard (Pendente) - 80k',
-        tabela: 'Tabela de Preços', caixa: '15.5kk', total_dia: '1.2kk'
+        tabela: 'Tabela de Preços', caixa: '15.5kk', total_dia: '150k'
       };
 
       if (interaction.type === 2 && interaction.data.name === 'editar_embed') {
@@ -559,7 +559,6 @@ export default {
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
           
-          // 1. Search for trainer profile by sequentialId (string or integer)
           const profileQuery = { 
             structuredQuery: { 
               from: [{ collectionId: 'trainer_profiles' }], 
@@ -569,7 +568,7 @@ export default {
                   filters: [
                     { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { stringValue: idSite } } },
                     { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { stringValue: idSite.replace(/^0+/, '') } } },
-                    { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { integerValue: parseInt(idSite).toString() } } }
+                    { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { integerValue: parseInt(idSite) } } }
                   ]
                 }
               }, 
@@ -656,20 +655,17 @@ export default {
           ctx.waitUntil((async () => {
             const idToken = await getFirebaseToken(env);
             const settingsDoc = await getFirestoreDoc(env, 'bot_config', 'settings', idToken);
-            const s = settingsDoc?.fields ? Object.fromEntries(Object.entries(settingsDoc.fields).map(([k, v]) => [k, v.booleanValue || (v.stringValue && !isNaN(v.stringValue) ? v.stringValue : v.stringValue)])) : { notif: true, pings: true, maintenance: false, logChannel: '', name: '', status: '' };
+            const s = settingsDoc?.fields ? Object.fromEntries(Object.entries(settingsDoc.fields).map(([k, v]) => [k, v.booleanValue || (v.stringValue && !isNaN(v.stringValue) ? v.stringValue : v.stringValue)])) : { notif: true, pings: true, maintenance: false, logChannel: '' };
             
             let embed, components;
             
             if (category === 'config_notif') {
               embed = {
-                title: "📢 Gestão de Notificações & Alertas",
-                description: "Configure como o sistema deve reagir a novos eventos e onde os registros devem ser armazenados.\n\n" +
-                             "• **Notificações:** Ativa/Desativa o envio de mensagens automáticas.\n" +
-                             "• **Pings de Equipe:** Define se a equipe deve ser mencionada em novos pedidos.\n" +
-                             "• **Logs:** Histórico técnico de todas as transações e erros.",
+                title: "📢 Configurações de Notificação",
+                description: "Gerencie como o bot se comunica com a equipe e registra atividades.",
                 color: 0x3b82f6,
                 fields: [
-                  { name: "📊 Configuração Atual", value: `📡 Estado: ${s.notif ? '`ON` ✅' : '`OFF` ❌'}\n🔔 Pings: ${s.pings ? '`ON` ✅' : '`OFF` ❌'}\n📺 Canal de Logs: <#${s.logChannel || 'Não Definido'}>` }
+                  { name: "Status Atual", value: `🔔 Notificações: ${s.notif ? '✅' : '❌'}\n📣 Pings: ${s.pings ? '✅' : '❌'}\n📺 Logs: <#${s.logChannel || '0'}>` }
                 ]
               };
               components = [
@@ -684,14 +680,11 @@ export default {
               ];
             } else if (category === 'config_profile') {
               embed = {
-                title: "👤 Customização de Identidade",
-                description: "Molde a personalidade e a aparência do bot no servidor.\n\n" +
-                             "• **Nome & Bio:** O nome de exibição e a descrição 'Sobre Mim'.\n" +
-                             "• **Avatar:** A imagem de perfil (requer URL direta).\n" +
-                             "• **Status:** A frase que aparece abaixo do nome do bot.",
+                title: "👤 Perfil & Identidade",
+                description: "Personalize a presença do bot no servidor.",
                 color: 0xa855f7,
                 fields: [
-                  { name: "🎭 Identidade Atual", value: `🏷️ **Nome:** ${s.name || 'Padrão'}\n📝 **Status:** ${s.status || 'Sem status definido'}` }
+                  { name: "Instruções", value: "Clique nos botões abaixo para abrir os formulários de alteração de identidade." }
                 ]
               };
               components = [{
@@ -705,12 +698,12 @@ export default {
               }];
             } else if (category === 'config_system') {
               embed = {
-                title: "🛡️ Segurança & Núcleo do Sistema",
-                description: "Acesse funções críticas de manutenção e integridade dos dados.\n\n" +
-                             "• **Modo Manutenção:** Bloqueia comandos para usuários não-administradores.\n" +
-                             "• **Limpeza de Cache:** Força a atualização de variáveis locais e tokens.",
+                title: "🛡️ Configurações de Sistema",
+                description: "Controles de segurança e manutenção global.",
                 color: 0xef4444,
-                fields: [{ name: "Modo Manutenção", value: s.maintenance ? "⚠️ O bot está em modo de manutenção." : "✅ O bot está operando normalmente." }]
+                fields: [
+                  { name: "Modo Manutenção", value: s.maintenance ? "⚠️ O bot está em modo de manutenção. Apenas administradores podem interagir." : "✅ O bot está operando normalmente." }
+                ]
               };
               components = [{
                 type: 1,
@@ -731,58 +724,63 @@ export default {
         }
 
         if (interaction.data.custom_id === 'config_edit_identity') {
-          return jsonResponse({ type: 9, data: { title: 'Editar Identidade', custom_id: 'config_identity_submit', components: [
-            { type: 1, components: [{ type: 4, custom_id: 'name', label: 'Nome do Bot', style: 1, required: true }] },
-            { type: 1, components: [{ type: 4, custom_id: 'bio', label: 'Biografia/Sobre', style: 2, required: true }] }
-          ]}});
+          return jsonResponse({ type: 9, data: { title: 'Editar Identidade', custom_id: 'modal_bot_identity', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'username', label: 'Nome do Bot', style: 1, min_length: 2, max_length: 32, required: true }] }
+          ] } });
         }
 
         if (interaction.data.custom_id === 'config_edit_avatar') {
-          return jsonResponse({ type: 9, data: { title: 'Alterar Avatar', custom_id: 'config_avatar_submit', components: [
-            { type: 1, components: [{ type: 4, custom_id: 'url', label: 'URL da Imagem', style: 1, required: true }] }
-          ]}});
+          return jsonResponse({ type: 9, data: { title: 'Alterar Avatar', custom_id: 'modal_bot_avatar', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'avatar', label: 'URL da Imagem', placeholder: 'https://...', style: 1, required: true }] }
+          ] } });
         }
 
         if (interaction.data.custom_id === 'config_edit_status') {
-          return jsonResponse({ type: 9, data: { title: 'Definir Status', custom_id: 'config_status_submit', components: [
-            { type: 1, components: [{ type: 4, custom_id: 'status', label: 'Mensagem do Status', style: 1, required: true }] }
-          ]}});
+          return jsonResponse({ type: 9, data: { title: 'Definir Status', custom_id: 'modal_bot_status', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'status', label: 'Mensagem de Status', style: 1, max_length: 128, required: true }] },
+            { type: 1, components: [{ type: 4, custom_id: 'type', label: 'Tipo (0: Jogando, 1: Transmitindo, 2: Ouvindo, 3: Assistindo)', placeholder: '0', style: 1, min_length: 1, max_length: 1, required: true }] }
+          ] } });
         }
 
         if (interaction.data.custom_id === 'config_set_logchannel') {
-          return jsonResponse({ type: 9, data: { title: 'Canal de Logs', custom_id: 'config_logchannel_submit', components: [
-            { type: 1, components: [{ type: 4, custom_id: 'channel_id', label: 'ID do Canal', style: 1, required: true }] }
-          ]}});
+          return jsonResponse({ type: 9, data: { title: 'Canal de Logs', custom_id: 'modal_config_logchannel', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'val', label: 'ID do Canal', style: 1, min_length: 15, max_length: 20, required: true }] }
+          ] } });
         }
 
         if (interaction.data.custom_id === 'back_to_config') {
-          return jsonResponse({ type: 7, data: {
-            embeds: [{
-              title: "⚙️ Painel de Comando Administrativo",
-              description: "Bem-vindo ao **Valiant Hub**. Aqui você pode orquestrar todas as facetas do seu assistente digital, desde a sua identidade visual até os protocolos de notificação e manutenção do sistema.\n\nSelecione uma **categoria** abaixo para começar a configuração.",
-              color: 0x3b82f6,
-              thumbnail: { url: "https://i.imgur.com/rNn9A9S.png" },
-              fields: [
-                { name: "📢 Notificações", value: "Canais de logs, pings e regras de alerta.", inline: true },
-                { name: "👤 Identidade", value: "Nome, Avatar, Bio e Status do bot.", inline: true },
-                { name: "🛡️ Sistema", value: "Manutenção e permissões críticas.", inline: true }
-              ],
-              footer: { text: "ValiantShop • Gestão de Infraestrutura" }
-            }],
-            components: [{
-              type: 1,
-              components: [{
-                type: 3,
-                custom_id: "config_category_select",
-                options: [
-                  { label: "Notificações", value: "config_notif", description: "Configurar logs e pings", emoji: { name: "📢" } },
-                  { label: "Perfil & Identidade", value: "config_profile", description: "Alterar nome, avatar e status", emoji: { name: "👤" } },
-                  { label: "Configurações de Sistema", value: "config_system", description: "Manutenção e modo seguro", emoji: { name: "🛡️" } }
-                ],
-                placeholder: "Selecione a área de atuação..."
-              }]
-            }]
-          }});
+          ctx.waitUntil((async () => {
+             const embed = {
+               title: "⚙️ Central de Configurações - ValiantShop",
+               description: "Selecione uma categoria abaixo para ajustar as funcionalidades do bot.",
+               color: 0x2b2d31,
+               fields: [
+                 { name: "📢 Notificações", value: "Logs, Pings e Canais de aviso.", inline: true },
+                 { name: "👤 Identidade", value: "Nome, Avatar, Bio e Status do bot.", inline: true },
+                 { name: "🛡️ Sistema", value: "Manutenção e permissões críticas.", inline: true }
+               ],
+               footer: { text: "ValiantShop • Gestão de Infraestrutura" }
+             };
+             const components = [{
+               type: 1,
+               components: [{
+                 type: 3,
+                 custom_id: "config_category_select",
+                 options: [
+                   { label: "Notificações", value: "config_notif", description: "Configurar logs e pings", emoji: { name: "📢" } },
+                   { label: "Perfil & Identidade", value: "config_profile", description: "Alterar nome, avatar e status", emoji: { name: "👤" } },
+                   { label: "Configurações de Sistema", value: "config_system", description: "Manutenção e modo seguro", emoji: { name: "🛡️" } }
+                 ],
+                 placeholder: "Selecione a área de atuação..."
+               }]
+             }];
+             await fetch(`https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ type: 7, data: { embeds: [embed], components } })
+             });
+          })());
+          return jsonResponse({ type: 5 });
         }
 
         const type = parts[parts.length - 1];
@@ -963,33 +961,44 @@ export default {
         const getVal = (cid) => interaction.data.components.find(c => c.components[0].custom_id === cid).components[0].value;
         const cid = interaction.data.custom_id;
 
-        if (cid === 'config_logchannel_submit' || cid === 'config_identity_submit' || cid === 'config_avatar_submit' || cid === 'config_status_submit') {
-          ctx.waitUntil((async () => {
-            const settingsDoc = await getFirestoreDoc(env, 'bot_config', 'settings', idToken);
-            const s = settingsDoc?.fields ? Object.fromEntries(Object.entries(settingsDoc.fields).map(([k, v]) => [k, v.booleanValue !== undefined ? v.booleanValue : (v.stringValue && !isNaN(v.stringValue) && k !== 'logChannel' ? parseInt(v.stringValue) : v.stringValue)])) : { notif: true, pings: true, maintenance: false, logChannel: '', name: '', bio: '', avatar: '', status: '' };
-            
-            if (cid === 'config_logchannel_submit') s.logChannel = getVal('channel_id');
-            if (cid === 'config_identity_submit') { s.name = getVal('name'); s.bio = getVal('bio'); }
-            if (cid === 'config_avatar_submit') s.avatar = getVal('url');
-            if (cid === 'config_status_submit') s.status = getVal('status');
-            
-            const fields = Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'boolean' ? { booleanValue: v } : { stringValue: (v || '').toString() }]));
-            await updateFirestoreDoc(env, 'bot_config', 'settings', { fields }, idToken);
-            
-            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
-              method: 'PATCH', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ content: "✅ **Configuração Global Atualizada!**\nAs mudanças foram salvas no banco de dados e aplicadas ao sistema.", embeds: [], components: [] }) 
-            });
-          })());
-          return jsonResponse({ type: 6 });
+        if (cid === 'modal_bot_identity' || cid === 'modal_bot_avatar' || cid === 'modal_bot_status') {
+           ctx.waitUntil((async () => {
+             const body = {};
+             if (cid === 'modal_bot_identity') {
+               body.username = getVal('username');
+             }
+             if (cid === 'modal_bot_avatar') {
+               const avatarUrl = getVal('avatar');
+               const res = await fetch(avatarUrl);
+               const buf = await res.arrayBuffer();
+               const type = res.headers.get('content-type');
+               const base64 = btoa(Array.from(new Uint8Array(buf)).map(b => String.fromCharCode(b)).join(''));
+               body.avatar = `data:${type};base64,${base64}`;
+             }
+             
+             if (body.username || body.avatar) {
+               await fetch('https://discord.com/api/v10/users/@me', {
+                 method: 'PATCH',
+                 headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
+                 body: JSON.stringify(body)
+               });
+             }
+             
+             if (cid === 'modal_bot_status') {
+               const status = getVal('status');
+               const type = parseInt(getVal('type'));
+               await updateFirestore(env, 'bot_config', 'settings', { status: { stringValue: status }, statusType: { integerValue: type } }, idToken);
+             }
+             
+             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+               method: 'PATCH', 
+               headers: { 'Content-Type': 'application/json' }, 
+               body: JSON.stringify({ content: "✅ Perfil atualizado com sucesso! Pode demorar alguns minutos para refletir em todos os servidores.", embeds: [], components: [] }) 
+             });
+           })());
+           return jsonResponse({ type: 6 });
         }
-        const mockOrder = { 
-          pokemon: 'Pikachu', playerNick: 'Treinador', ivs: 'F6', gender: 'Macho', ability: 'Static', totalPrice: 100000, observations: 'Nenhuma', discordNick: 'User',
-          Pendente: '5', Breeding: '3', Finalizado: '2', Entregue: '10', total: '1.5kk',
-          nick: 'ValiantUser', id: '123456789012345678', gasto: '500k', historico: '• Pikachu (Finalizado) - 100k\n• Charizard (Pendente) - 80k',
-          tabela: 'Tabela de Preços', caixa: '15.5kk', total_dia: '1.2kk'
-        };
+        const mockOrder = { pokemon: 'Pikachu', playerNick: 'Treinador', ivs: 'F6', gender: 'Macho', ability: 'Static', totalPrice: 100000, observations: 'Nenhuma', discordNick: 'User' };
 
         if (cid.includes('_submit')) {
            const parts = cid.split('_'); const type = parts.pop();
@@ -1030,6 +1039,33 @@ export default {
            }
         }
         if (cid === 'modal_config_logchannel') {
+           const val = getVal('val');
+           ctx.waitUntil((async () => {
+             const settingsDoc = await getFirestoreDoc(env, 'bot_config', 'settings', idToken);
+             const s = settingsDoc?.fields ? Object.fromEntries(Object.entries(settingsDoc.fields).map(([k, v]) => [k, v.booleanValue || (v.stringValue && !isNaN(v.stringValue) ? v.stringValue : v.stringValue)])) : { notif: true, pings: true, maintenance: false, logChannel: '' };
+             s.logChannel = val;
+             await updateFirestore(env, 'bot_config', 'settings', Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'boolean' ? { booleanValue: v } : { stringValue: v }])), idToken);
+             
+             const cfg = await getEmbedConfig(env, 'config', idToken);
+             const desc = `${cfg.description}\n\n` +
+               `🔔 **Notificações:** ${s.notif ? '✅ Ativo' : '❌ Inativo'}\n` +
+               `📣 **Pings de Equipe:** ${s.pings ? '✅ Ativo' : '❌ Inativo'}\n` +
+               `🛠️ **Manutenção:** ${s.maintenance ? '⚠️ Ativado' : '✅ Normal'}\n` +
+               `📺 **Canal de Logs:** <#${val}>`;
+             const embed = buildEmbedFromConfig(cfg, {}); embed.description = desc;
+             const components = [
+               { type: 1, components: [
+                 { type: 2, label: '🔔 Notificações', style: s.notif ? 3 : 4, custom_id: 'config_toggle_notif' },
+                 { type: 2, label: '📣 Pings', style: s.pings ? 3 : 4, custom_id: 'config_toggle_pings' },
+                 { type: 2, label: '🛠️ Manutenção', style: s.maintenance ? 3 : 4, custom_id: 'config_toggle_maint' }
+               ]},
+               { type: 1, components: [
+                 { type: 2, label: '📺 Set Log Channel', style: 2, custom_id: 'config_set_logchannel' },
+                 { type: 2, label: '⬅️ Voltar', style: 2, custom_id: 'menu_back_home' }
+               ]}
+             ];
+             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed], components } ) });
+           })());
            return jsonResponse({ type: 6 });
         }
 

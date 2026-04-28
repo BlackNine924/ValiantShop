@@ -7,10 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "deploy-worker": "cd worker && npx wrangler deploy",
-    "deploy-pages": "npm run build && npx wrangler pages deploy dist --project-name valiantshop",
-    "deploy-all": "npm run deploy-pages && npm run deploy-worker"
+    "preview": "vite preview"
   },
   "dependencies": {
     "axios": "^1.15.2",
