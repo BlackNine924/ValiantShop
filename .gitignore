@@ -31,3 +31,5 @@ serviceAccountKey.json
 *.key
 .env
 .env.*
+worker/wrangler.toml
+scratch/

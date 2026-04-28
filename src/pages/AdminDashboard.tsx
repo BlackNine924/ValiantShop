@@ -1172,10 +1172,10 @@ export const AdminDashboard = () => {
               </button>
 
               <button 
-                onClick={() => setActiveTab('comunidade')} 
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'comunidade' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                onClick={() => setActiveTab('ferramentas')} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'ferramentas' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
               >
-                <Crosshair size={18} /> Comunidade & Eventos
+                <Crosshair size={18} /> Ferramentas
               </button>
 
               <button className="w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all">
@@ -1185,7 +1185,7 @@ export const AdminDashboard = () => {
           </aside>
 
           <main className="lg:col-span-3 space-y-8">
-            {activeTab !== 'stock_rooms' && activeTab !== 'comunidade' && activeTab !== 'feedbacks' && (
+            {activeTab !== 'stock_rooms' && activeTab !== 'ferramentas' && activeTab !== 'feedbacks' && (
               <div className="flex flex-col gap-4 bg-white/5 p-8 rounded-2xl border border-white/5">
 
               <div className="flex justify-between items-center">
@@ -1606,102 +1606,89 @@ export const AdminDashboard = () => {
                 <div className="space-y-12 pb-20">
                   <StockRoomsManager />
                 </div>
-              ) : activeTab === 'comunidade' ? (
-                <div className="space-y-10 animate-fade">
-                  {/* Header Style like Breeders Tab */}
-                  <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[2.5rem] flex flex-col xl:flex-row xl:items-center justify-between gap-6 w-full shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-primary/[0.02] group-hover:bg-primary/[0.03] transition-all pointer-events-none" />
-                    <div className="relative z-10 flex items-center gap-6">
-                       <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30 shadow-[0_0_30px_var(--primary-glow)] text-primary">
-                          <Zap size={32} />
-                       </div>
-                       <div>
-                          <h3 className="pixel-title text-xl text-white mb-1">Disparar Novo Evento</h3>
-                          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">Inicie uma caça ao tesouro global para todos os treinadores conectados</p>
-                       </div>
-                    </div>
-                    
-                    <div className="relative z-10 flex flex-col sm:flex-row gap-4 items-center w-full xl:w-auto">
-                      <div className="relative w-full sm:w-80">
-                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" />
-                        <input 
-                          type="text"
-                          id="hunt-pokemon-name-real"
-                          placeholder="Ex: Mew, Shiny Celebi, Groudon..."
-                          className="w-full bg-black/60 border border-white/10 rounded-2xl pl-10 pr-4 py-4 text-xs font-black text-white focus:border-primary/40 outline-none transition-all uppercase tracking-widest placeholder:text-gray-700"
-                        />
-                      </div>
-                      <button 
-                        onClick={() => {
-                          const input = document.getElementById('hunt-pokemon-name-real') as HTMLInputElement;
-                          handleTriggerHunt(input.value);
-                          input.value = '';
-                        }}
-                        className="w-full sm:w-auto px-10 py-4 bg-primary text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_var(--primary-glow)] flex items-center justify-center gap-3"
-                      >
-                        <Crosshair size={16} /> Disparar Agora
-                      </button>
-                    </div>
+              ) : activeTab === 'ferramentas' ? (
+                <div className="p-8 space-y-8 animate-fade-in">
+                  <div>
+                    <h3 className="pixel-title text-lg text-white mb-2 underline underline-offset-8 decoration-secondary flex items-center gap-3">
+                      CENTRAL DE FERRAMENTAS <span className="text-secondary">[DOCS]</span>
+                    </h3>
+                    <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest">Documentação de variáveis e utilitários do bot</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                     {/* Event Status Card */}
-                     <div className="glow-card p-10 border-white/5 bg-black/40 relative overflow-hidden group">
-                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
-                        <div className="flex items-center justify-between mb-8">
-                           <div className="flex items-center gap-4">
-                              <Crosshair size={20} className="text-gray-500" />
-                              <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest">Painel do Evento</h3>
-                           </div>
-                           <button 
-                             onClick={handleStopHunt}
-                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all"
-                           >
-                             Encerrar Tudo
-                           </button>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                          <MessageSquare size={20} />
                         </div>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Informações do Pedido</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {[
+                          { v: '{pokemon}', d: 'Espécie do Pokémon.' },
+                          { v: '{ivs}', d: 'Status de IVs (ex: 6 IVs).' },
+                          { v: '{ability}', d: 'Habilidade escolhida.' },
+                          { v: '{genero}', d: 'Macho, Fêmea ou Genderless.' },
+                          { v: '{obs}', d: 'Observações do pedido.' },
+                          { v: '{sprite}', d: 'Link do GIF/Imagem do Pokémon.' },
+                          { v: '{total}', d: 'Valor total do pedido.' }
+                        ].map(item => (
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
+                            <code className="text-blue-400 font-bold text-[10px] shrink-0">{item.v}</code>
+                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                        <div className="space-y-6">
-                           <div className="flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-2xl">
-                              <div className="flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/10 [image-rendering:pixelated]">
-                                    <Sparkles size={24} className="text-primary/40" />
-                                 </div>
-                                 <div>
-                                    <p className="text-[10px] text-gray-600 font-bold uppercase mb-1">Status Global</p>
-                                    <h4 className="text-sm font-black text-white uppercase tracking-wider">Aguardando Disparo</h4>
-                                 </div>
-                              </div>
-                              <div className="w-3 h-3 bg-white/10 rounded-full" />
-                           </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                          <Users size={20} />
+                        </div>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Informações do Cliente</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {[
+                          { v: '{treinador}', d: 'Nick do cliente no jogo.' },
+                          { v: '{nick}', d: 'Nick do cliente no site.' },
+                          { v: '{id}', d: 'ID único do cliente no sistema.' },
+                          { v: '{discord}', d: 'Menção ao Discord do cliente.' },
+                          { v: '{gasto}', d: 'Total gasto pelo cliente na loja.' },
+                          { v: '{historico}', d: 'Lista resumida de últimos pedidos.' }
+                        ].map(item => (
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
+                            <code className="text-purple-400 font-bold text-[10px] shrink-0">{item.v}</code>
+                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                           <div className="p-6 bg-primary/5 border border-primary/10 rounded-3xl">
-                              <p className="text-[9px] font-black text-primary/70 uppercase tracking-widest mb-3">Dica do Administrador</p>
-                              <p className="text-xs text-secondary leading-relaxed font-bold italic">
-                                "Use nomes compostos como 'Shiny Celebi' para disparar formas raras. O Pokémon aparecerá em uma posição aleatória na tela de todos os usuários logados."
-                              </p>
-                           </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-secondary/20 rounded-lg text-secondary">
+                          <Zap size={20} />
                         </div>
-                     </div>
-
-                     {/* Social Moderation */}
-                     <div className="glow-card p-10 border-white/5 bg-black/40 group relative">
-                        <div className="flex items-center gap-4 mb-8">
-                           <MessageSquare size={20} className="text-gray-500" />
-                           <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest">Controles de Comunidade</h3>
-                        </div>
-                        
-                        <div className="flex flex-col items-center justify-center py-10 opacity-20">
-                           <ShieldCheck size={48} className="text-gray-600 mb-4" />
-                           <p className="text-[10px] font-black text-gray-600 uppercase tracking-wider">Tudo sob controle no Feed</p>
-                        </div>
-
-                        <div className="mt-4 pt-6 border-t border-white/5">
-                           <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest leading-relaxed text-center">
-                              Integração com denúncias em tempo real ativada.
-                           </p>
-                        </div>
-                     </div>
+                        <h4 className="font-bold uppercase tracking-wider text-sm">Financeiro & Sistema</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {[
+                          { v: '{caixa}', d: 'Lucro acumulado total da ValiantShop.' },
+                          { v: '{total_dia}', d: 'Lucro gerado no dia de hoje.' },
+                          { v: '{pendente}', d: 'Pedidos aguardando produção.' },
+                          { v: '{breeding}', d: 'Pedidos em fase de breeding.' },
+                          { v: '{finalizado}', d: 'Pedidos prontos para entrega.' },
+                          { v: '{entregue}', d: 'Total de pedidos já entregues.' },
+                          { v: '{tabela}', d: 'Link para a tabela de preços oficial.' }
+                        ].map(item => (
+                          <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/[0.05] transition-all">
+                            <code className="text-secondary font-bold text-[10px] shrink-0">{item.v}</code>
+                            <p className="text-[9px] text-gray-400 font-medium leading-tight">{item.d}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : activeTab === 'feedbacks' ? (
