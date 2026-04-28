@@ -650,6 +650,7 @@ export default {
       }
 
       if (interaction.type === 3) {
+        const parts = interaction.data.custom_id ? interaction.data.custom_id.split('_') : [];
         if (interaction.data.custom_id === "config_category_select") {
           const category = interaction.data.values[0];
           ctx.waitUntil((async () => {
