@@ -27,7 +27,10 @@ const DEFAULT_EMBEDS = {
       { name: '🧪 Ability', value: '{ability}', inline: true }, { name: '🧬 Gênero', value: '{genero}', inline: true }, { name: '💬 Discord', value: '{discord}', inline: true },
       { name: '📝 Observações', value: '{obs}', inline: true }, { name: '🥚 Egg Group', value: '{egg}', inline: true }, { name: '💰 Valor Total', value: '{total}', inline: true }
     ],
-    components: []
+    components: [
+      { type: 2, label: '⚙️ Status', style: 1, custom_id: 'menu_status' },
+      { type: 2, label: '❌ Cancelar', style: 4, custom_id: 'confirm_cancel' }
+    ]
   },
   cancelamento: {
     title: '🚨 ENCOMENDA CANCELADA 🚨',
@@ -175,10 +178,20 @@ function getPokeInfo(name) {
 function replacePlaceholders(text, data) {
   if (!text) return text;
   const info = getPokeInfo(data.pokemon);
+  
+  // Format ignored IVs
+  let ivsDetalhe = '';
+  if (Array.isArray(data.ignoredIvs) && data.ignoredIvs.length > 0) {
+    ivsDetalhe = `(Faltante: ${data.ignoredIvs.map(iv => `-${iv.replace('special', 'Sp.').toUpperCase()}`).join(', ')})`;
+  } else if (typeof data.ignoredIvs === 'string' && data.ignoredIvs.length > 0) {
+    ivsDetalhe = `(Faltante: ${data.ignoredIvs})`;
+  }
+
   const map = {
     '{treinador}': data.playerNick || 'N/A',
     '{pokemon}': data.pokemon || 'N/A',
     '{ivs}': (data.ivs ? `F${data.ivs.toString().match(/\d+/)?.[0] || data.ivs.toString().replace('F', '')}` : 'N/A'),
+    '{ivs_detalhe}': ivsDetalhe,
     '{genero}': data.gender || 'N/A',
     '{ability}': data.ability ? (data.hasHA ? `${data.ability} (HA)` : data.ability) : 'N/A',
     '{b/c}': data.isCastrated ? '(CASTRADO)' : '(BREEDABLE)',
@@ -266,7 +279,18 @@ async function getEmbedConfig(env, type, idToken) {
       style: parseInt(v.mapValue.fields.style.integerValue),
       custom_id: v.mapValue.fields.custom_id?.stringValue || '',
       url: v.mapValue.fields.url?.stringValue || ''
-    })) || DEFAULT_EMBEDS[type].components || []
+    })) || DEFAULT_EMBEDS[type].components || [],
+    selects: f.selects?.arrayValue?.values?.map(v => ({
+      custom_id: v.mapValue.fields.custom_id.stringValue,
+      placeholder: v.mapValue.fields.placeholder.stringValue,
+      options: v.mapValue.fields.options.stringValue.split(',').map(o => ({ label: o.trim(), value: o.trim() }))
+    })) || [],
+    modals: f.modals?.arrayValue?.values?.map(v => ({
+      trigger_id: v.mapValue.fields.trigger_id.stringValue,
+      title: v.mapValue.fields.title.stringValue,
+      questions: v.mapValue.fields.questions.stringValue,
+      log_channel: v.mapValue.fields.log_channel.stringValue
+    })) || []
   };
 }
 
@@ -288,11 +312,13 @@ function buildEmbedEditorButtons(type) {
       { type: 2, label: '💬 Mensagem', style: 2, custom_id: `editembed_content_${type}` },
       { type: 2, label: '📺 Canal', style: 2, custom_id: `editembed_channel_${type}` },
       { type: 2, label: '🔘 Botões', style: 2, custom_id: `menu_buttons_${type}` },
+      { type: 2, label: '🔽 Menus', style: 2, custom_id: `menu_selects_${type}` },
       { type: 2, label: '📖 Ferramentas', style: 2, custom_id: `help_tools_info` }
     ]},
     { type: 1, components: [
       { type: 2, label: '✅ SALVAR', style: 3, custom_id: `verify_saveconfig_${type}` },
-      { type: 2, label: '❌ Cancelar', style: 4, custom_id: `action_cancelconfig_${type}` }
+      { type: 2, label: '❌ Cancelar', style: 4, custom_id: `action_cancelconfig_${type}` },
+      { type: 2, label: '🔧 Modais', style: 2, custom_id: `menu_modals_${type}` }
     ]}
   ];
 }
@@ -329,11 +355,53 @@ function buildButtonDeleteMenu(type, buttons) {
   return [{ type: 1, components: [{ type: 3, custom_id: `editbutton_delete_select_${type}`, placeholder: 'Selecione para remover', options: buttons.map((b, i) => ({ label: b.label.slice(0, 50), value: i.toString() })) }]}, { type: 1, components: [{ type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_buttons_${type}` }] }];
 }
 
-function buildMainMenuButtons(orderId, customButtons = []) {
-  if (customButtons && customButtons.length > 0) {
-    return [{ type: 1, components: customButtons.map(b => ({ ...b, custom_id: b.custom_id ? `${b.custom_id}_${orderId}` : undefined })) }];
+function buildSelectButtons(type, selects = []) {
+  const rows = [];
+  const btnElements = selects.map((s, i) => ({ type: 2, label: (s.placeholder || s.custom_id || 'Menu').slice(0, 15), style: 2, custom_id: `editselect_modal_${i}_${type}` }));
+  for (let i = 0; i < btnElements.length; i += 5) rows.push({ type: 1, components: btnElements.slice(i, i + 5) });
+  const actionRow = { type: 1, components: [] };
+  if (selects.length < 5) actionRow.components.push({ type: 2, label: '➕ Adicionar Menu', style: 3, custom_id: `editselect_add_${type}` });
+  if (selects.length > 0) actionRow.components.push({ type: 2, label: '🗑️ Remover Menu', style: 4, custom_id: `menu_selects_delete_${type}` });
+  actionRow.components.push({ type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_back_config_${type}` });
+  rows.push(actionRow);
+  return rows;
+}
+
+function buildSelectDeleteMenu(type, selects = []) {
+  return [{ type: 1, components: [{ type: 3, custom_id: `editselect_delete_select_${type}`, placeholder: 'Selecione para remover', options: selects.map((s, i) => ({ label: (s.placeholder || s.custom_id || 'Menu').slice(0, 50), value: i.toString() })) }]}, { type: 1, components: [{ type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_selects_${type}` }] }];
+}
+
+function buildModalButtons(type, modals = []) {
+  const rows = [];
+  const btnElements = modals.map((m, i) => ({ type: 2, label: (m.title || m.custom_id || 'Modal').slice(0, 15), style: 2, custom_id: `editmodal_modal_${i}_${type}` }));
+  for (let i = 0; i < btnElements.length; i += 5) rows.push({ type: 1, components: btnElements.slice(i, i + 5) });
+  const actionRow = { type: 1, components: [] };
+  if (modals.length < 5) actionRow.components.push({ type: 2, label: '➕ Adicionar Modal', style: 3, custom_id: `editmodal_add_${type}` });
+  if (modals.length > 0) actionRow.components.push({ type: 2, label: '🗑️ Remover Modal', style: 4, custom_id: `menu_modals_delete_${type}` });
+  actionRow.components.push({ type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_back_config_${type}` });
+  rows.push(actionRow);
+  return rows;
+}
+
+function buildModalDeleteMenu(type, modals = []) {
+  return [{ type: 1, components: [{ type: 3, custom_id: `editmodal_delete_select_${type}`, placeholder: 'Selecione para remover', options: modals.map((m, i) => ({ label: (m.title || m.custom_id || 'Modal').slice(0, 50), value: i.toString() })) }]}, { type: 1, components: [{ type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_modals_${type}` }] }];
+}
+
+function buildMainMenuComponents(orderId, customButtons = [], customSelects = []) {
+  const rows = [];
+  if (customSelects && customSelects.length > 0) {
+    for (const select of customSelects) {
+      rows.push({ type: 1, components: [{ type: 3, custom_id: select.custom_id ? `${select.custom_id}_${orderId}` : `menu_select_${orderId}`, placeholder: select.placeholder || 'Escolha uma opção', options: select.options }] });
+    }
   }
-  return [{ type: 1, components: [{ type: 2, label: '⚙️ Status', style: 1, custom_id: `menu_status_${orderId}` }, { type: 2, label: '❌ Cancelar', style: 4, custom_id: `confirm_cancel_${orderId}` }] }];
+  
+  if (customButtons && customButtons.length > 0) {
+    const btnElements = customButtons.map(b => ({ ...b, custom_id: b.custom_id ? `${b.custom_id}_${orderId}` : undefined }));
+    for (let i = 0; i < btnElements.length; i += 5) rows.push({ type: 1, components: btnElements.slice(i, i + 5) });
+  } else if (rows.length === 0) {
+    rows.push({ type: 1, components: [{ type: 2, label: '⚙️ Status', style: 1, custom_id: `menu_status_${orderId}` }, { type: 2, label: '❌ Cancelar', style: 4, custom_id: `confirm_cancel_${orderId}` }] });
+  }
+  return rows;
 }
 
 function buildStatusSelectionButtons(orderId, currentStatus) {
@@ -429,7 +497,7 @@ export default {
         let newMessageId = currentMessageId;
         
         if (newStatus === 'Entregue' && currentChannelId !== ARCHIVE_CHANNEL_ID) {
-          const res = await fetch(`https://discord.com/api/v10/channels/${ARCHIVE_CHANNEL_ID}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: '📦 Encomenda Arquivada', embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+          const res = await fetch(`https://discord.com/api/v10/channels/${ARCHIVE_CHANNEL_ID}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: '📦 Encomenda Arquivada', embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
           if (res.ok) {
              const newMsg = await res.json();
              newMessageId = newMsg.id;
@@ -437,14 +505,14 @@ export default {
           }
         } else if (newStatus !== 'Entregue' && currentChannelId === ARCHIVE_CHANNEL_ID) {
           const targetChannelId = cfg.channel || DEFAULT_EMBEDS['notificacao'].channel;
-          const res = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder), embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+          const res = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
           if (res.ok) {
              const newMsg = await res.json();
              newMessageId = newMsg.id;
              await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
           }
         } else {
-          await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder), embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+          await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
         }
         
         if (newMessageId !== currentMessageId) {
@@ -650,6 +718,32 @@ export default {
       }
 
       if (interaction.type === 3) {
+        if (interaction.data.custom_id && interaction.data.custom_id.startsWith('custommodal_')) {
+           const idToken = await getFirebaseToken(env);
+           const embedsDoc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
+           if (embedsDoc && embedsDoc.fields) {
+             let targetModal = null;
+             for (const type of Object.keys(embedsDoc.fields)) {
+               const f = embedsDoc.fields[type].mapValue.fields;
+               if (f.modals && f.modals.arrayValue && f.modals.arrayValue.values) {
+                 const modals = f.modals.arrayValue.values.map(v => ({
+                   trigger_id: v.mapValue.fields.trigger_id.stringValue,
+                   title: v.mapValue.fields.title.stringValue,
+                   questions: v.mapValue.fields.questions.stringValue,
+                   log_channel: v.mapValue.fields.log_channel.stringValue
+                 }));
+                 targetModal = modals.find(m => m.trigger_id === interaction.data.custom_id);
+                 if (targetModal) break;
+               }
+             }
+             if (targetModal) {
+               const qList = targetModal.questions.split(',').map(q => q.trim()).filter(q => q.length > 0);
+               const components = qList.map((q, i) => ({ type: 1, components: [{ type: 4, custom_id: `q_${i}`, label: q.substring(0, 45), style: 1, required: true }] })).slice(0, 5);
+               return jsonResponse({ type: 9, data: { title: targetModal.title.substring(0, 45), custom_id: `submitmodal_${interaction.data.custom_id}`, components } });
+             }
+           }
+        }
+
         const parts = interaction.data.custom_id ? interaction.data.custom_id.split('_') : [];
         if (interaction.data.custom_id === "config_category_select") {
           const category = interaction.data.values[0];
@@ -715,13 +809,13 @@ export default {
               }];
             }
             
-            await fetch(`https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`, {
-              method: 'POST',
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, {
+              method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 7, data: { embeds: [embed], components } })
+              body: JSON.stringify({ embeds: [embed], components })
             });
           })());
-          return jsonResponse({ type: 5 });
+          return jsonResponse({ type: 6 });
         }
 
         if (interaction.data.custom_id === 'config_edit_identity') {
@@ -775,13 +869,13 @@ export default {
                  placeholder: "Selecione a área de atuação..."
                }]
              }];
-             await fetch(`https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`, {
-               method: 'POST',
+             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, {
+               method: 'PATCH',
                headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ type: 7, data: { embeds: [embed], components } })
+               body: JSON.stringify({ embeds: [embed], components })
              });
           })());
-          return jsonResponse({ type: 5 });
+          return jsonResponse({ type: 6 });
         }
 
         const type = parts[parts.length - 1];
@@ -853,6 +947,87 @@ export default {
            cfg.components.splice(index, 1);
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
            return jsonResponse({ type: 7, data: { components: buildButtonButtons(type, cfg.components) } });
+        }
+
+        if (parts[0] === 'menu' && parts[1] === 'selects') {
+           const idToken = await getFirebaseToken(env);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           if (parts[2] === 'delete') return jsonResponse({ type: 7, data: { components: buildSelectDeleteMenu(type, cfg.selects || []) } });
+           return jsonResponse({ type: 7, data: { components: buildSelectButtons(type, cfg.selects || []) } });
+        }
+        
+        if (parts[0] === 'editselect' && parts[1] === 'add') {
+           return jsonResponse({ type: 9, data: { title: 'Adicionar Menu Suspenso', custom_id: `modalselect_add_${type}`, components: [
+             { type: 1, components: [{ type: 4, custom_id: 'placeholder', label: 'Texto Padrão (Placeholder)', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado (Ação)', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'options', label: 'Opções (separadas por vírgula)', placeholder: 'Opção 1, Opção 2', style: 2, required: true }] }
+           ]}});
+        }
+        
+        if (parts[0] === 'editselect' && parts[1] === 'modal') {
+           const idToken = await getFirebaseToken(env);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           const index = parseInt(parts[2]);
+           const s = cfg.selects[index];
+           const optionsStr = s.options.map(o => o.label).join(', ');
+           return jsonResponse({ type: 9, data: { title: 'Editar Menu Suspenso', custom_id: `modalselect_edit_${index}_${type}`, components: [
+             { type: 1, components: [{ type: 4, custom_id: 'placeholder', label: 'Texto Padrão', value: s.placeholder, style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado', value: s.custom_id, style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'options', label: 'Opções (separadas por vírgula)', value: optionsStr, style: 2, required: true }] }
+           ]}});
+        }
+        
+        if (parts[0] === 'editselect' && parts[1] === 'delete' && parts[2] === 'select') {
+           const idToken = await getFirebaseToken(env);
+           const index = parseInt(interaction.data.values[0]);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           cfg.selects.splice(index, 1);
+           await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
+           return jsonResponse({ type: 7, data: { components: buildSelectButtons(type, cfg.selects) } });
+        }
+
+        if (parts[0] === 'menu' && parts[1] === 'modals') {
+           const idToken = await getFirebaseToken(env);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           if (parts[2] === 'delete') return jsonResponse({ type: 7, data: { components: buildModalDeleteMenu(type, cfg.modals || []) } });
+           return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals || []) } });
+        }
+        
+        if (parts[0] === 'editmodal' && parts[1] === 'add') {
+           return jsonResponse({ type: 9, data: { title: 'Adicionar Modal', custom_id: `modalconfig_add_${type}`, components: [
+             { type: 1, components: [{ type: 4, custom_id: 'title', label: 'Título do Modal', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'trigger_id', label: 'ID Gatilho (comece com custommodal_)', placeholder: 'custommodal_ticket', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'questions', label: 'Perguntas (separadas por vírgula, máx 5)', placeholder: 'Nome, Idade, Email', style: 2, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'log_channel', label: 'Canal de Respostas (Log ID)', style: 1, required: true }] }
+           ]}});
+        }
+        
+        if (parts[0] === 'editmodal' && parts[1] === 'modal') {
+           const idToken = await getFirebaseToken(env);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           const index = parseInt(parts[2]);
+           const m = cfg.modals[index];
+           return jsonResponse({ type: 9, data: { title: 'Editar Modal', custom_id: `modalconfig_edit_${index}_${type}`, components: [
+             { type: 1, components: [{ type: 4, custom_id: 'title', label: 'Título do Modal', value: m.title, style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'trigger_id', label: 'ID Gatilho (comece com custommodal_)', value: m.trigger_id, style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'questions', label: 'Perguntas (separadas por vírgula)', value: m.questions, style: 2, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'log_channel', label: 'Canal de Logs', value: m.log_channel, style: 1, required: true }] }
+           ]}});
+        }
+        
+        if (parts[0] === 'editmodal' && parts[1] === 'delete' && parts[2] === 'select') {
+           const idToken = await getFirebaseToken(env);
+           const index = parseInt(interaction.data.values[0]);
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           cfg.modals.splice(index, 1);
+           await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
+           return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
         }
 
         if (interaction.data.custom_id === "config_toggle_notif" || interaction.data.custom_id === "config_toggle_pings" || interaction.data.custom_id === "config_toggle_maint") {
@@ -930,7 +1105,7 @@ export default {
                
                let newMessageId = interaction.message.id;
                if (parts[1] === 'Entregue' && interaction.channel_id !== ARCHIVE_CHANNEL_ID) {
-                 const res = await fetch(`https://discord.com/api/v10/channels/${ARCHIVE_CHANNEL_ID}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: '📦 Encomenda Arquivada', embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+                 const res = await fetch(`https://discord.com/api/v10/channels/${ARCHIVE_CHANNEL_ID}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: '📦 Encomenda Arquivada', embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
                  if (res.ok) {
                    const newMsg = await res.json();
                    newMessageId = newMsg.id;
@@ -938,14 +1113,14 @@ export default {
                  }
                } else if (parts[1] !== 'Entregue' && interaction.channel_id === ARCHIVE_CHANNEL_ID) {
                  const targetChannelId = cfg.channel || DEFAULT_EMBEDS['notificacao'].channel;
-                 const res = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+                 const res = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
                  if (res.ok) {
                    const newMsg = await res.json();
                    newMessageId = newMsg.id;
                    await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/${interaction.message.id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
                  }
                } else {
-                 await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/${interaction.message.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuButtons(orderId, cfg.components) }) });
+                 await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/${interaction.message.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
                }
                
                if (newMessageId !== interaction.message.id) {
@@ -1018,6 +1193,17 @@ export default {
                   style: { integerValue: b.style.toString() },
                   custom_id: { stringValue: b.custom_id || '' },
                   url: { stringValue: b.url || '' }
+                }}})) }},
+                selects: { arrayValue: { values: (cfg.selects || []).map(s => ({ mapValue: { fields: {
+                  placeholder: { stringValue: s.placeholder },
+                  custom_id: { stringValue: s.custom_id },
+                  options: { stringValue: s.options.map(o => o.label).join(',') }
+                }}})) }},
+                modals: { arrayValue: { values: (cfg.modals || []).map(m => ({ mapValue: { fields: {
+                  title: { stringValue: m.title },
+                  trigger_id: { stringValue: m.trigger_id },
+                  questions: { stringValue: m.questions },
+                  log_channel: { stringValue: m.log_channel }
                 }}})) }}
               }}}};
               await updateFirestore(env, 'bot_config', 'embeds', fields, idToken);
@@ -1070,6 +1256,36 @@ export default {
            return jsonResponse({ type: 6 });
         }
 
+        if (cid.startsWith('submitmodal_')) {
+           const trigger_id = cid.substring('submitmodal_'.length);
+           ctx.waitUntil((async () => {
+             const idToken = await getFirebaseToken(env);
+             const embedsDoc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
+             let targetModal = null;
+             for (const type of Object.keys(embedsDoc.fields)) {
+               const f = embedsDoc.fields[type].mapValue.fields;
+               if (f.modals && f.modals.arrayValue && f.modals.arrayValue.values) {
+                 const modals = f.modals.arrayValue.values.map(v => ({
+                   trigger_id: v.mapValue.fields.trigger_id.stringValue,
+                   title: v.mapValue.fields.title.stringValue,
+                   questions: v.mapValue.fields.questions.stringValue,
+                   log_channel: v.mapValue.fields.log_channel.stringValue
+                 }));
+                 targetModal = modals.find(m => m.trigger_id === trigger_id);
+                 if (targetModal) break;
+               }
+             }
+             if (targetModal) {
+               const qList = targetModal.questions.split(',').map(q => q.trim()).filter(q => q.length > 0).slice(0, 5);
+               const fields = qList.map((q, i) => ({ name: q, value: getVal(`q_${i}`) || 'N/A', inline: false }));
+               const embed = { title: targetModal.title, color: 0x3498DB, author: { name: interaction.member?.user?.username || 'Usuário' }, fields };
+               await fetch(`https://discord.com/api/v10/channels/${targetModal.log_channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ embeds: [embed] }) });
+               await fetch(`https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 4, data: { content: "✅ Resposta enviada com sucesso!", flags: 64 } }) });
+             }
+           })());
+           return jsonResponse({ type: 5, data: { flags: 64 } });
+        }
+
         if (cid.startsWith('modalbutton_')) {
            const parts = cid.split('_'); const action = parts[1]; const type = parts.pop();
            const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
@@ -1083,6 +1299,37 @@ export default {
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
            const preview = buildEmbedFromConfig(cfg, mockOrder);
            return jsonResponse({ type: 7, data: { embeds: [preview], components: buildButtonButtons(type, cfg.components) } });
+        }
+
+        if (cid.startsWith('modalselect_')) {
+           const parts = cid.split('_'); const action = parts[1]; const type = parts.pop();
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           if (!cfg.selects) cfg.selects = [];
+           
+           const optionsRaw = getVal('options').split(',');
+           const options = optionsRaw.map(o => ({ label: o.trim(), value: o.trim() })).filter(o => o.label.length > 0);
+           
+           const newSelect = { placeholder: getVal('placeholder'), custom_id: getVal('custom_id'), options };
+           if (action === 'add') cfg.selects.push(newSelect);
+           else { const index = parseInt(parts[2]); cfg.selects[index] = newSelect; }
+           
+           await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
+           return jsonResponse({ type: 7, data: { components: buildSelectButtons(type, cfg.selects) } });
+        }
+
+        if (cid.startsWith('modalconfig_')) {
+           const parts = cid.split('_'); const action = parts[1]; const type = parts.pop();
+           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+           if (!cfg.modals) cfg.modals = [];
+           
+           const newModal = { title: getVal('title'), trigger_id: getVal('trigger_id'), questions: getVal('questions'), log_channel: getVal('log_channel') };
+           if (action === 'add') cfg.modals.push(newModal);
+           else { const index = parseInt(parts[2]); cfg.modals[index] = newModal; }
+           
+           await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
+           return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
         }
 
         if (cid.startsWith('modaleditor_')) {

@@ -1627,6 +1627,7 @@ export const AdminDashboard = () => {
                         {[
                           { v: '{pokemon}', d: 'Espécie do Pokémon encomendado.' },
                           { v: '{ivs}', d: 'Status de IVs (ex: 6 IVs, F5).' },
+                          { v: '{ivs_detalhe}', d: 'Atributos ignorados em F4/F5 (ex: -Atk, -SpA).' },
                           { v: '{ability}', d: 'Habilidade (Ability) escolhida.' },
                           { v: '{genero}', d: 'Macho, Fêmea ou Genderless.' },
                           { v: '{total}', d: 'Valor da encomenda atual (ex: 100k).' },
