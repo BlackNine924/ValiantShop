@@ -184,12 +184,16 @@ function replacePlaceholders(text, data) {
   if (!text) return text;
   const info = getPokeInfo(data.pokemon);
   
-  // Format ignored IVs
+  // Formata IVs ignorados — exibe apenas "-HP -Atk" sem prefixo
   let ivsDetalhe = '';
+  const IV_NAME_MAP: Record<string, string> = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe', special: 'SpA' };
   if (Array.isArray(data.ignoredIvs) && data.ignoredIvs.length > 0) {
-    ivsDetalhe = `(Faltante: ${data.ignoredIvs.map(iv => `-${iv.replace('special', 'Sp.').toUpperCase()}`).join(', ')})`;
+    ivsDetalhe = data.ignoredIvs.map(iv => {
+      const key = iv.toString().toLowerCase();
+      return `-${IV_NAME_MAP[key] || iv}`;
+    }).join(' ');
   } else if (typeof data.ignoredIvs === 'string' && data.ignoredIvs.length > 0) {
-    ivsDetalhe = `(Faltante: ${data.ignoredIvs})`;
+    ivsDetalhe = data.ignoredIvs;
   }
 
   const map = {
@@ -447,7 +451,7 @@ export default {
         },
         {
           name: "cliente",
-          description: "👤 [SISTEMA] Histórico e detalhes do cliente via ID do Site",
+          description: "🎨 [SISTEMA] Histórico e detalhes do cliente via ID do Site",
           options: [{
             name: "id_site",
             description: "ID Sequencial do Treinador (Ex: 00001)",
@@ -457,11 +461,11 @@ export default {
         },
         {
           name: "caixa",
-          description: "💰 [LOGÍSTICA] Lucro total da loja em tempo real"
+          description: "📦 [LOGÍSTICA] Lucro total da loja em tempo real"
         },
         {
           name: "resumo",
-          description: "📊 [LOGÍSTICA] Painel de pedidos e valores do dia"
+          description: "📦 [LOGÍSTICA] Painel de pedidos e valores do dia"
         },
         {
           name: "config_bot",
@@ -469,30 +473,11 @@ export default {
         },
         {
           name: "tabela",
-          description: "📜 [INFO] Exibe a tabela de preços cobrada"
+          description: "ℹ️ [INFO] Exibe a tabela de preços cobrada"
         },
         {
           name: "server",
-          description: "🛡️ [ADMIN] Comandos de gerenciamento do servidor",
-          options: [
-            {
-              name: "clear",
-              description: "Apagar mensagens do chat",
-              type: 1,
-              options: [{ name: "quantidade", description: "Número de mensagens (1-100)", type: 4, required: true, min_value: 1, max_value: 100 }]
-            },
-            {
-              name: "nuke",
-              description: "Apagar e recriar o canal atual",
-              type: 1
-            },
-            {
-              name: "purge_category",
-              description: "Apagar todos os canais de uma categoria",
-              type: 1,
-              options: [{ name: "id", description: "ID da categoria", type: 3, required: true }]
-            }
-          ]
+          description: "🛡️ [ADMIN] Central de gerenciamento do servidor"
         }
       ];
       await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { 
@@ -753,40 +738,32 @@ export default {
       }
 
       if (interaction.type === 2 && interaction.data.name === 'server') {
-        const subCommand = interaction.data.options[0].name;
-        const options = interaction.data.options[0].options || [];
-        
-        ctx.waitUntil((async () => {
-          if (subCommand === 'clear') {
-            const amount = options.find(o => o.name === 'quantidade').value;
-            const res = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages?limit=${amount}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
-            if (res.ok) {
-              const msgs = await res.json();
-              const ids = msgs.map(m => m.id);
-              if (ids.length > 0) {
-                await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/bulk-delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ messages: ids }) });
-              }
-            }
-          } else if (subCommand === 'nuke') {
-            const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
-            const newChannel = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ name: channel.name, type: channel.type, topic: channel.topic, parent_id: channel.parent_id, permission_overwrites: channel.permission_overwrites, position: channel.position }) }).then(r => r.json());
-            if (newChannel.id) {
-              await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
-              await fetch(`https://discord.com/api/v10/channels/${newChannel.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: `☢️ **Channel Nuked** by <@${interaction.member.user.id}>` }) });
-              return; // End here as the old channel is gone
-            }
-          } else if (subCommand === 'purge_category') {
-            const catId = options.find(o => o.name === 'id').value;
-            const guildChannels = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
-            const targets = guildChannels.filter(c => c.parent_id === catId);
-            for (const c of targets) {
-              await fetch(`https://discord.com/api/v10/channels/${c.id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
-            }
+        // Retorna a central de gerência como painel interativo com botões
+        return jsonResponse({
+          type: 4,
+          data: {
+            flags: 64,
+            embeds: [{
+              title: '🛡️ Central do Servidor',
+              description: 'Selecione uma ação abaixo. Cada opção abrirá um formulário de confirmação antes de executar.',
+              color: 0xef4444,
+              fields: [
+                { name: '🧹 Limpar Mensagens', value: 'Apaga em massa até 100 mensagens do canal atual.', inline: true },
+                { name: '☢️ Nuke Canal', value: 'Recria o canal atual com o mesmo nome e permissões.', inline: true },
+                { name: '🗑️ Purgar Categoria', value: 'Apaga todos os canais de uma categoria pelo ID.', inline: true }
+              ],
+              footer: { text: '⚠️ Atenção: ações destrutivas! Use com cuidado.' }
+            }],
+            components: [{
+              type: 1,
+              components: [
+                { type: 2, label: '🧹 Limpar Mensagens', style: 2, custom_id: 'server_action_clear' },
+                { type: 2, label: '☢️ Nuke Canal', style: 4, custom_id: 'server_action_nuke' },
+                { type: 2, label: '🗑️ Purgar Categoria', style: 4, custom_id: 'server_action_purge' }
+              ]
+            }]
           }
-          
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `✅ Comando \`${subCommand}\` executado com sucesso!` }) });
-        })());
-        return jsonResponse({ type: 5, data: { flags: 64 } });
+        });
       }
 
       if (interaction.type === 3) {
@@ -816,7 +793,28 @@ export default {
            }
         }
 
+
+        // ─── Botões da Central do Servidor ────────────────────────────────────
+        if (interaction.data.custom_id === 'server_action_clear') {
+          return jsonResponse({ type: 9, data: { title: '🧹 Limpar Mensagens', custom_id: 'modal_server_clear', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'quantidade', label: 'Quantas mensagens apagar? (1–100)', placeholder: 'Ex: 50', style: 1, min_length: 1, max_length: 3, required: true }] }
+          ] } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_nuke') {
+          return jsonResponse({ type: 9, data: { title: '☢️ Nuke Canal', custom_id: 'modal_server_nuke', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'confirmar', label: 'Digite CONFIRMAR para prosseguir', placeholder: 'CONFIRMAR', style: 1, required: true }] }
+          ] } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_purge') {
+          return jsonResponse({ type: 9, data: { title: '🗑️ Purgar Categoria', custom_id: 'modal_server_purge', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'cat_id', label: 'ID da Categoria', placeholder: 'Cole aqui o ID da categoria...', style: 1, min_length: 15, max_length: 20, required: true }] }
+          ] } });
+        }
+
         const parts = interaction.data.custom_id ? interaction.data.custom_id.split('_') : [];
+
         if (interaction.data.custom_id === "config_category_select") {
           const category = interaction.data.values[0];
           ctx.waitUntil((async () => {
@@ -1267,6 +1265,51 @@ export default {
              });
            })());
            return jsonResponse({ type: 6 });
+        }
+
+        // ─── Handlers dos Modais do /server ───────────────────────────────────
+        if (cid === 'modal_server_clear') {
+          const amount = parseInt(getVal('quantidade'));
+          if (isNaN(amount) || amount < 1 || amount > 100) return jsonResponse({ type: 4, data: { flags: 64, content: "❌ Quantidade inválida! Escolha entre 1 e 100." } });
+          
+          ctx.waitUntil((async () => {
+            const res = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages?limit=${amount}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+            if (res.ok) {
+              const msgs = await res.json();
+              const ids = msgs.map(m => m.id);
+              if (ids.length > 0) {
+                await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/bulk-delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ messages: ids }) });
+              }
+            }
+          })());
+          return jsonResponse({ type: 4, data: { flags: 64, content: `🧹 Iniciando limpeza de ${amount} mensagens...` } });
+        }
+
+        if (cid === 'modal_server_nuke') {
+          const confirm = getVal('confirmar').toUpperCase();
+          if (confirm !== 'CONFIRMAR') return jsonResponse({ type: 4, data: { flags: 64, content: "❌ Confirmação incorreta! Operação cancelada." } });
+          
+          ctx.waitUntil((async () => {
+            const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            const newChannel = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ name: channel.name, type: channel.type, topic: channel.topic, parent_id: channel.parent_id, permission_overwrites: channel.permission_overwrites, position: channel.position }) }).then(r => r.json());
+            if (newChannel.id) {
+              await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+              await fetch(`https://discord.com/api/v10/channels/${newChannel.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: `☢️ **Canal Recriado** por <@${interaction.member.user.id}>` }) });
+            }
+          })());
+          return jsonResponse({ type: 4, data: { flags: 64, content: "☢️ Iniciando reconstrução do canal..." } });
+        }
+
+        if (cid === 'modal_server_purge') {
+          const catId = getVal('cat_id');
+          ctx.waitUntil((async () => {
+            const guildChannels = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            const targets = Array.isArray(guildChannels) ? guildChannels.filter(c => c.parent_id === catId) : [];
+            for (const c of targets) {
+              await fetch(`https://discord.com/api/v10/channels/${c.id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+            }
+          })());
+          return jsonResponse({ type: 4, data: { flags: 64, content: `🗑️ Iniciando purga da categoria \`${catId}\`...` } });
         }
         const mockOrder = { pokemon: 'Pikachu', playerNick: 'Treinador', ivs: 'F6', gender: 'Macho', ability: 'Static', totalPrice: 100000, observations: 'Nenhuma', discordNick: 'User' };
 
