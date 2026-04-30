@@ -3356,6 +3356,9 @@ const AutoOrderGenerator = ({ onClose }: { onClose: () => void }) => {
           <div>
             <h3 className="pixel-title text-xl text-secondary">Auto-Gerador</h3>
             <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Extraia dados de texto e crie encomendas instantâneas</p>
+            <div className="flex gap-2 mt-2">
+              <span className="text-[8px] bg-secondary/10 text-secondary px-2 py-0.5 rounded border border-secondary/20 font-bold uppercase">Variáveis: {`{treinador}, {pokemon}, {ivs}, {ivs_detalhe}, {genero}`}</span>
+            </div>
           </div>
         </div>
 

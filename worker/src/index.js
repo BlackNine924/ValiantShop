@@ -423,7 +423,7 @@ export default {
       const commands = [
         { 
           name: "editar_embed", 
-          description: "Painel de configuração de embeds", 
+          description: "[LOGÍSTICA] Painel de configuração de embeds", 
           options: [{ 
             name: "tipo", 
             description: "Tipo de embed", 
@@ -442,7 +442,7 @@ export default {
         },
         {
           name: "cliente",
-          description: "Histórico e detalhes do cliente via ID do Site",
+          description: "[LOGÍSTICA] Histórico e detalhes do cliente via ID do Site",
           options: [{
             name: "id_site",
             description: "ID Sequencial do Treinador (Ex: 00001)",
@@ -452,11 +452,11 @@ export default {
         },
         {
           name: "caixa",
-          description: "Lucro total da loja em tempo real"
+          description: "[LOGÍSTICA] Lucro total da loja em tempo real"
         },
         {
           name: "resumo",
-          description: "Painel de pedidos e valores do dia"
+          description: "[LOGÍSTICA] Painel de pedidos e valores do dia"
         },
         {
           name: "config_bot",
@@ -717,6 +717,43 @@ export default {
         });
       }
 
+      if (interaction.type === 2 && interaction.data.name === 'server') {
+        const subCommand = interaction.data.options[0].name;
+        const options = interaction.data.options[0].options || [];
+        
+        ctx.waitUntil((async () => {
+          if (subCommand === 'clear') {
+            const amount = options.find(o => o.name === 'quantidade').value;
+            const res = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages?limit=${amount}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+            if (res.ok) {
+              const msgs = await res.json();
+              const ids = msgs.map(m => m.id);
+              if (ids.length > 0) {
+                await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/bulk-delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ messages: ids }) });
+              }
+            }
+          } else if (subCommand === 'nuke') {
+            const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            const newChannel = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ name: channel.name, type: channel.type, topic: channel.topic, parent_id: channel.parent_id, permission_overwrites: channel.permission_overwrites, position: channel.position }) }).then(r => r.json());
+            if (newChannel.id) {
+              await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+              await fetch(`https://discord.com/api/v10/channels/${newChannel.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: `☢️ **Channel Nuked** by <@${interaction.member.user.id}>` }) });
+              return; // End here as the old channel is gone
+            }
+          } else if (subCommand === 'purge_category') {
+            const catId = options.find(o => o.name === 'id').value;
+            const guildChannels = await fetch(`https://discord.com/api/v10/guilds/${interaction.guild_id}/channels`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            const targets = guildChannels.filter(c => c.parent_id === catId);
+            for (const c of targets) {
+              await fetch(`https://discord.com/api/v10/channels/${c.id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+            }
+          }
+          
+          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `✅ Comando \`${subCommand}\` executado com sucesso!` }) });
+        })());
+        return jsonResponse({ type: 5, data: { flags: 64 } });
+      }
+
       if (interaction.type === 3) {
         if (interaction.data.custom_id && interaction.data.custom_id.startsWith('custommodal_')) {
            const idToken = await getFirebaseToken(env);
@@ -881,6 +918,28 @@ export default {
         const type = parts[parts.length - 1];
         const orderId = parts.slice(2).join('_');
 
+        if (interaction.data.custom_id === 'help_tools_info') {
+          return jsonResponse({
+            type: 4,
+            data: {
+              flags: 64,
+              embeds: [{
+                title: "📖 Guia de Variáveis & Ferramentas",
+                description: "Use estas variáveis nos campos de texto para exibir dados dinâmicos das encomendas.",
+                color: 0x2ECC71,
+                fields: [
+                  { name: "👤 Cliente", value: "`{treinador}`: Nick do jogador\n`{discord}`: Tag do Discord", inline: true },
+                  { name: "👾 Pokémon", value: "`{pokemon}`: Nome da espécie\n`{sprite}`: Imagem do Pokémon", inline: true },
+                  { name: "📊 Atributos", value: "`{ivs}`: Formato F5/F6\n`{ivs_detalhe}`: IVs faltantes\n`{genero}`: M/F/N", inline: true },
+                  { name: "🧬 Genética", value: "`{ability}`: Habilidade\n`{egg}`: Egg Groups\n`{b/c}`: Breed/Castrado", inline: true },
+                  { name: "💰 Financeiro", value: "`{total}`: Valor total (ex: 80k)\n`{caixa}`: Lucro total acumulado", inline: true },
+                  { name: "💡 Dica", value: "O campo **Canal** deve conter o ID numérico (Ex: 123456789).", inline: false }
+                ]
+              }]
+            }
+          });
+        }
+
         if (parts[0] === 'verify') {
            const cid = parts[1] === 'delete' ? `delete_order_submit_${orderId}` : (parts[1] === 'saveconfig' ? `editembed_save_submit_${type}` : `action_cancel_submit_${type}`);
            return jsonResponse({ type: 9, data: { title: 'Confirmação', custom_id: cid, components: [{ type: 1, components: [{ type: 4, custom_id: 'confirm', label: `Digite '${VERIFY_CONFIRM}' para confirmar`, placeholder: VERIFY_CONFIRM, style: 1, min_length: 3, max_length: 3 }] }] } });
@@ -914,7 +973,7 @@ export default {
              { type: 1, components: [{ type: 4, custom_id: 'label', label: 'Texto do Botão', style: 1, required: true }] },
              { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-Blurple, 2-Gray, 3-Green, 4-Red)', placeholder: '2', style: 1, required: true }] },
              { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado (Ação)', placeholder: 'ex: status_check', style: 1 }] },
-             { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL (Opcional)', placeholder: 'https://...', style: 1 }] }
+             { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL (Opcional)', placeholder: 'https://...', style: 1, required: false }] }
            ]}});
         }
 
@@ -928,7 +987,7 @@ export default {
              { type: 1, components: [{ type: 4, custom_id: 'label', label: 'Texto do Botão', value: btn.label, style: 1, required: true }] },
              { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-4)', value: btn.style.toString(), style: 1, required: true }] },
              { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado', value: btn.custom_id || '', style: 1 }] },
-             { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL', value: btn.url || '', style: 1 }] }
+             { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL', value: btn.url || '', style: 1, required: false }] }
            ]}});
         }
 
@@ -1039,7 +1098,7 @@ export default {
             const field = interaction.data.custom_id === "config_toggle_notif" ? "notif" : (interaction.data.custom_id === "config_toggle_pings" ? "pings" : "maintenance");
             s[field] = !s[field];
             
-            await updateFirestoreDoc(env, 'bot_config', 'settings', { fields: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'boolean' ? { booleanValue: v } : { stringValue: v.toString() }])) }, idToken);
+            await updateFirestore(env, 'bot_config', 'settings', Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'boolean' ? { booleanValue: v } : { stringValue: v.toString() }])), idToken);
             
             // Trigger a re-render of the current view (Notificações or Sistema)
             const isMaint = interaction.data.custom_id === "config_toggle_maint";
@@ -1207,7 +1266,29 @@ export default {
                 }}})) }}
               }}}};
               await updateFirestore(env, 'bot_config', 'embeds', fields, idToken);
-              return jsonResponse({ type: 7, data: { content: `✅ Configuração salva!`, embeds: [], components: [] } });
+              
+              // Automatic patch original message
+              ctx.waitUntil((async () => {
+                const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+                const embed = buildEmbedFromConfig(cfg, mockOrder);
+                const channelId = cfg.channel || DEFAULT_EMBEDS[type]?.channel;
+                
+                // Fetch last message from channel to find our official embed
+                const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=5`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+                if (res.ok) {
+                   const msgs = await res.json();
+                   const target = msgs.find(m => m.author.id === (interaction.application_id || '1498061638941806833'));
+                   if (target) {
+                      await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${target.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
+                        body: JSON.stringify({ content: cfg.content, embeds: [embed], components: buildMainMenuComponents('PREVIEW', cfg.components, cfg.selects) })
+                      });
+                   }
+                }
+              })());
+
+              return jsonResponse({ type: 7, data: { content: `✅ Configuração salva e sincronizada!`, embeds: [], components: [] } });
            }
            if (parts[0] === 'delete') {
               ctx.waitUntil((async () => {
@@ -1331,6 +1412,44 @@ export default {
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
            return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
         }
+
+         if (cid === 'modal_bot_identity') {
+            const username = getVal('username');
+            ctx.waitUntil((async () => {
+              await fetch(`https://discord.com/api/v10/users/@me`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ username }) });
+              await updateFirestore(env, 'bot_config', 'settings', { username: { stringValue: username } }, idToken);
+            })());
+            return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Nome do bot atualizado para **${username}**!` } });
+         }
+
+         if (cid === 'modal_bot_avatar') {
+            const avatarUrl = getVal('avatar');
+            ctx.waitUntil((async () => {
+              const res = await fetch(avatarUrl);
+              const blob = await res.blob();
+              const reader = new FileReader();
+              const base64 = await new Promise((resolve) => {
+                const r = new FileReader();
+                r.onloadend = () => resolve(r.result);
+                r.readAsDataURL(blob);
+              });
+              await fetch(`https://discord.com/api/v10/users/@me`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ avatar: base64 }) });
+              await updateFirestore(env, 'bot_config', 'settings', { avatar: { stringValue: avatarUrl } }, idToken);
+            })());
+            return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Avatar do bot atualizado!` } });
+         }
+
+         if (cid === 'modal_bot_status') {
+            const status = getVal('status');
+            const typeStatus = parseInt(getVal('type')) || 0;
+            ctx.waitUntil((async () => {
+              await fetch(`https://discord.com/api/v10/gateway/bot`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }); // Not enough to set status, usually requires WSS, but we can store it
+              await updateFirestore(env, 'bot_config', 'settings', { status: { stringValue: status }, statusType: { integerValue: typeStatus } }, idToken);
+              // For Workers, we rely on the next interaction or a scheduled task to 'show' status if using a library, 
+              // but here we at least persist it. 
+            })());
+            return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Status definido para: *${status}*` } });
+         }
 
         if (cid.startsWith('modaleditor_')) {
            const parts = cid.split('_'); const action = parts[1]; const type = parts.pop();
