@@ -186,7 +186,7 @@ function replacePlaceholders(text, data) {
   
   // Formata IVs ignorados — exibe apenas "-HP -Atk" sem prefixo
   let ivsDetalhe = '';
-  const IV_NAME_MAP: Record<string, string> = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe', special: 'SpA' };
+  const IV_NAME_MAP = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe', special: 'SpA' };
   if (Array.isArray(data.ignoredIvs) && data.ignoredIvs.length > 0) {
     ivsDetalhe = data.ignoredIvs.map(iv => {
       const key = iv.toString().toLowerCase();
