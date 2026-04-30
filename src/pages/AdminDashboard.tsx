@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, Zap, Sparkles
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, DollarSign
 } from 'lucide-react';
+
 import { adminDb, adminAuth as auth } from '../firebase';
 import { collection, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDocs, where, limit, addDoc, getDoc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut, browserSessionPersistence, setPersistence } from 'firebase/auth';
@@ -32,7 +33,8 @@ export const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
   const [newBreederEmail, setNewBreederEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade'>('pedidos');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade' | 'ferramentas'>('pedidos');
+
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [breeders, setBreeders] = useState<any[]>([]);
   const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
@@ -158,31 +160,7 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleTriggerHunt = async (pokemonName: string) => {
-    if (!pokemonName) return;
-    try {
-      await setDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
-        pokemonName,
-        isActive: true,
-        spawnTime: Date.now(), // Use current timestamp as unique session ID for state resets
-        winners: [],
-        location: 'random'
-      });
-      alert(`Caça ao ${pokemonName} disparada com sucesso!`);
-    } catch (error) {
-      console.error("Error triggering hunt:", error);
-    }
-  };
 
-  const handleStopHunt = async () => {
-    try {
-      await updateDoc(doc(adminDb, 'global_events', 'pixel_hunt'), {
-        isActive: false
-      });
-    } catch (error) {
-      console.error("Error stopping hunt:", error);
-    }
-  };
 
   // ONE-TIME ADMIN TOOL: Merge duplicate profiles (commented out due to unused)
   /* const handleMergeProfiles = async () => {
@@ -1291,13 +1269,14 @@ export const AdminDashboard = () => {
                     <option value="4 IVs">4 IVs</option>
                   </select>
 
-                  <select 
+                   <select 
                     value={filterGender} onChange={e => setFilterGender(e.target.value)} 
                     className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="">Qualquer Gênero</option>
                     <option value="Macho">Macho</option>
                     <option value="Fêmea">Fêmea</option>
+                    <option value="Qualquer">Qualquer</option>
                     <option value="Genderless">Genderless</option>
                   </select>
 

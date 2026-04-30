@@ -116,7 +116,12 @@ const VERIFY_CONFIRM = "SIM";
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-Valiant-Key' },
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Access-Control-Allow-Origin': '*', 
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 
+      'Access-Control-Allow-Headers': 'Content-Type, X-Valiant-Key' 
+    },
   });
 }
 
@@ -192,7 +197,7 @@ function replacePlaceholders(text, data) {
     '{pokemon}': data.pokemon || 'N/A',
     '{ivs}': (data.ivs ? `F${data.ivs.toString().match(/\d+/)?.[0] || data.ivs.toString().replace('F', '')}` : 'N/A'),
     '{ivs_detalhe}': ivsDetalhe,
-    '{genero}': data.gender || 'N/A',
+    '{genero}': data.gender === 'Q' ? 'Qualquer' : (data.gender === 'G' ? 'Genderless' : (data.gender || 'N/A')),
     '{ability}': data.ability ? (data.hasHA ? `${data.ability} (HA)` : data.ability) : 'N/A',
     '{b/c}': data.isCastrated ? '(CASTRADO)' : '(BREEDABLE)',
     '{total}': (data.totalPrice ? Math.floor(Number(data.totalPrice) / (Number(data.totalPrice) >= 1000 ? 1000 : 1)) + (Number(data.totalPrice) >= 1000 ? 'k' : '') : (data.total || 'N/A')),
@@ -423,7 +428,7 @@ export default {
       const commands = [
         { 
           name: "editar_embed", 
-          description: "[LOGÍSTICA] Painel de configuração de embeds", 
+          description: "🎨 [SISTEMA] Painel de configuração de embeds", 
           options: [{ 
             name: "tipo", 
             description: "Tipo de embed", 
@@ -442,7 +447,7 @@ export default {
         },
         {
           name: "cliente",
-          description: "[LOGÍSTICA] Histórico e detalhes do cliente via ID do Site",
+          description: "👤 [SISTEMA] Histórico e detalhes do cliente via ID do Site",
           options: [{
             name: "id_site",
             description: "ID Sequencial do Treinador (Ex: 00001)",
@@ -452,23 +457,53 @@ export default {
         },
         {
           name: "caixa",
-          description: "[LOGÍSTICA] Lucro total da loja em tempo real"
+          description: "💰 [LOGÍSTICA] Lucro total da loja em tempo real"
         },
         {
           name: "resumo",
-          description: "[LOGÍSTICA] Painel de pedidos e valores do dia"
+          description: "📊 [LOGÍSTICA] Painel de pedidos e valores do dia"
         },
         {
           name: "config_bot",
-          description: "Configurar funções e perfil do bot (pings, nome, status)"
+          description: "⚙️ [CONFIG] Configurar funções e perfil do bot"
         },
         {
           name: "tabela",
-          description: "Exibe a tabela de preços cobrada"
+          description: "📜 [INFO] Exibe a tabela de preços cobrada"
+        },
+        {
+          name: "server",
+          description: "🛡️ [ADMIN] Comandos de gerenciamento do servidor",
+          options: [
+            {
+              name: "clear",
+              description: "Apagar mensagens do chat",
+              type: 1,
+              options: [{ name: "quantidade", description: "Número de mensagens (1-100)", type: 4, required: true, min_value: 1, max_value: 100 }]
+            },
+            {
+              name: "nuke",
+              description: "Apagar e recriar o canal atual",
+              type: 1
+            },
+            {
+              name: "purge_category",
+              description: "Apagar todos os canais de uma categoria",
+              type: 1,
+              options: [{ name: "id", description: "ID da categoria", type: 3, required: true }]
+            }
+          ]
         }
       ];
-      await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { method: 'PUT', headers: { 'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify(commands) });
-      return new Response('Commands updated');
+      await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { 
+        method: 'PUT', 
+        headers: { 
+          'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`, 
+          'Content-Type': 'application/json' 
+        }, 
+        body: JSON.stringify(commands) 
+      });
+      return new Response('Commands updated successfully (v2)');
     }
 
     const signature = request.headers.get('X-Signature-Ed25519');
@@ -476,7 +511,7 @@ export default {
     const siteKey    = request.headers.get('X-Valiant-Key');
     const body = await request.text();
 
-    if (!signature && siteKey === env.VALIANT_SECRET) {
+    if (!signature && siteKey && siteKey === env.VALIANT_SECRET) {
       const data = JSON.parse(body);
       const order = data.order || {};
       const idToken = await getFirebaseToken(env);
@@ -524,7 +559,7 @@ export default {
       if (data.action === 'send') {
         const cfg = await getEmbedConfig(env, 'notificacao', idToken);
         const embed = buildEmbedFromConfig(cfg, order);
-        const res = await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuButtons(data.orderId, cfg.components) }) });
+        const res = await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuComponents(data.orderId, cfg.components, cfg.selects) }) });
         if (res.ok) {
            const msg = await res.json();
            return jsonResponse({ success: true, id: msg.id });
@@ -1448,7 +1483,7 @@ export default {
               // For Workers, we rely on the next interaction or a scheduled task to 'show' status if using a library, 
               // but here we at least persist it. 
             })());
-            return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Status definido para: *${status}*` } });
+            return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Status definido para: **${status}**` } });
          }
 
         if (cid.startsWith('modaleditor_')) {
