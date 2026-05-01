@@ -831,12 +831,6 @@ export default {
                 { type: 2, label: 'Exportar Chat', style: 2, custom_id: 'server_action_export' },
                 { type: 2, label: 'Nota do Canal', style: 2, custom_id: 'server_action_note' }
               ]},
-            components = [
-              { type: 1, components: [
-                { type: 2, label: 'Refazer Webhooks', style: 2, custom_id: 'server_action_rewebhooks' },
-                { type: 2, label: 'Exportar Chat', style: 2, custom_id: 'server_action_export' },
-                { type: 2, label: 'Nota do Canal', style: 2, custom_id: 'server_action_note' }
-              ]},
               { type: 1, components: [
                 { type: 2, label: 'Sync Ambiente (DEV/PROD)', style: 1, custom_id: 'server_action_env' },
                 { type: 2, label: 'Voltar', style: 2, custom_id: 'server_back_main' }
