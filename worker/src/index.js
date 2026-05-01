@@ -738,29 +738,33 @@ export default {
       }
 
       if (interaction.type === 2 && interaction.data.name === 'server') {
-        // Retorna a central de gerência como painel interativo com botões
         return jsonResponse({
           type: 4,
           data: {
             flags: 64,
             embeds: [{
-              title: '🛡️ Central do Servidor',
-              description: 'Selecione uma ação abaixo. Cada opção abrirá um formulário de confirmação antes de executar.',
+              title: '🛡️ Central de Comando ValiantShop',
+              description: 'Bem-vindo ao centro de operações privadas. Selecione uma categoria abaixo para gerenciar a infraestrutura do seu servidor.',
               color: 0xef4444,
               fields: [
-                { name: '🧹 Limpar Mensagens', value: 'Apaga em massa até 100 mensagens do canal atual.', inline: true },
-                { name: '☢️ Nuke Canal', value: 'Recria o canal atual com o mesmo nome e permissões.', inline: true },
-                { name: '🗑️ Purgar Categoria', value: 'Apaga todos os canais de uma categoria pelo ID.', inline: true }
+                { name: '🔒 Segurança', value: 'Controle de acesso e limpeza seletiva.', inline: true },
+                { name: '☢️ Infraestrutura', value: 'Nuke, Purgar e Gerenciamento de Canais.', inline: true },
+                { name: '📂 Workspace', value: 'Organização, Webhooks e Notas.', inline: true }
               ],
-              footer: { text: '⚠️ Atenção: ações destrutivas! Use com cuidado.' }
+              footer: { text: '⚠️ Apenas Administradores • Operações Privadas' }
             }],
             components: [{
               type: 1,
-              components: [
-                { type: 2, label: '🧹 Limpar Mensagens', style: 2, custom_id: 'server_action_clear' },
-                { type: 2, label: '☢️ Nuke Canal', style: 4, custom_id: 'server_action_nuke' },
-                { type: 2, label: '🗑️ Purgar Categoria', style: 4, custom_id: 'server_action_purge' }
-              ]
+              components: [{
+                type: 3,
+                custom_id: "server_category_select",
+                options: [
+                  { label: "Segurança & Moderação", value: "server_cat_security", description: "Limpeza, Lockdown e Filtros", emoji: { name: "🔒" } },
+                  { label: "Infraestrutura", value: "server_cat_infra", description: "Nuke, Purge e Workspace", emoji: { name: "☢️" } },
+                  { label: "Workspace & Ferramentas", value: "server_cat_tools", description: "Webhooks, Notas e Exportação", emoji: { name: "📂" } }
+                ],
+                placeholder: "Selecione a área de atuação..."
+              }]
             }]
           }
         });
@@ -794,7 +798,157 @@ export default {
         }
 
 
-        // ─── Botões da Central do Servidor ────────────────────────────────────
+        // ─── Handlers das Categorias do /server ───────────────────────────────
+        if (interaction.data.custom_id === 'server_category_select') {
+          const cat = interaction.data.values[0];
+          let embed, components = [];
+          
+          if (cat === 'server_cat_security') {
+            embed = { title: "🔒 Segurança & Moderação", description: "Ações de limpeza e controle de acesso.", color: 0x3498DB };
+            components = [
+              { type: 1, components: [
+                { type: 2, label: 'Limpar Canal', style: 2, custom_id: 'server_action_clear' },
+                { type: 2, label: 'Limpar Usuário', style: 2, custom_id: 'server_action_clearuser' },
+                { type: 2, label: 'Alternar Lockdown', style: 4, custom_id: 'server_action_lockdown' }
+              ]},
+              { type: 1, components: [{ type: 2, label: 'Voltar', style: 2, custom_id: 'server_back_main' }] }
+            ];
+          } else if (cat === 'server_cat_infra') {
+            embed = { title: "☢️ Infraestrutura", description: "Gerenciamento pesado de canais e categorias.", color: 0xE74C3C };
+            components = [
+              { type: 1, components: [
+                { type: 2, label: 'Nuke Canal', style: 4, custom_id: 'server_action_nuke' },
+                { type: 2, label: 'Purgar Categoria', style: 4, custom_id: 'server_action_purge' },
+                { type: 2, label: 'Sincronizar Permissões', style: 2, custom_id: 'server_action_sync_perms' }
+              ]},
+              { type: 1, components: [{ type: 2, label: 'Voltar', style: 2, custom_id: 'server_back_main' }] }
+            ];
+          } else if (cat === 'server_cat_tools') {
+            embed = { title: "📂 Workspace & Ferramentas", description: "Utilitários para desenvolvedor e organização.", color: 0xF1C40F };
+            components = [
+              { type: 1, components: [
+                { type: 2, label: 'Refazer Webhooks', style: 2, custom_id: 'server_action_rewebhooks' },
+                { type: 2, label: 'Exportar Chat', style: 2, custom_id: 'server_action_export' },
+                { type: 2, label: 'Nota do Canal', style: 2, custom_id: 'server_action_note' }
+              ]},
+            components = [
+              { type: 1, components: [
+                { type: 2, label: 'Refazer Webhooks', style: 2, custom_id: 'server_action_rewebhooks' },
+                { type: 2, label: 'Exportar Chat', style: 2, custom_id: 'server_action_export' },
+                { type: 2, label: 'Nota do Canal', style: 2, custom_id: 'server_action_note' }
+              ]},
+              { type: 1, components: [
+                { type: 2, label: 'Sync Ambiente (DEV/PROD)', style: 1, custom_id: 'server_action_env' },
+                { type: 2, label: 'Voltar', style: 2, custom_id: 'server_back_main' }
+              ]}
+            ];
+          }
+          
+          return jsonResponse({ type: 7, data: { embeds: [embed], components } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_lockdown') {
+          ctx.waitUntil((async () => {
+            const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            const everyoneRole = interaction.guild_id;
+            const currentOverwrites = channel.permission_overwrites || [];
+            const everyoneIdx = currentOverwrites.findIndex(o => o.id === everyoneRole);
+            
+            let newOverwrites = [...currentOverwrites];
+            let isLocked = false;
+            
+            if (everyoneIdx > -1) {
+              const ow = currentOverwrites[everyoneIdx];
+              const deny = BigInt(ow.deny || "0");
+              const sendMsg = 1n << 11n; // SEND_MESSAGES
+              if ((deny & sendMsg) === sendMsg) {
+                // Unlock
+                newOverwrites[everyoneIdx].deny = (deny & ~sendMsg).toString();
+                isLocked = false;
+              } else {
+                // Lock
+                newOverwrites[everyoneIdx].deny = (deny | sendMsg).toString();
+                isLocked = true;
+              }
+            } else {
+              newOverwrites.push({ id: everyoneRole, type: 0, allow: "0", deny: (1n << 11n).toString() });
+              isLocked = true;
+            }
+            
+            await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ permission_overwrites: newOverwrites }) });
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: isLocked ? "🔒 Canal trancado com sucesso!" : "🔓 Canal destrancado com sucesso!" }) });
+          })());
+          return jsonResponse({ type: 6 });
+        }
+
+        if (interaction.data.custom_id === 'server_action_sync_perms') {
+          ctx.waitUntil((async () => {
+             const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+             if (channel.parent_id) {
+               const category = await fetch(`https://discord.com/api/v10/channels/${channel.parent_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+               await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ permission_overwrites: category.permission_overwrites }) });
+               await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "✅ Permissões sincronizadas com a categoria!" }) });
+             }
+          })());
+          return jsonResponse({ type: 6 });
+        }
+
+        if (interaction.data.custom_id === 'server_action_rewebhooks') {
+          ctx.waitUntil((async () => {
+            const webhooks = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/webhooks`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            for (const wh of webhooks) { await fetch(`https://discord.com/api/v10/webhooks/${wh.id}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }); }
+            await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/webhooks`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ name: 'ValiantShop Manager' }) });
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "🔄 Webhooks do canal refeitos com sucesso!" }) });
+          })());
+          return jsonResponse({ type: 6 });
+        }
+
+        if (interaction.data.custom_id === 'server_action_export') {
+           ctx.waitUntil((async () => {
+             const res = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages?limit=100`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+             if (res.ok) {
+               const msgs = await res.json();
+               const data = JSON.stringify(msgs, null, 2);
+               // Send as file via webhook or message
+               await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages`, { method: 'POST', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "📄 Exportação do canal concluída (Últimas 100 mensagens):", files: [{ name: 'export.json', data: btoa(data) }] }) });
+             }
+           })());
+           return jsonResponse({ type: 6 });
+        }
+
+        if (interaction.data.custom_id.startsWith('server_env_')) {
+          const mode = interaction.data.custom_id.split('_')[2];
+          ctx.waitUntil((async () => {
+            const channel = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }).then(r => r.json());
+            let name = channel.name.replace('🛠️-', '').replace('🚀-', '');
+            name = (mode === 'dev' ? '🛠️-' : '🚀-') + name;
+            await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ name }) });
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `✅ Ambiente alterado para **${mode.toUpperCase()}**!` }) });
+          })());
+          return jsonResponse({ type: 6 });
+        }
+
+        if (interaction.data.custom_id === 'server_back_main') {
+          return jsonResponse({ type: 7, data: { embeds: [{ title: '🛡️ Central de Comando ValiantShop', description: 'Bem-vindo ao centro de operações privadas...', color: 0xef4444 }], components: [{ type: 1, components: [{ type: 3, custom_id: "server_category_select", options: [{ label: "Segurança & Moderação", value: "server_cat_security", emoji: { name: "🔒" } }, { label: "Infraestrutura", value: "server_cat_infra", emoji: { name: "☢️" } }, { label: "Workspace & Ferramentas", value: "server_cat_tools", emoji: { name: "📂" } }], placeholder: "Selecione a área de atuação..." }] }] } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_clearuser') {
+          return jsonResponse({ type: 9, data: { title: '🧹 Limpar Usuário', custom_id: 'modal_server_clearuser', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'user_id', label: 'ID do Usuário', placeholder: 'Cole o ID aqui...', style: 1, required: true }] }
+          ] } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_note') {
+          return jsonResponse({ type: 9, data: { title: '📝 Nota do Canal', custom_id: 'modal_server_note', components: [
+            { type: 1, components: [{ type: 4, custom_id: 'note', label: 'Nova Nota (Tópico)', style: 2, required: true }] }
+          ] } });
+        }
+
+        if (interaction.data.custom_id === 'server_action_env') {
+          return jsonResponse({ type: 4, data: { flags: 64, content: "Selecione o ambiente para este canal:", components: [{ type: 1, components: [{ type: 2, label: 'Modo DEV 🛠️', style: 1, custom_id: 'server_env_dev' }, { type: 2, label: 'Modo PROD 🚀', style: 3, custom_id: 'server_env_prod' }] }] } });
+        }
+
+        // ─── Handlers Legados e Replicados ────────────────────────────────────
         if (interaction.data.custom_id === 'server_action_clear') {
           return jsonResponse({ type: 9, data: { title: '🧹 Limpar Mensagens', custom_id: 'modal_server_clear', components: [
             { type: 1, components: [{ type: 4, custom_id: 'quantidade', label: 'Quantas mensagens apagar? (1–100)', placeholder: 'Ex: 50', style: 1, min_length: 1, max_length: 3, required: true }] }
@@ -1310,6 +1464,27 @@ export default {
             }
           })());
           return jsonResponse({ type: 4, data: { flags: 64, content: `🗑️ Iniciando purga da categoria \`${catId}\`...` } });
+        }
+
+        if (cid === 'modal_server_clearuser') {
+          const userId = getVal('user_id');
+          ctx.waitUntil((async () => {
+            const res = await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages?limit=100`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+            if (res.ok) {
+              const msgs = await res.json();
+              const ids = msgs.filter(m => m.author.id === userId).map(m => m.id);
+              if (ids.length > 0) {
+                await fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}/messages/bulk-delete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ messages: ids }) });
+              }
+            }
+          })());
+          return jsonResponse({ type: 4, data: { flags: 64, content: `🧹 Limpando mensagens de <@${userId}> (últimas 100 do canal)...` } });
+        }
+
+        if (cid === 'modal_server_note') {
+          const note = getVal('note');
+          ctx.waitUntil(fetch(`https://discord.com/api/v10/channels/${interaction.channel_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ topic: note }) }));
+          return jsonResponse({ type: 4, data: { flags: 64, content: `📝 Tópico do canal atualizado para: **${note}**` } });
         }
         const mockOrder = { pokemon: 'Pikachu', playerNick: 'Treinador', ivs: 'F6', gender: 'Macho', ability: 'Static', totalPrice: 100000, observations: 'Nenhuma', discordNick: 'User' };
 
