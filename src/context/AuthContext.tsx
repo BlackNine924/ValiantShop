@@ -72,12 +72,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Initial Check & Create if missing (Single one-off check to avoid recursive listener loops)
         const initialSnap = await getDocs(query(collection(db, 'users'), where('__name__', '==', user.uid)));
         if (initialSnap.empty) {
+          // Attempt to get data from trainer_profile to mirror it
+          const trainerSnap = await getDocs(query(collection(db, 'trainer_profiles'), where('uid', '==', user.uid)));
+          const trainerData = !trainerSnap.empty ? trainerSnap.docs[0].data() : null;
+
           const initialProfile: UserProfile = {
             bio: safeStorage.getItem(`settings_bio_${user.uid}`, 'Apaixonado por Pokémon e batalhas competitivas!'),
             avatarUrl: safeStorage.getItem(`settings_avatar_${user.uid}`, user.photoURL || ''),
             bannerUrl: safeStorage.getItem(`settings_banner_${user.uid}`, 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop'),
+            minecraftNick: trainerData?.displayName || user.displayName || '',
+            discordTag: trainerData?.discordTag || '',
           };
           await setDoc(userRef, initialProfile, { merge: true });
+        } else {
+          // Even if exists, ensure nick/discord are mirrored if missing (Retroactive fix)
+          const data = initialSnap.docs[0].data();
+          if (!data.minecraftNick || !data.discordTag) {
+             const trainerSnap = await getDocs(query(collection(db, 'trainer_profiles'), where('uid', '==', user.uid)));
+             const trainerData = !trainerSnap.empty ? trainerSnap.docs[0].data() : null;
+             if (trainerData) {
+               await setDoc(userRef, {
+                 minecraftNick: trainerData.displayName || '',
+                 discordTag: trainerData.discordTag || ''
+               }, { merge: true });
+             }
+          }
         }
 
         // Trainer Profile check (Single one-off check)
@@ -152,10 +171,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await setDoc(userRef, data, { merge: true });
   };
 
-  const isDiscordValid = (tag: string) => {
-    const oldTag = /^.{2,32}#\d{4}$/;
-    const newTag = /^[a-z0-9_.]{2,32}$/;
-    return oldTag.test(tag) || newTag.test(tag);
+  const isDiscordValid = (_tag: string) => {
+    // Permissivo: aceita qualquer string não vazia
+    return true;
   };
 
   const authenticate = async (nick: string, discord: string) => {
@@ -163,7 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const cleanNickId = cleanNick.toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanDiscord = discord.trim().toLowerCase();
     
-    if (!cleanNickId || !cleanDiscord) throw new Error("Preencha campos válidos (letras e números).");
+    if (!cleanNickId || !discord.trim()) throw new Error("Preencha campos válidos.");
     
     if (!isDiscordValid(discord)) {
       throw new Error("O formato do Discord '" + discord + "' é inválido. Use usuario#0000 ou o novo formato (ex: joao.poke).");
@@ -181,7 +199,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // If profile exists and Discord is different, throw the divergence error early
       if (existingDiscord && existingDiscord !== cleanDiscord) {
-        throw new Error(`Este Nick já está vinculado ao Discord "${existingDiscord}". Se este Nick é seu, use o Discord correto.`);
+        throw new Error(`Este Nick já está em uso por outro Treinador (Credenciais divergentes).`);
       }
     }
 
@@ -204,6 +222,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }, { merge: true });
       }
 
+      // ENSURE MIRROR IN 'users' COLLECTION
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        minecraftNick: cleanNick,
+        discordTag: cleanDiscord
+      }, { merge: true });
+
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
         // If login fails but we didn't find a divergent discord in the pre-check,
@@ -222,6 +246,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             nick_lowercase: cleanNick.toLowerCase(),
             discordTag: cleanDiscord,
             createdAt: serverTimestamp()
+          }, { merge: true });
+
+          // ENSURE MIRROR IN 'users' COLLECTION
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            minecraftNick: cleanNick,
+            discordTag: cleanDiscord
           }, { merge: true });
 
         } catch (createErr: any) {

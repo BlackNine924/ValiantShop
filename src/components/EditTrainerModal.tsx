@@ -7,7 +7,7 @@ interface EditTrainerModalProps {
   isOpen: boolean;
   trainer: any;
   onClose: () => void;
-  onSave: (trainerNick: string, updatedData: any) => Promise<void>;
+  onSave: (nick: string, discord: string, totalSpent: number) => Promise<void>;
 }
 
 export const EditTrainerModal: React.FC<EditTrainerModalProps> = ({ isOpen, trainer, onClose, onSave }) => {
@@ -23,7 +23,7 @@ export const EditTrainerModal: React.FC<EditTrainerModalProps> = ({ isOpen, trai
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      await onSave(trainer.nick, formData);
+      await onSave(trainer.nick, formData.discordNick, formData.totalSpent);
       onClose();
     } catch (error) {
       console.error("Erro ao salvar treinador:", error);

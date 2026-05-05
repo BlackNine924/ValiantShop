@@ -51,6 +51,9 @@ export const AdminDashboard = () => {
   // isSyncingRank commented out
   // const [isSyncingRank, setIsSyncingRank] = useState(false);
   
+  const [repairData, setRepairData] = useState({ nick: '', discord: '' });
+  const [isRepairing, setIsRepairing] = useState(false);
+  
   const getDisplayAbility = (item: any) => {
     if (!item || !item.pokemon) return item?.ability;
     const pokemonInfo = POKEMON_DATA.find(p => p.name === item.pokemon);
@@ -299,6 +302,11 @@ export const AdminDashboard = () => {
       // setIsSyncingRank(false);
     }
   }; */
+
+  const isDiscordValid = (_tag: string) => {
+    // Permissivo: aceita qualquer string não vazia
+    return true;
+  };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
@@ -588,16 +596,125 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateTrainer = async (_trainerNick: string, updatedData: any) => {
+  const handleUpdateTrainer = async (cleanNickId: string, discord: string, totalSpent: number) => {
     try {
-       if (selectedTrainerForEdit?.uid) {
-         await updateDoc(doc(adminDb, 'trainer_profiles', selectedTrainerForEdit.uid), updatedData);
-       } else {
-         throw new Error("UID do treinador não encontrado.");
-       }
-    } catch (err) {
-      console.error("Erro ao atualizar treinador:", err);
+      if (!cleanNickId || !discord.trim()) throw new Error("Preencha campos válidos.");
+      const trainerNick = cleanNickId;
+      const cleanDiscord = (discord || '').trim().toLowerCase();
+      let targetUid = selectedTrainerForEdit?.uid;
+
+      // 1. Localizar o UID
+      if (!targetUid || targetUid === 'N/A') {
+        const q = query(collection(adminDb, 'trainer_profiles'), where('nick_lowercase', '==', trainerNick.toLowerCase()), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          targetUid = snap.docs[0].id;
+        }
+      }
+
+      // 2. Atualizar Perfil (Trainer Profile) e Usuário de forma independente (mais resiliente)
+      if (targetUid && targetUid !== 'N/A') {
+        await setDoc(doc(adminDb, 'trainer_profiles', targetUid), {
+          discordTag: cleanDiscord,
+          discordNick: cleanDiscord,
+          totalSpent: totalSpent || 0
+        }, { merge: true });
+
+        await setDoc(doc(adminDb, 'users', targetUid), {
+          discordTag: cleanDiscord,
+          minecraftNick: trainerNick
+        }, { merge: true });
+      }
+
+      // 3. Atualizar Encomendas
+      const ordersQuery = query(collection(adminDb, 'orders'), where('playerNick', '==', trainerNick));
+      const ordersSnap = await getDocs(ordersQuery);
+      
+      const updatePromises = ordersSnap.docs.map(orderDoc => 
+        updateDoc(doc(adminDb, 'orders', orderDoc.id), { discordNick: cleanDiscord })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Atualizar interface local
+      setOrders(prev => prev.map(o => o.playerNick === trainerNick ? { ...o, discordNick: cleanDiscord } : o));
+
+      alert("Dados do treinador sincronizados com sucesso!");
+    } catch (err: any) {
+      console.error("Erro ao sincronizar treinador:", err);
+      alert("Erro ao salvar: " + err.message);
       throw err;
+    }
+  };
+
+  const handleRepairDiscordLink = async (targetNick: string, newDiscord: string) => {
+    if (!targetNick.trim() || !newDiscord.trim()) return alert("Preencha ambos os campos.");
+    if (!window.confirm(`ATENÇÃO: Você está prestes a forçar o vínculo do Nick "${targetNick}" ao Discord "${newDiscord}". Isso afetará o login do cliente. Prosseguir?`)) return;
+
+    try {
+      const cleanNick = targetNick.trim();
+      const cleanDiscord = newDiscord.trim().toLowerCase();
+      
+      // 1. Localizar por Nick na coleção trainer_profiles
+      const q = query(collection(adminDb, 'trainer_profiles'), where('nick_lowercase', '==', cleanNick.toLowerCase()), limit(1));
+      const snap = await getDocs(q);
+      
+      const batch = writeBatch(adminDb);
+      let foundUid = '';
+
+      if (!snap.empty) {
+        const docRef = snap.docs[0].ref;
+        foundUid = snap.docs[0].id;
+        batch.set(docRef, {
+          discordTag: cleanDiscord,
+          discordNick: cleanDiscord,
+          uid: foundUid // Garantir que o UID esteja lá
+        }, { merge: true });
+
+        // 2. Mirror para coleção users
+        batch.set(doc(adminDb, 'users', foundUid), {
+          discordTag: cleanDiscord,
+          minecraftNick: cleanNick
+        }, { merge: true });
+      } else {
+        // Se não existir, criar um novo documento para evitar o erro de 'N/A'
+        const newRef = doc(collection(adminDb, 'trainer_profiles'));
+        foundUid = newRef.id;
+        batch.set(newRef, {
+          uid: foundUid,
+          displayName: cleanNick,
+          nick_lowercase: cleanNick.toLowerCase(),
+          discordTag: cleanDiscord,
+          discordNick: cleanDiscord,
+          createdAt: serverTimestamp(),
+          totalSpent: 0,
+          ordersCompletedCount: 0
+        });
+        
+        batch.set(doc(adminDb, 'users', foundUid), {
+          discordTag: cleanDiscord,
+          minecraftNick: cleanNick
+        }, { merge: true });
+      }
+
+      // 3. Atualizar Encomendas
+      const ordersQ = query(collection(adminDb, 'orders'), where('playerNick', '==', cleanNick));
+      const ordersSnap = await getDocs(ordersQ);
+      ordersSnap.forEach(o => {
+        batch.update(o.ref, { 
+          discordNick: cleanDiscord,
+          playerUid: foundUid // Sincroniza o UID em todas as ordens antigas
+        });
+      });
+
+      await batch.commit();
+      alert(`SINCROIZAÇÃO COMPLETA!\nNick: ${cleanNick}\nNovo Discord: ${cleanDiscord}\nO cliente agora pode logar.`);
+      
+      // Limpar campos
+      setRepairData({ nick: '', discord: '' });
+    } catch (err: any) {
+      console.error("Erro no Reparo:", err);
+      alert("Erro crítico no reparo: " + err.message);
     }
   };
 
@@ -1664,6 +1781,62 @@ export const AdminDashboard = () => {
                             <p className="text-[10px] text-gray-400 font-medium leading-relaxed">{item.d}</p>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EMERGENCY REPAIR TOOL */}
+                  <div className="bg-red-500/5 border border-red-500/20 rounded-3xl p-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.05] pointer-events-none">
+                      <ShieldCheck size={120} className="text-red-500" />
+                    </div>
+                    
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-red-500/20 rounded-lg text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                          <AlertCircle size={24} />
+                        </div>
+                        <div>
+                          <h4 className="pixel-title text-lg text-red-500 uppercase">REPARO DE EMERGÊNCIA: VÍNCULO DISCORD</h4>
+                          <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Use esta ferramenta apenas se o login do cliente estiver bloqueado ou divergente.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Minecraft Nick (Exato)</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ex: Masterreplay69"
+                            value={repairData.nick}
+                            onChange={(e) => setRepairData(prev => ({ ...prev, nick: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-red-500/50 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Novo Discord Tag (Exato)</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ex: mizuy_"
+                            value={repairData.discord}
+                            onChange={(e) => setRepairData(prev => ({ ...prev, discord: e.target.value }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-red-500/50 transition-all"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <button 
+                            onClick={() => handleRepairDiscordLink(repairData.nick, repairData.discord)}
+                            className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-red-900/40 flex items-center justify-center gap-2"
+                          >
+                            <ShieldCheck size={16} /> FORÇAR SINCRONIZAÇÃO
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 p-4 bg-black/40 rounded-2xl border border-white/5">
+                        <p className="text-[9px] text-gray-500 font-bold leading-relaxed uppercase">
+                          <span className="text-red-500">O QUE ESTA FERRAMENTA FAZ:</span> Ela varre as coleções <span className="text-white">trainer_profiles</span>, <span className="text-white">users</span> e <span className="text-white">orders</span> procurando pelo Nick informado e substitui o Discord vinculado pelo novo. Isso ignora qualquer erro de UID 'N/A' e cria o documento se ele não existir.
+                        </p>
                       </div>
                     </div>
                   </div>
