@@ -165,28 +165,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     if (!cleanNickId || !cleanDiscord) throw new Error("Preencha campos válidos (letras e números).");
     
-    await new Promise(resolve => setTimeout(resolve, 800));
-
     if (!isDiscordValid(discord)) {
-      throw new Error("A conta Discord '" + discord + "' não foi encontrada em nossos registros ou o formato é inválido.");
+      throw new Error("O formato do Discord '" + discord + "' é inválido. Use usuario#0000 ou o novo formato (ex: joao.poke).");
+    }
+
+    // Pre-check: Does this Nick already exist in trainer_profiles?
+    const profilesRef = collection(db, 'trainer_profiles');
+    const q = query(profilesRef, where('nick_lowercase', '==', cleanNick.toLowerCase()), limit(1));
+    const querySnapshot = await getDocs(q);
+    
+    let existingDiscord = '';
+    if (!querySnapshot.empty) {
+      const profileData = querySnapshot.docs[0].data();
+      existingDiscord = (profileData.discordTag || '').toLowerCase();
+      
+      // If profile exists and Discord is different, throw the divergence error early
+      if (existingDiscord && existingDiscord !== cleanDiscord) {
+        throw new Error(`Este Nick já está vinculado ao Discord "${existingDiscord}". Se este Nick é seu, use o Discord correto.`);
+      }
     }
 
     const email = `${cleanNickId}@valiantshop.com`;
     const password = `${cleanDiscord}123456`.slice(0, 16);
 
     try {
+      // Attempt login
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Sync display name if needed
       if (userCredential.user.displayName !== cleanNick) {
         await updateProfile(userCredential.user, { displayName: cleanNick });
       }
+
+      // If profile exists but didn't have discordTag (legacy), update it now
+      if (!querySnapshot.empty && !existingDiscord) {
+        await setDoc(doc(db, 'trainer_profiles', userCredential.user.uid), {
+          discordTag: cleanDiscord
+        }, { merge: true });
+      }
+
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        // If login fails but we didn't find a divergent discord in the pre-check,
+        // it might be a new user or a password mismatch for an account created with different logic.
+        
         try {
+          // Double check if email is in use (just in case)
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           await updateProfile(userCredential.user, { displayName: cleanNick });
+          
+          // Initial profile creation is handled by the useEffect, 
+          // but we want to ensure the discordTag is there.
+          await setDoc(doc(db, 'trainer_profiles', userCredential.user.uid), {
+            uid: userCredential.user.uid,
+            displayName: cleanNick,
+            nick_lowercase: cleanNick.toLowerCase(),
+            discordTag: cleanDiscord,
+            createdAt: serverTimestamp()
+          }, { merge: true });
+
         } catch (createErr: any) {
           if (createErr.code === 'auth/email-already-in-use') {
-            throw new Error("Este Nick já está em uso por outro Treinador (Discord divergente).");
+            throw new Error("Este Nick já está em uso por outro Treinador (Credenciais divergentes).");
           }
           throw createErr;
         }
