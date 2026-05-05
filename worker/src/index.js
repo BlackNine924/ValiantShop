@@ -721,7 +721,7 @@ export default {
           const query = { structuredQuery: { from: [{ collectionId: 'stock_rooms' }] } };
           const results = await queryFirestore(env, query, idToken);
           
-          const rooms = results.map(r => {
+          let rooms = results.map(r => {
             const d = r.document; if (!d) return null;
             const fields = d.fields;
             const pokemonList = fields.pokemonList?.arrayValue?.values?.map(v => v.stringValue) || [];
@@ -736,14 +736,18 @@ export default {
              return a.name.localeCompare(b.name, undefined, { numeric: true });
           });
 
+          // Filtrar se o pokémon foi especificado
+          if (highlightPoke) {
+            rooms = rooms.filter(room => 
+              room.pokemonList.some(p => p.toLowerCase().includes(highlightPoke))
+            );
+          }
+
           if (rooms.length === 0) {
-            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "❌ Nenhuma sala de estoque encontrada." }) });
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: highlightPoke ? `❌ Nenhum estoque encontrado para o pokémon \`${highlightPoke}\`.` : "❌ Nenhuma sala de estoque encontrada." }) });
             return;
           }
 
-          const embeds = [];
-          // Discord limits: max 10 embeds per message. Let's group rooms if needed or use fields.
-          // Better: One embed with multiple fields.
           const fields = rooms.map(room => {
             const list = room.pokemonList.map(p => {
               const isMatch = highlightPoke && p.toLowerCase().includes(highlightPoke);
@@ -756,12 +760,12 @@ export default {
             };
           });
 
-          // Split fields into multiple embeds if they exceed 25 (Discord limit per embed)
+          const embeds = [];
           for (let i = 0; i < fields.length; i += 25) {
             embeds.push({
-              title: i === 0 ? "🏪 SALAS DO ESTOQUE — VALIANTSHOP" : "🏪 SALAS DO ESTOQUE (Continuação)",
-              description: i === 0 ? "Abaixo estão listadas todas as salas de estoque e seus respectivos Pokémon cadastrados no site." : undefined,
-              color: 0x2ecc71,
+              title: i === 0 ? (highlightPoke ? `🔍 RESULTADO DE BUSCA: ${highlightPoke.toUpperCase()}` : "🏪 SALAS DO ESTOQUE — VALIANTSHOP") : "🏪 SALAS DO ESTOQUE (Continuação)",
+              description: i === 0 ? (highlightPoke ? `Exibindo apenas as salas que contém o pokémon solicitado.` : "Abaixo estão listadas todas as salas de estoque e seus respectivos Pokémon cadastrados no site.") : undefined,
+              color: highlightPoke ? 0xFFA500 : 0x2ecc71,
               fields: fields.slice(i, i + 25),
               footer: { text: "ValiantShop | Inventário em Tempo Real" },
               timestamp: new Date().toISOString()
@@ -771,7 +775,7 @@ export default {
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ embeds: embeds.slice(0, 10) }) // Max 10 embeds
+            body: JSON.stringify({ embeds: embeds.slice(0, 10) }) 
           });
         })());
         return jsonResponse({ type: 5 });
