@@ -52,7 +52,6 @@ export const AdminDashboard = () => {
   // const [isSyncingRank, setIsSyncingRank] = useState(false);
   
   const [repairData, setRepairData] = useState({ nick: '', discord: '' });
-  const [isRepairing, setIsRepairing] = useState(false);
   
   const getDisplayAbility = (item: any) => {
     if (!item || !item.pokemon) return item?.ability;
@@ -303,10 +302,6 @@ export const AdminDashboard = () => {
     }
   }; */
 
-  const isDiscordValid = (_tag: string) => {
-    // Permissivo: aceita qualquer string não vazia
-    return true;
-  };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
@@ -2016,7 +2011,7 @@ export const AdminDashboard = () => {
                                       )}
                                       {o.ignoredIvs && o.ignoredIvs.length > 0 && (
                                         <span className="text-[9px] px-2 py-0.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-md font-black uppercase">
-                                          Ignorar: {o.ignoredIvs.join(', ')}
+                                          Ignorar: {o.ignoredIvs.map((iv: string) => iv === 'QUALQUER' ? 'QUALQUER' : iv).join(', ')}
                                         </span>
                                       )}
                                       {o.giftNick && (

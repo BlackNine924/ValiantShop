@@ -200,7 +200,7 @@ function replacePlaceholders(text, data) {
     '{treinador}': data.playerNick || 'N/A',
     '{pokemon}': data.pokemon || 'N/A',
     '{ivs}': (data.ivs ? `F${data.ivs.toString().match(/\d+/)?.[0] || data.ivs.toString().replace('F', '')}` : 'N/A'),
-    '{ivs_detalhe}': ivsDetalhe,
+    '{ivs_detalhe}': ivsDetalhe.replace(/QUALQUER/g, 'QUALQUER'), // Mantém QUALQUER legível
     '{genero}': data.gender === 'Q' ? 'Qualquer' : (data.gender === 'G' ? 'Genderless' : (data.gender || 'N/A')),
     '{ability}': data.ability ? (data.hasHA ? `${data.ability} (HA)` : data.ability) : 'N/A',
     '{b/c}': data.isCastrated ? '(CASTRADO)' : '(BREEDABLE)',
@@ -478,6 +478,16 @@ export default {
         {
           name: "server",
           description: "🛡️ [ADMIN] Central de gerenciamento do servidor"
+        },
+        {
+          name: "salas_estoque",
+          description: "🏪 [LOGÍSTICA] Visualizar salas do estoque em tempo real",
+          options: [{
+            name: "pokemon",
+            description: "Nome do Pokémon para destacar na lista",
+            type: 3,
+            required: false
+          }]
         }
       ];
       await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { 
@@ -700,6 +710,69 @@ export default {
           const cfg = await getEmbedConfig(env, 'tabela', idToken);
           const embed = buildEmbedFromConfig(cfg, {});
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
+        })());
+        return jsonResponse({ type: 5 });
+      }
+
+      if (interaction.type === 2 && interaction.data.name === 'salas_estoque') {
+        const highlightPoke = interaction.data.options?.find(o => o.name === 'pokemon')?.value?.toLowerCase();
+        ctx.waitUntil((async () => {
+          const idToken = await getFirebaseToken(env);
+          const query = { structuredQuery: { from: [{ collectionId: 'stock_rooms' }] } };
+          const results = await queryFirestore(env, query, idToken);
+          
+          const rooms = results.map(r => {
+            const d = r.document; if (!d) return null;
+            const fields = d.fields;
+            const pokemonList = fields.pokemonList?.arrayValue?.values?.map(v => v.stringValue) || [];
+            return {
+              name: fields.name?.stringValue || 'Sem Nome',
+              pokemonList
+            };
+          }).filter(Boolean).sort((a, b) => {
+             const numA = parseInt(a.name.replace(/\D/g, ''), 10);
+             const numB = parseInt(b.name.replace(/\D/g, ''), 10);
+             if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+             return a.name.localeCompare(b.name, undefined, { numeric: true });
+          });
+
+          if (rooms.length === 0) {
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "❌ Nenhuma sala de estoque encontrada." }) });
+            return;
+          }
+
+          const embeds = [];
+          // Discord limits: max 10 embeds per message. Let's group rooms if needed or use fields.
+          // Better: One embed with multiple fields.
+          const fields = rooms.map(room => {
+            const list = room.pokemonList.map(p => {
+              const isMatch = highlightPoke && p.toLowerCase().includes(highlightPoke);
+              return isMatch ? `**${p}**` : p;
+            }).join(', ') || 'Vazia';
+            return {
+              name: `📦 ${room.name.toUpperCase()}`,
+              value: list,
+              inline: false
+            };
+          });
+
+          // Split fields into multiple embeds if they exceed 25 (Discord limit per embed)
+          for (let i = 0; i < fields.length; i += 25) {
+            embeds.push({
+              title: i === 0 ? "🏪 SALAS DO ESTOQUE — VALIANTSHOP" : "🏪 SALAS DO ESTOQUE (Continuação)",
+              description: i === 0 ? "Abaixo estão listadas todas as salas de estoque e seus respectivos Pokémon cadastrados no site." : undefined,
+              color: 0x2ecc71,
+              fields: fields.slice(i, i + 25),
+              footer: { text: "ValiantShop | Inventário em Tempo Real" },
+              timestamp: new Date().toISOString()
+            });
+          }
+
+          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+            method: 'PATCH', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ embeds: embeds.slice(0, 10) }) // Max 10 embeds
+          });
         })());
         return jsonResponse({ type: 5 });
       }

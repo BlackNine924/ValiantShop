@@ -770,6 +770,43 @@ export const OrderForm = () => {
                         </button>
                       );
                     })}
+
+                    {/* ✨ Botões QUALQUER (Dinamicos) */}
+                    {Array.from({ length: IV_DETAILS[form.ivs].numIgnored }).map((_, idx) => {
+                      // Conta quantos "QUALQUER" já foram selecionados
+                      const selectedAnyCount = form.ignoredIvs.filter((i: string) => i === 'QUALQUER').length;
+                      const isThisSelected = idx < selectedAnyCount;
+
+                      return (
+                        <button
+                          key={`any-${idx}`}
+                          onClick={() => {
+                            if (isThisSelected) {
+                              // Remove um "QUALQUER" (o último encontrado)
+                              const indexToRemove = form.ignoredIvs.lastIndexOf('QUALQUER');
+                              if (indexToRemove !== -1) {
+                                const newIgnored = [...form.ignoredIvs];
+                                newIgnored.splice(indexToRemove, 1);
+                                setForm({ ...form, ignoredIvs: newIgnored });
+                              }
+                            } else {
+                              if (form.ignoredIvs.length < IV_DETAILS[form.ivs].numIgnored) {
+                                setForm({ ...form, ignoredIvs: [...form.ignoredIvs, 'QUALQUER'] });
+                              }
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-xl font-bold transition-all border-2 ${
+                            isThisSelected 
+                              ? 'bg-secondary/20 border-secondary text-secondary shadow-[0_0_15px_var(--secondary-glow)]' 
+                              : form.ignoredIvs.length >= IV_DETAILS[form.ivs].numIgnored
+                                ? 'bg-black/50 border-white/5 text-gray-700 cursor-not-allowed'
+                                : 'bg-black/50 border-white/10 text-gray-400 hover:border-secondary/50 hover:text-secondary'
+                          }`}
+                        >
+                          -QUALQUER
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
