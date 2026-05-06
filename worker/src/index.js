@@ -520,11 +520,7 @@ export default {
               required: false,
               choices: [
                 { name: "Iniciais", value: "starter" },
-                { name: "Semi-Lendários", value: "pseudo" },
-                { name: "Lendários", value: "legendary" },
-                { name: "Míticos", value: "mythical" },
-                { name: "Ultra Beasts", value: "ub" },
-                { name: "Paradox", value: "paradox" }
+                { name: "Semi-Lendários", value: "pseudo" }
               ]
             }
           ]
@@ -794,28 +790,63 @@ export default {
           if (hasPokeFilters) {
             rooms = rooms.map(room => {
               const filteredList = room.pokemonList.filter(p => {
-                const pokeData = POKEMON_DB[p] || Object.values(POKEMON_DB).find(val => val.name?.toLowerCase() === p.toLowerCase());
-                if (!pokeData) return false;
+                const info = getPokeInfo(p);
+                if (!info) return false;
 
-                // Egg Group
-                if (filterEgg && !pokeData.e?.some(e => e.toLowerCase() === filterEgg)) return false;
+                // 1. Egg Group
+                if (filterEgg && !info.e?.some(e => e.toLowerCase() === filterEgg)) return false;
 
-                // Tipos
+                // 2. Tipos (Deve ter TODOS os tipos especificados)
                 if (filterTypes && filterTypes.length > 0) {
-                  const pTypes = (pokeData.t || []).map(t => t.toLowerCase());
-                  if (!filterTypes.every(ft => pTypes.includes(ft))) return false;
+                   const typesRaw = info.t || [];
+                   const pTypes = typesRaw.map(t => t.toLowerCase());
+                   if (!filterTypes.every(ft => pTypes.includes(ft))) return false;
                 }
 
-                // Gen (Calculado pelo ID se não houver campo explícito, ou use campo 'g' se existir)
+                // 3. Gen (Lógica baseada em faixas de ID de Kanto a Paldea)
                 if (filterGen) {
-                  const gen = pokeData.g; // Campo 'g' no pokemonDb.js
-                  if (gen !== filterGen) return false;
+                  const id = info.id;
+                  let pGen = 0;
+                  if (id >= 1 && id <= 151) pGen = 1;
+                  else if (id >= 152 && id <= 251) pGen = 2;
+                  else if (id >= 252 && id <= 386) pGen = 3;
+                  else if (id >= 387 && id <= 493) pGen = 4;
+                  else if (id >= 494 && id <= 649) pGen = 5;
+                  else if (id >= 650 && id <= 721) pGen = 6;
+                  else if (id >= 722 && id <= 809) pGen = 7;
+                  else if (id >= 810 && id <= 905) pGen = 8;
+                  else if (id >= 906 && id <= 1025) pGen = 9;
+                  
+                  if (pGen !== filterGen) return false;
                 }
 
-                // Categoria (Campo 'c' no pokemonDb.js: s=starter, p=pseudo, l=legend, m=mythic, u=ub, x=paradox)
+                // 4. Categoria (Iniciais e Pseudos)
                 if (filterCategory) {
-                  const catMap = { starter: 's', pseudo: 'p', legendary: 'l', mythical: 'm', ub: 'u', paradox: 'x' };
-                  if (pokeData.c !== catMap[filterCategory]) return false;
+                  const id = info.id;
+                  if (filterCategory === 'starter') {
+                    // IDs dos iniciais (Bulbasaur, Charmander, Squirtle e suas evoluções, etc)
+                    const starters = [
+                      1,2,3, 4,5,6, 7,8,9, // Gen 1
+                      152,153,154, 155,156,157, 158,159,160, // Gen 2
+                      252,253,254, 255,256,257, 258,259,260, // Gen 3
+                      387,388,389, 390,391,392, 393,394,395, // Gen 4
+                      495,496,497, 498,499,500, 501,502,503, // Gen 5
+                      650,651,652, 653,654,655, 656,657,658, // Gen 6
+                      722,723,724, 725,726,727, 728,729,730, // Gen 7
+                      810,811,812, 813,814,815, 816,817,818, // Gen 8
+                      906,907,908, 909,910,911, 912,913,914  // Gen 9
+                    ];
+                    if (!starters.includes(id)) return false;
+                  }
+                  if (filterCategory === 'pseudo') {
+                    // Pseudos comuns
+                    const pseudos = [
+                      147,148,149, 246,247,248, 371,372,373, 374,375,376, 
+                      443,444,445, 633,634,635, 704,705,706, 782,783,784, 
+                      885,886,887, 996,997,998
+                    ];
+                    if (!pseudos.includes(id)) return false;
+                  }
                 }
 
                 return true;
