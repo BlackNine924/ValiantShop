@@ -500,6 +500,32 @@ export default {
               description: "Filtrar por Egg Group (Ex: Field, Monster)",
               type: 3,
               required: false
+            },
+            {
+              name: "tipos",
+              description: "Filtrar por tipos (Ex: Fire, Water)",
+              type: 3,
+              required: false
+            },
+            {
+              name: "gen",
+              description: "Filtrar por Geração (1-9)",
+              type: 4,
+              required: false
+            },
+            {
+              name: "categoria",
+              description: "Filtrar por categoria especial",
+              type: 3,
+              required: false,
+              choices: [
+                { name: "Iniciais", value: "starter" },
+                { name: "Semi-Lendários", value: "pseudo" },
+                { name: "Lendários", value: "legendary" },
+                { name: "Míticos", value: "mythical" },
+                { name: "Ultra Beasts", value: "ub" },
+                { name: "Paradox", value: "paradox" }
+              ]
             }
           ]
         }
@@ -732,6 +758,9 @@ export default {
         const highlightPoke = interaction.data.options?.find(o => o.name === 'pokemon')?.value?.toLowerCase();
         const filterSalas = interaction.data.options?.find(o => o.name === 'salas')?.value?.toLowerCase()?.split(',')?.map(s => s.trim());
         const filterEgg = interaction.data.options?.find(o => o.name === 'egg_group')?.value?.toLowerCase();
+        const filterTypes = interaction.data.options?.find(o => o.name === 'tipos')?.value?.toLowerCase()?.split(',')?.map(s => s.trim());
+        const filterGen = interaction.data.options?.find(o => o.name === 'gen')?.value;
+        const filterCategory = interaction.data.options?.find(o => o.name === 'categoria')?.value;
 
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
@@ -753,25 +782,49 @@ export default {
              return a.name.localeCompare(b.name, undefined, { numeric: true });
           });
 
-          // 1. Filtrar por salas se especificado
+          // 1. Filtrar por salas (Lógica flexível: 1, 2, Sala 1, etc)
           if (filterSalas && filterSalas.length > 0) {
             rooms = rooms.filter(room => 
               filterSalas.some(s => room.name.toLowerCase().includes(s))
             );
           }
 
-          // 2. Filtrar por Egg Group se especificado
-          if (filterEgg) {
+          // 2. Aplicar filtros de Pokémon (Egg, Tipos, Gen, Categoria)
+          const hasPokeFilters = filterEgg || filterTypes || filterGen || filterCategory;
+          if (hasPokeFilters) {
             rooms = rooms.map(room => {
               const filteredList = room.pokemonList.filter(p => {
                 const pokeData = POKEMON_DB[p] || Object.values(POKEMON_DB).find(val => val.name?.toLowerCase() === p.toLowerCase());
-                return pokeData?.e?.some(e => e.toLowerCase() === filterEgg);
+                if (!pokeData) return false;
+
+                // Egg Group
+                if (filterEgg && !pokeData.e?.some(e => e.toLowerCase() === filterEgg)) return false;
+
+                // Tipos
+                if (filterTypes && filterTypes.length > 0) {
+                  const pTypes = (pokeData.t || []).map(t => t.toLowerCase());
+                  if (!filterTypes.every(ft => pTypes.includes(ft))) return false;
+                }
+
+                // Gen (Calculado pelo ID se não houver campo explícito, ou use campo 'g' se existir)
+                if (filterGen) {
+                  const gen = pokeData.g; // Campo 'g' no pokemonDb.js
+                  if (gen !== filterGen) return false;
+                }
+
+                // Categoria (Campo 'c' no pokemonDb.js: s=starter, p=pseudo, l=legend, m=mythic, u=ub, x=paradox)
+                if (filterCategory) {
+                  const catMap = { starter: 's', pseudo: 'p', legendary: 'l', mythical: 'm', ub: 'u', paradox: 'x' };
+                  if (pokeData.c !== catMap[filterCategory]) return false;
+                }
+
+                return true;
               });
               return { ...room, pokemonList: filteredList };
             }).filter(room => room.pokemonList.length > 0);
           }
 
-          // 3. Filtrar por pokémon se especificado (AND logic with other filters)
+          // 3. Filtrar por pokémon específico (AND logic)
           if (highlightPoke) {
             rooms = rooms.filter(room => 
               room.pokemonList.some(p => p.toLowerCase().includes(highlightPoke))
@@ -780,7 +833,7 @@ export default {
 
           if (rooms.length === 0) {
             let errorMsg = "❌ Nenhuma sala encontrada com os filtros aplicados.";
-            if (!highlightPoke && !filterSalas && !filterEgg) errorMsg = "❌ Nenhuma sala de estoque cadastrada no sistema.";
+            if (!highlightPoke && !filterSalas && !hasPokeFilters) errorMsg = "❌ Nenhuma sala de estoque cadastrada no sistema.";
             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
               method: 'PATCH', 
               headers: { 'Content-Type': 'application/json' }, 
@@ -789,7 +842,7 @@ export default {
             return;
           }
 
-          const hasFilters = highlightPoke || filterSalas || filterEgg;
+          const hasAnyFilter = highlightPoke || filterSalas || hasPokeFilters;
           const fields = rooms.map(room => {
             const list = room.pokemonList.map(p => {
               const isMatch = highlightPoke && p.toLowerCase().includes(highlightPoke);
@@ -799,7 +852,7 @@ export default {
             return {
               name: `📦 ${room.name.toUpperCase()}`,
               value: list,
-              inline: !hasFilters // Se tiver filtros, deixamos vertical para melhor leitura. Se não tiver, compactamos.
+              inline: !hasAnyFilter
             };
           });
 
@@ -807,16 +860,13 @@ export default {
           for (let i = 0; i < fields.length; i += 25) {
             const embed = {
               title: i === 0 ? "🏪 SALAS DO ESTOQUE — VALIANTSHOP" : "🏪 SALAS DO ESTOQUE (Continuação)",
-              color: hasFilters ? 0xFFA500 : 0x2ecc71,
+              color: hasAnyFilter ? 0xFFA500 : 0x2ecc71,
               fields: fields.slice(i, i + 25),
-              footer: { text: `ValiantShop | Inventário (${rooms.length} salas exibidas)` },
+              footer: { text: `ValiantShop | Inventário (${rooms.length} salas)` },
               timestamp: new Date().toISOString()
             };
-
             if (i === 0) {
-              let desc = "Abaixo estão listadas as salas de estoque conforme solicitado.";
-              if (!hasFilters) desc = "Visão geral compacta de todas as salas de estoque ativas no sistema.";
-              embed.description = desc;
+              embed.description = hasAnyFilter ? "Filtros aplicados. Exibindo apenas os resultados correspondentes." : "Visão geral compacta de todas as salas de estoque.";
             }
             embeds.push(embed);
           }
