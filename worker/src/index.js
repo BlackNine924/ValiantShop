@@ -482,12 +482,26 @@ export default {
         {
           name: "salas_estoque",
           description: "🏪 [LOGÍSTICA] Visualizar salas do estoque em tempo real",
-          options: [{
-            name: "pokemon",
-            description: "Nome do Pokémon para destacar na lista",
-            type: 3,
-            required: false
-          }]
+          options: [
+            {
+              name: "pokemon",
+              description: "Nome do Pokémon para destacar ou filtrar",
+              type: 3,
+              required: false
+            },
+            {
+              name: "salas",
+              description: "Filtrar por salas específicas (Ex: Sala 1, Sala 2)",
+              type: 3,
+              required: false
+            },
+            {
+              name: "egg_group",
+              description: "Filtrar por Egg Group (Ex: Field, Monster)",
+              type: 3,
+              required: false
+            }
+          ]
         }
       ];
       await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { 
@@ -716,6 +730,9 @@ export default {
 
       if (interaction.type === 2 && interaction.data.name === 'salas_estoque') {
         const highlightPoke = interaction.data.options?.find(o => o.name === 'pokemon')?.value?.toLowerCase();
+        const filterSalas = interaction.data.options?.find(o => o.name === 'salas')?.value?.toLowerCase()?.split(',')?.map(s => s.trim());
+        const filterEgg = interaction.data.options?.find(o => o.name === 'egg_group')?.value?.toLowerCase();
+
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
           const query = { structuredQuery: { from: [{ collectionId: 'stock_rooms' }] } };
@@ -736,7 +753,25 @@ export default {
              return a.name.localeCompare(b.name, undefined, { numeric: true });
           });
 
-          // Filtrar se o pokémon foi especificado
+          // 1. Filtrar por salas se especificado
+          if (filterSalas && filterSalas.length > 0) {
+            rooms = rooms.filter(room => 
+              filterSalas.some(s => room.name.toLowerCase().includes(s))
+            );
+          }
+
+          // 2. Filtrar por Egg Group se especificado
+          if (filterEgg) {
+            rooms = rooms.map(room => {
+              const filteredList = room.pokemonList.filter(p => {
+                const pokeData = POKEMON_DB[p] || Object.values(POKEMON_DB).find(val => val.name?.toLowerCase() === p.toLowerCase());
+                return pokeData?.e?.some(e => e.toLowerCase() === filterEgg);
+              });
+              return { ...room, pokemonList: filteredList };
+            }).filter(room => room.pokemonList.length > 0);
+          }
+
+          // 3. Filtrar por pokémon se especificado (AND logic with other filters)
           if (highlightPoke) {
             rooms = rooms.filter(room => 
               room.pokemonList.some(p => p.toLowerCase().includes(highlightPoke))
@@ -744,32 +779,46 @@ export default {
           }
 
           if (rooms.length === 0) {
-            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: highlightPoke ? `❌ Nenhum estoque encontrado para o pokémon \`${highlightPoke}\`.` : "❌ Nenhuma sala de estoque encontrada." }) });
+            let errorMsg = "❌ Nenhuma sala encontrada com os filtros aplicados.";
+            if (!highlightPoke && !filterSalas && !filterEgg) errorMsg = "❌ Nenhuma sala de estoque cadastrada no sistema.";
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+              method: 'PATCH', 
+              headers: { 'Content-Type': 'application/json' }, 
+              body: JSON.stringify({ content: errorMsg }) 
+            });
             return;
           }
 
+          const hasFilters = highlightPoke || filterSalas || filterEgg;
           const fields = rooms.map(room => {
             const list = room.pokemonList.map(p => {
               const isMatch = highlightPoke && p.toLowerCase().includes(highlightPoke);
               return isMatch ? `**${p}**` : p;
             }).join(', ') || 'Vazia';
+            
             return {
               name: `📦 ${room.name.toUpperCase()}`,
               value: list,
-              inline: false
+              inline: !hasFilters // Se tiver filtros, deixamos vertical para melhor leitura. Se não tiver, compactamos.
             };
           });
 
           const embeds = [];
           for (let i = 0; i < fields.length; i += 25) {
-            embeds.push({
-              title: i === 0 ? (highlightPoke ? `🔍 RESULTADO DE BUSCA: ${highlightPoke.toUpperCase()}` : "🏪 SALAS DO ESTOQUE — VALIANTSHOP") : "🏪 SALAS DO ESTOQUE (Continuação)",
-              description: i === 0 ? (highlightPoke ? `Exibindo apenas as salas que contém o pokémon solicitado.` : "Abaixo estão listadas todas as salas de estoque e seus respectivos Pokémon cadastrados no site.") : undefined,
-              color: highlightPoke ? 0xFFA500 : 0x2ecc71,
+            const embed = {
+              title: i === 0 ? "🏪 SALAS DO ESTOQUE — VALIANTSHOP" : "🏪 SALAS DO ESTOQUE (Continuação)",
+              color: hasFilters ? 0xFFA500 : 0x2ecc71,
               fields: fields.slice(i, i + 25),
-              footer: { text: "ValiantShop | Inventário em Tempo Real" },
+              footer: { text: `ValiantShop | Inventário (${rooms.length} salas exibidas)` },
               timestamp: new Date().toISOString()
-            });
+            };
+
+            if (i === 0) {
+              let desc = "Abaixo estão listadas as salas de estoque conforme solicitado.";
+              if (!hasFilters) desc = "Visão geral compacta de todas as salas de estoque ativas no sistema.";
+              embed.description = desc;
+            }
+            embeds.push(embed);
           }
 
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
