@@ -99,6 +99,19 @@ const DEFAULT_EMBEDS = {
     ],
     components: [
       { label: 'Site Oficial', style: 5, url: 'https://valiantshop.pages.dev', emoji: { name: '🌐' } }
+    ],
+    selects: [
+      {
+        placeholder: 'Selecione uma categoria...',
+        custom_id: 'help_menu',
+        options: [
+          { label: '🏠 Início', value: 'help_home', description: 'Voltar para a tela inicial.' },
+          { label: '📦 Logística & Pedidos', value: 'help_logistics', description: 'Comandos de balanço, resumo e histórico.' },
+          { label: '🛠️ Ferramentas & Estoque', value: 'help_tools', description: 'Tabela de preços, salas de estoque e utilitários.' },
+          { label: '⚙️ Configurações', value: 'help_settings', description: 'Ajustes de identidade, avatar e status.' },
+          { label: '📄 Personalização', value: 'help_system', description: 'Edição de embeds, modais e botões.' }
+        ]
+      }
     ]
   },
   cliente: {
@@ -257,6 +270,40 @@ function buildEmbedFromConfig(cfg, order) {
   };
 }
 
+function buildFinalComponents(cfg) {
+  const rows = [];
+  if (cfg.selects && cfg.selects.length > 0) {
+    cfg.selects.forEach(s => {
+      rows.push({
+        type: 1,
+        components: [{
+          type: 3,
+          custom_id: s.custom_id,
+          placeholder: s.placeholder,
+          options: s.options.map(o => ({
+            label: o.label.substring(0, 100),
+            value: o.value.substring(0, 100),
+            description: o.description ? o.description.substring(0, 100) : undefined
+          })).slice(0, 25)
+        }]
+      });
+    });
+  }
+  if (cfg.components && cfg.components.length > 0) {
+    const btns = cfg.components.map((b, i) => {
+      let btn = { type: 2, label: b.label.substring(0, 80), style: b.style };
+      if (b.emoji) btn.emoji = b.emoji;
+      if (b.style === 5) btn.url = b.url;
+      else btn.custom_id = b.custom_id || `custom_btn_${i}`;
+      return btn;
+    });
+    for (let i = 0; i < btns.length; i += 5) {
+      rows.push({ type: 1, components: btns.slice(i, i + 5) });
+    }
+  }
+  return rows.slice(0, 5);
+}
+
 async function getEmbedConfig(env, type, idToken) {
   const doc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
   let cfg = DEFAULT_EMBEDS[type] || { fields: [], components: [], selects: [], modals: [] };
@@ -288,7 +335,10 @@ async function getEmbedConfig(env, type, idToken) {
       selects: f.selects?.arrayValue?.values?.map(v => ({
         placeholder: v.mapValue.fields.placeholder.stringValue,
         custom_id: v.mapValue.fields.custom_id.stringValue,
-        options: v.mapValue.fields.options.stringValue.split(',').map(o => ({ label: o.trim(), value: o.trim() }))
+        options: v.mapValue.fields.options.stringValue.split(',').map(o => {
+          const parts = o.split('|');
+          return { label: parts[0].trim(), value: parts[0].trim(), description: parts[1] ? parts[1].trim() : undefined };
+        })
       })) || cfg.selects || [],
       modals: f.modals?.arrayValue?.values?.map(v => ({
         title: v.mapValue.fields.title.stringValue,
@@ -512,11 +562,15 @@ export default {
           });
           
           const embed = buildEmbedFromConfig(cfg, mockOrder);
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+          const res = await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ embeds: [embed], components: buildEmbedEditorButtons(type) }) 
           });
+          if (!res.ok) {
+             const err = await res.text();
+             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Erro da API Discord ao salvar:\n\`\`\`json\n${err}\n\`\`\`` }) });
+          }
         })());
         return jsonResponse({ type: 5 });
       }
@@ -526,43 +580,17 @@ export default {
           const idToken = await getFirebaseToken(env);
           const cfg = await getEmbedConfig(env, 'help', idToken);
           const embed = buildEmbedFromConfig(cfg, mockOrder);
-          
-          const components = [
-            {
-              type: 1,
-              components: [
-                {
-                  type: 3,
-                  custom_id: 'help_menu',
-                  placeholder: cfg.selects?.[0]?.placeholder || 'Selecione uma categoria...',
-                  options: [
-                    { label: '🏠 Início', value: 'help_home', description: 'Voltar para a tela inicial.', emoji: { name: '🏠' } },
-                    { label: '📦 Logística & Pedidos', value: 'help_logistics', description: 'Comandos de balanço, resumo e histórico.', emoji: { name: '📦' } },
-                    { label: '🛠️ Ferramentas & Estoque', value: 'help_tools', description: 'Tabela de preços, salas de estoque e utilitários.', emoji: { name: '🛠️' } },
-                    { label: '⚙️ Configurações', value: 'help_settings', description: 'Ajustes de identidade, avatar e status.', emoji: { name: '⚙️' } },
-                    { label: '📄 Personalização', value: 'help_system', description: 'Edição de embeds, modais e botões.', emoji: { name: '📄' } }
-                  ]
-                }
-              ]
-            }
-          ];
+          const components = buildFinalComponents(cfg);
 
-          if (cfg.components && cfg.components.length > 0) {
-            components.push({ type: 1, components: cfg.components.slice(0, 5) });
-          } else {
-            components.push({
-              type: 1,
-              components: [
-                { type: 2, label: 'Site Oficial', style: 5, url: 'https://valiantshop.pages.dev', emoji: { name: '🌐' } }
-              ]
-            });
-          }
-
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+          const res = await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ embeds: [embed], components }) 
           });
+          if (!res.ok) {
+            const err = await res.text();
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Erro na configuração do painel:\n\`\`\`json\n${err}\n\`\`\`` }) });
+          }
         })());
         return jsonResponse({ type: 5 });
       }
@@ -689,11 +717,15 @@ export default {
           }
 
           const embed = buildEmbedFromConfig(cfg, data);
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+          const res = await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ embeds: [embed] }) 
+            body: JSON.stringify({ embeds: [embed], components: buildFinalComponents(cfg) }) 
           });
+          if (!res.ok) {
+            const err = await res.text();
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Erro da API:\n\`\`\`json\n${err}\n\`\`\`` }) });
+          }
         })());
         return jsonResponse({ type: 5 });
       }
@@ -722,11 +754,15 @@ export default {
           }
 
           const embed = buildEmbedFromConfig(cfg, data);
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+          const res = await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ embeds: [embed] }) 
+            body: JSON.stringify({ embeds: [embed], components: buildFinalComponents(cfg) }) 
           });
+          if (!res.ok) {
+            const err = await res.text();
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Erro da API:\n\`\`\`json\n${err}\n\`\`\`` }) });
+          }
         })());
         return jsonResponse({ type: 5 });
       }
@@ -736,11 +772,15 @@ export default {
           const idToken = await getFirebaseToken(env);
           const cfg = await getEmbedConfig(env, 'tabela', idToken);
           const embed = buildEmbedFromConfig(cfg, {});
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+          const res = await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
             method: 'PATCH', 
             headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ embeds: [embed] }) 
+            body: JSON.stringify({ embeds: [embed], components: buildFinalComponents(cfg) }) 
           });
+          if (!res.ok) {
+            const err = await res.text();
+            await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Erro da API:\n\`\`\`json\n${err}\n\`\`\`` }) });
+          }
         })());
         return jsonResponse({ type: 5 });
       }
