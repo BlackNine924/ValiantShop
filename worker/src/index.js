@@ -95,9 +95,9 @@ const DEFAULT_EMBEDS = {
     ],
     components: []
   },
-  caixa: {
+  balance: {
     title: '💰 BALANÇO FINANCEIRO',
-    description: 'Relatório consolidado de lucros da ValiantShop.\n\n💰 **Lucro Total:** `{caixa}`',
+    description: 'Relatório consolidado de lucros da ValiantShop.\n\n💰 **Lucro Total:** `{balance}`',
     color: '0x2ECC71',
     footer: 'Atualizado em tempo real',
     author: 'Gestão Financeira',
@@ -109,7 +109,7 @@ const DEFAULT_EMBEDS = {
     title: '📊 PERFORMANCE DIÁRIA',
     description: 'Detalhamento das operações realizadas nas últimas 24 horas.',
     color: '0x3498DB',
-    footer: 'ValiantShop Logistics',
+    footer: 'ValiantShop Logistics • {data}',
     author: 'Painel de Operações',
     fields: [
       { name: '🟠 Pendentes', value: '`{pendente}`', inline: true },
@@ -117,6 +117,22 @@ const DEFAULT_EMBEDS = {
       { name: '🟢 Finalizados', value: '`{finalizado}`', inline: true },
       { name: '🔵 Entregues', value: '`{entregue}`', inline: true },
       { name: '💰 Total do Dia', value: '**{total_dia}**', inline: false }
+    ],
+    components: []
+  },
+  help: {
+    title: '🌟 CENTRAL DE AJUDA VALIANTSHOP',
+    description: 'Bem-vindo ao centro de comando do **ValiantShop**. Aqui você encontra todos os detalhes das funções operacionais logísticas do servidor.\n\nUtilize os comandos de barra (`/`) para acessar os sistemas abaixo.',
+    color: '0xFACC15',
+    footer: 'ValiantShop — Suporte Automático',
+    author: 'Central de Inteligência',
+    thumbnail: 'https://cdn-icons-png.flaticon.com/512/1067/1067566.png',
+    fields: [
+      { name: '👤 `/cliente [discord]`', value: 'Busca o perfil e o histórico detalhado de compras de um jogador pelo seu **Nickname do Discord**.\n*Ex: /cliente discord: reskallaarthur*', inline: false },
+      { name: '📊 `/resumo`', value: 'Gera um relatório de performance mostrando o volume de operações (pendentes, breedings, entregues) e a receita gerada nas **últimas 24 horas**.', inline: false },
+      { name: '💰 `/balance`', value: 'Apresenta o balanço financeiro e o **lucro total histórico** já faturado pela ValiantShop.', inline: false },
+      { name: '🎨 `/editar_embed`', value: 'Painel administrativo para customizar **todas** as Embeds do bot de forma visual (título, cor, foto, textos).', inline: false },
+      { name: '📦 Outros Comandos', value: '`/salas_estoque` - Consulta do inventário de baús.\n`/tabela` - Lista de preços oficial.\n`/config_bot` - Ajuste de canal logístico.', inline: false }
     ],
     components: []
   },
@@ -284,8 +300,10 @@ function replacePlaceholders(text, data, templateType = 'notificacao') {
     '{obs}': data.observations || 'Nenhuma',
     '{discord}': data.discordNick || 'N/A',
     '{egg}': data.eggGroup || info?.e?.join(', ') || 'N/A',
-    '{caixa}': data.caixa || '0',
+    '{balance}': data.balance || '0',
+    '{caixa}': data.caixa || data.balance || '0',
     '{total_dia}': data.total_dia || '0',
+    '{data}': data.data || '',
     '{status}': (STATUS_CONFIG[data.status || 'Pendente']?.emoji || '') + ' ' + (STATUS_CONFIG[data.status || 'Pendente']?.label || 'Pendente'),
     '{sprite}': info ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${info.id}.png` : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
     '{pendente}': data.pendente || data.Pendente || '0',
@@ -523,31 +541,36 @@ export default {
               { name: "Encomenda Geral", value: "notificacao" }, 
               { name: "Encomenda Competitiva", value: "notificacao_competitiva" },
               { name: "Cancelamento", value: "cancelamento" },
-              { name: "Caixa", value: "caixa" },
+              { name: "Balance", value: "balance" },
               { name: "Resumo", value: "resumo" },
               { name: "Cliente", value: "cliente" },
               { name: "Tabela", value: "tabela" },
-              { name: "Bot Config", value: "config_bot" }
+              { name: "Bot Config", value: "config_bot" },
+              { name: "Help", value: "help" }
             ] 
           }] 
         },
         {
           name: "cliente",
-          description: "🎨 [SISTEMA] Histórico e detalhes do cliente via ID do Site",
+          description: "🎨 [SISTEMA] Histórico e detalhes do cliente via Nick do Discord",
           options: [{
-            name: "id_site",
-            description: "ID Sequencial do Treinador (Ex: 00001)",
+            name: "discord",
+            description: "Nick do Discord do Treinador (Ex: reskallaarthur)",
             type: 3,
             required: true
           }]
         },
         {
-          name: "caixa",
+          name: "balance",
           description: "📦 [LOGÍSTICA] Lucro total da loja em tempo real"
         },
         {
           name: "resumo",
-          description: "📦 [LOGÍSTICA] Painel de pedidos e valores do dia"
+          description: "📦 [LOGÍSTICA] Painel de pedidos e valores das últimas 24 horas"
+        },
+        {
+          name: "help",
+          description: "🌟 [INFO] Central de ajuda e comandos da ValiantShop"
         },
         {
           name: "config_bot",
@@ -732,15 +755,15 @@ export default {
          return jsonResponse({ type: 5 });
       }
 
-      if (interaction.type === 2 && interaction.data.name === 'caixa') {
+      if (interaction.type === 2 && interaction.data.name === 'balance') {
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
           const query = { structuredQuery: { from: [{ collectionId: 'orders' }], select: { fields: [{ fieldPath: 'totalPrice' }] } } };
           const results = await queryFirestore(env, query, idToken);
           const total = results.reduce((acc, r) => acc + (parseInt(r.document?.fields?.totalPrice?.integerValue || r.document?.fields?.totalPrice?.doubleValue || 0)), 0);
           const formatted = total >= 1000000 ? `${(total/1000000).toFixed(2)}kk` : `${(total/1000).toFixed(0)}k`;
-          const cfg = await getEmbedConfig(env, 'caixa', idToken);
-          const embed = buildEmbedFromConfig(cfg, { caixa: formatted });
+          const cfg = await getEmbedConfig(env, 'balance', idToken);
+          const embed = buildEmbedFromConfig(cfg, { balance: formatted });
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
         })());
         return jsonResponse({ type: 5 });
@@ -749,8 +772,8 @@ export default {
       if (interaction.type === 2 && interaction.data.name === 'resumo') {
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
-          const today = new Date(); today.setHours(0,0,0,0);
-          const query = { structuredQuery: { from: [{ collectionId: 'orders' }], where: { fieldFilter: { field: { fieldPath: 'createdAt' }, op: 'GREATER_THAN_OR_EQUAL', value: { timestampValue: today.toISOString() } } } } };
+          const past24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const query = { structuredQuery: { from: [{ collectionId: 'orders' }], where: { fieldFilter: { field: { fieldPath: 'createdAt' }, op: 'GREATER_THAN_OR_EQUAL', value: { timestampValue: past24h.toISOString() } } } } };
           const results = await queryFirestore(env, query, idToken);
           const stats = { pendente: 0, breeding: 0, finalizado: 0, entregue: 0, totalVal: 0 };
           results.forEach(r => {
@@ -761,8 +784,9 @@ export default {
             stats.totalVal += val;
           });
           const formattedVal = stats.totalVal >= 1000000 ? `${(stats.totalVal/1000000).toFixed(2)}kk` : `${(stats.totalVal/1000).toFixed(0)}k`;
+          const currentDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(new Date());
           const cfg = await getEmbedConfig(env, 'resumo', idToken);
-          const embed = buildEmbedFromConfig(cfg, { ...stats, total_dia: formattedVal });
+          const embed = buildEmbedFromConfig(cfg, { ...stats, total_dia: formattedVal, data: currentDate });
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
         })());
         return jsonResponse({ type: 5 });
@@ -771,45 +795,28 @@ export default {
 
 
       if (interaction.type === 2 && interaction.data.name === 'cliente') {
-        let idSite = interaction.data.options.find(o => o.name === 'id_site')?.value;
-        if (idSite && !isNaN(idSite)) {
-          idSite = idSite.toString().padStart(5, '0');
-        }
+        const discordInput = interaction.data.options.find(o => o.name === 'discord')?.value || '';
+        
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
           
-          const profileQuery = { 
+          const orderQuery = { 
             structuredQuery: { 
-              from: [{ collectionId: 'trainer_profiles' }], 
-              where: {
-                compositeFilter: {
-                  op: 'OR',
-                  filters: [
-                    { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { stringValue: idSite } } },
-                    { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { stringValue: idSite.replace(/^0+/, '') } } },
-                    { fieldFilter: { field: { fieldPath: 'sequentialId' }, op: 'EQUAL', value: { integerValue: parseInt(idSite) } } }
-                  ]
-                }
-              }, 
-              limit: 1 
+              from: [{ collectionId: 'orders' }], 
+              where: { fieldFilter: { field: { fieldPath: 'discordNick' }, op: 'EQUAL', value: { stringValue: discordInput } } } 
             } 
           };
-          const profileResults = await queryFirestore(env, profileQuery, idToken);
-          const profileDoc = profileResults[0]?.document;
           
-          if (!profileDoc) {
-             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Treinador com ID \`${idSite}\` não encontrado no banco de dados.` }) });
+          const results = await queryFirestore(env, orderQuery, idToken);
+          
+          if (!results || results.length === 0 || !results[0].document) {
+             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `❌ Nenhuma encomenda encontrada para o Discord Nick \`${discordInput}\`. Verifique a ortografia exata.` }) });
              return;
           }
 
-          const nick = profileDoc.fields.displayName.stringValue;
-          const discordNick = profileDoc.fields.discordNick?.stringValue || 'N/A';
-
-          // 2. Search for orders by playerNick (matches displayName in profile)
-          const orderQuery = { structuredQuery: { from: [{ collectionId: 'orders' }], where: { fieldFilter: { field: { fieldPath: 'playerNick' }, op: 'EQUAL', value: { stringValue: nick } } } } };
-          const results = await queryFirestore(env, orderQuery, idToken);
-          
           let totalSpent = 0;
+          let playerNick = results[0].document.fields?.playerNick?.stringValue || 'Desconhecido';
+          
           let history = results.map(r => {
             const d = r.document; if (!d) return null;
             const val = parseInt(d.fields?.totalPrice?.integerValue || d.fields?.totalPrice?.doubleValue || 0);
@@ -819,7 +826,17 @@ export default {
 
           const formattedSpent = totalSpent >= 1000000 ? `${(totalSpent/1000000).toFixed(2)}kk` : `${(totalSpent/1000).toFixed(0)}k`;
           const cfg = await getEmbedConfig(env, 'cliente', idToken);
-          const embed = buildEmbedFromConfig(cfg, { nick: `${nick} (${discordNick})`, id: idSite, gasto: formattedSpent, historico: history || 'Nenhum pedido encontrado.' });
+          const embed = buildEmbedFromConfig(cfg, { nick: `${playerNick}`, id: discordInput, gasto: formattedSpent, historico: history || 'Nenhum pedido encontrado.' });
+          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
+        })());
+        return jsonResponse({ type: 5 });
+      }
+
+      if (interaction.type === 2 && interaction.data.name === 'help') {
+        ctx.waitUntil((async () => {
+          const idToken = await getFirebaseToken(env);
+          const cfg = await getEmbedConfig(env, 'help', idToken);
+          const embed = buildEmbedFromConfig(cfg, {});
           await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
         })());
         return jsonResponse({ type: 5 });
