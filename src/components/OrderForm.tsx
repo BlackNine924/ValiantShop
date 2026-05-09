@@ -155,6 +155,29 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     { color: '#ffffff', label: 'Branco' },
   ];
 
+  // Edit form state for full template editing
+  const [editForm, setEditForm] = useState<{
+    pokemon: string; nature: string; ability: string; gender: string;
+    ivs: string; isCastrated: boolean; hasHA: boolean; observations: string;
+    evs: Record<string,number>; level: string; item: string; moves: string[]; ppMax: boolean;
+  }>({
+    pokemon: '', nature: '', ability: '', gender: '', ivs: '',
+    isCastrated: false, hasHA: false, observations: '',
+    evs: { HP: 0, Atk: 0, Def: 0, SpA: 0, SpD: 0, Spe: 0 },
+    level: '50', item: '', moves: ['', '', '', ''], ppMax: false,
+  });
+
+  // Returns black or white depending on background lightness
+  const getContrastColor = (hex: string): string => {
+    const h = hex.replace('#', '');
+    if (h.length !== 6) return '#ffffff';
+    const r = parseInt(h.substring(0,2), 16);
+    const g = parseInt(h.substring(2,4), 16);
+    const b = parseInt(h.substring(4,6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+  };
+
   // Load wishlist (legacy, kept for backward compat)
   useEffect(() => {
     if (!user) {
@@ -722,43 +745,68 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
 
   const handleSaveTemplate = async () => {
     if (!user) { alert('Faça login para salvar templates!'); return; }
-    if (!form.pokemon) { alert('Selecione um Pokémon antes de salvar o template!'); return; }
     const finalColor = templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor;
     setIsSavingTemplate(true);
     try {
-      const payload = {
-        uid: user.uid,
-        name: templateName.trim() || `Template de ${form.pokemon}`,
-        color: finalColor,
-        isCompetitive,
-        pokemon: form.pokemon,
-        nature: form.nature || 'Aleatória',
-        ability: form.ability,
-        gender: form.gender,
-        ivs: form.ivs,
-        isCastrated: form.isCastrated,
-        ignoredIvs: form.ignoredIvs,
-        hasHA: form.hasHA,
-        observations: form.observations,
-        discordNick: form.discordNick,
-        ...(isCompetitive && {
-          evs: form.evs,
-          level: form.level,
-          item: form.item,
-          moves: form.moves,
-          ppMax: form.ppMax,
-        }),
-        totalPrice,
-        updatedAt: serverTimestamp(),
-      };
       if (editingTemplate?.id) {
-        await updateDoc(doc(db, 'order_templates', editingTemplate.id), payload);
+        // EDIT MODE: merge editForm into existing template, keeping original when blank
+        const orig = editingTemplate;
+        const merged: any = {
+          name: templateName.trim() || orig.name,
+          color: finalColor,
+          pokemon: editForm.pokemon.trim() || orig.pokemon,
+          nature: editForm.nature.trim() || orig.nature,
+          ability: editForm.ability.trim() || orig.ability,
+          gender: editForm.gender.trim() || orig.gender,
+          ivs: editForm.ivs.trim() || orig.ivs,
+          isCastrated: editForm.isCastrated,
+          hasHA: editForm.hasHA,
+          observations: editForm.observations,
+          updatedAt: serverTimestamp(),
+        };
+        // Competitive fields
+        if (orig.isCompetitive) {
+          merged.evs = editForm.evs;
+          merged.level = editForm.level || orig.level;
+          merged.item = editForm.item !== undefined ? editForm.item : orig.item;
+          merged.moves = editForm.moves;
+          merged.ppMax = editForm.ppMax;
+        }
+        await updateDoc(doc(db, 'order_templates', editingTemplate.id), merged);
       } else {
-        await addDoc(collection(db, 'order_templates'), { ...payload, createdAt: serverTimestamp() });
+        // CREATE MODE: requires a pokemon to be selected
+        if (!form.pokemon) { alert('Selecione um Pokémon antes de salvar o template!'); setIsSavingTemplate(false); return; }
+        const payload: any = {
+          uid: user.uid,
+          name: templateName.trim() || `Template de ${form.pokemon}`,
+          color: finalColor,
+          isCompetitive,
+          pokemon: form.pokemon,
+          nature: form.nature || 'Aleatória',
+          ability: form.ability,
+          gender: form.gender,
+          ivs: form.ivs,
+          isCastrated: form.isCastrated,
+          ignoredIvs: form.ignoredIvs,
+          hasHA: form.hasHA,
+          observations: form.observations,
+          discordNick: form.discordNick,
+          totalPrice,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        if (isCompetitive) {
+          payload.evs = form.evs;
+          payload.level = form.level;
+          payload.item = form.item;
+          payload.moves = form.moves;
+          payload.ppMax = form.ppMax;
+        }
+        await addDoc(collection(db, 'order_templates'), payload);
       }
       setIsTemplateModalOpen(false);
       setEditingTemplate(null);
-      setWishlistSuccessModal({ isOpen: true, pokemon: form.pokemon });
+      setWishlistSuccessModal({ isOpen: true, pokemon: editingTemplate?.pokemon || form.pokemon });
     } catch (e) {
       console.error(e);
       alert('Erro ao salvar template.');
@@ -781,7 +829,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
       observations: tpl.observations || '',
       discordNick: tpl.discordNick || form.discordNick,
     };
-    // If it's a competitive template and we are in competitive mode, also apply the build
     if (tpl.isCompetitive && isCompetitive) {
       setForm({
         ...baseApply,
@@ -796,7 +843,8 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     }
     setSearch(tpl.pokemon);
     setShowPokemonList(false);
-    setStep(2);
+    // Go to step 1 so user sees the prefilled form correctly
+    setStep(1);
   };
 
   const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
@@ -814,6 +862,23 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     setEditingTemplate(tpl);
     setTemplateName(tpl.name);
     setTemplateColor(tpl.color || '#6366f1');
+    setTemplateCustomHex('');
+    // Initialize editForm with template's current values so user can optionally override
+    setEditForm({
+      pokemon: tpl.pokemon || '',
+      nature: tpl.nature === 'Aleatória' ? '' : (tpl.nature || ''),
+      ability: tpl.ability || '',
+      gender: tpl.gender || '',
+      ivs: tpl.ivs || '',
+      isCastrated: tpl.isCastrated || false,
+      hasHA: tpl.hasHA || false,
+      observations: tpl.observations || '',
+      evs: tpl.evs || { HP: 0, Atk: 0, Def: 0, SpA: 0, SpD: 0, Spe: 0 },
+      level: tpl.level || '50',
+      item: tpl.item || '',
+      moves: tpl.moves || ['', '', '', ''],
+      ppMax: tpl.ppMax || false,
+    });
     setIsTemplateModalOpen(true);
   };
 
@@ -1013,7 +1078,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                                        <div className="flex items-center gap-1 shrink-0">
                                          <span
                                            className="text-[9px] font-black px-2 py-0.5 rounded-full"
-                                           style={{ background: `${tpl.color || '#6366f1'}30`, color: tpl.color || '#6366f1' }}
+                                           style={{ background: tpl.color || '#6366f1', color: getContrastColor(tpl.color || '#6366f1') }}
                                          >
                                            {tpl.isCompetitive ? '⚔️ COMP' : '🥚 GERAL'}
                                          </span>
@@ -1646,129 +1711,276 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
       {/* MODAL - SALVAR / EDITAR TEMPLATE */}
       {createPortal(
         <AnimatePresence>
-          {isTemplateModalOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-              onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
-            >
+          {isTemplateModalOpen && (() => {
+            const activeColor = templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor;
+            const contrastText = getContrastColor(activeColor);
+            return (
               <motion.div
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: 20 }}
-                className="max-w-md w-full rounded-3xl border border-white/10 bg-[#0d0d0f] shadow-2xl overflow-hidden"
-                onClick={e => e.stopPropagation()}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+                onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
               >
-                {/* Header com cor selecionada */}
-                <div
-                  className="p-6 pb-4"
-                  style={{ background: `linear-gradient(135deg, ${(templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor)}25, transparent)`, borderBottom: `1px solid ${(templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor)}30` }}
+                <motion.div
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  className="max-w-lg w-full rounded-3xl border border-white/10 bg-[#0d0d0f] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                  onClick={e => e.stopPropagation()}
                 >
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-2xl">🗂️</span>
-                    <h3 className="font-black text-white text-lg uppercase tracking-wider">
-                      {editingTemplate ? 'Editar Template' : 'Salvar Template'}
-                    </h3>
-                  </div>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider ml-10">
-                    {form.pokemon} · {isCompetitive ? '⚔️ Competitivo' : '🥚 Geral'}
-                  </p>
-                </div>
-
-                <div className="p-6 space-y-5">
-                  {/* Nome do template */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome do Template</label>
-                    <input
-                      type="text"
-                      value={templateName}
-                      onChange={e => setTemplateName(e.target.value)}
-                      maxLength={40}
-                      className="w-full bg-black/60 border-2 border-white/8 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-indigo-500 transition-all"
-                      placeholder="Ex: Cinderace VGC, Time de Chuva..."
-                    />
+                  {/* Header */}
+                  <div
+                    className="p-6 pb-4 shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${activeColor}22, transparent)`, borderBottom: `1px solid ${activeColor}30` }}
+                  >
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-2xl">🗂️</span>
+                      <h3 className="font-black text-white text-lg uppercase tracking-wider">
+                        {editingTemplate ? 'Editar Template' : 'Salvar Template'}
+                      </h3>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider ml-10">
+                      {editingTemplate ? editingTemplate.pokemon : form.pokemon} · {(editingTemplate?.isCompetitive || isCompetitive) ? '⚔️ Competitivo' : '🥚 Geral'}
+                    </p>
                   </div>
 
-                  {/* Seletor de cor */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cor do Card</label>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {TEMPLATE_PALETTE.map(({ color, label }) => (
-                        <button
-                          key={color}
-                          type="button"
-                          title={label}
-                          onClick={() => { setTemplateColor(color); setTemplateCustomHex(''); }}
-                          className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110 active:scale-95"
+                  {/* Scrollable body */}
+                  <div className="p-6 space-y-5 overflow-y-auto flex-1">
+
+                    {/* Nome */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome do Template</label>
+                      <input
+                        type="text"
+                        value={templateName}
+                        onChange={e => setTemplateName(e.target.value)}
+                        maxLength={40}
+                        className="w-full bg-black/60 border-2 border-white/8 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-indigo-500 transition-all"
+                        placeholder="Ex: Cinderace VGC, Time de Chuva..."
+                      />
+                    </div>
+
+                    {/* Cor */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cor do Card</label>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {TEMPLATE_PALETTE.map(({ color, label }) => (
+                          <button
+                            key={color}
+                            type="button"
+                            title={label}
+                            onClick={() => { setTemplateColor(color); setTemplateCustomHex(''); }}
+                            className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110 active:scale-95"
+                            style={{
+                              background: color,
+                              borderColor: templateColor === color && !templateCustomHex ? 'white' : 'transparent',
+                              boxShadow: templateColor === color && !templateCustomHex ? `0 0 12px ${color}` : 'none'
+                            }}
+                          />
+                        ))}
+                        <label
+                          className="w-8 h-8 rounded-full border-2 border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:border-white/60 transition-all relative overflow-hidden"
+                          title="Cor personalizada (HEX)"
                           style={{
-                            background: color,
-                            borderColor: templateColor === color && !templateCustomHex ? 'white' : 'transparent',
-                            boxShadow: templateColor === color && !templateCustomHex ? `0 0 12px ${color}` : 'none'
+                            background: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : 'transparent',
+                            borderColor: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? 'white' : undefined,
+                            boxShadow: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? `0 0 12px ${templateCustomHex}` : undefined,
                           }}
-                        />
-                      ))}
-                      {/* Círculo de cor customizada */}
-                      <label
-                        className="w-8 h-8 rounded-full border-2 border-dashed border-white/30 flex items-center justify-center cursor-pointer hover:border-white/60 transition-all relative overflow-hidden"
-                        title="Cor personalizada (HEX)"
+                        >
+                          <input type="color" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" value={templateCustomHex || '#6366f1'} onChange={e => setTemplateCustomHex(e.target.value)} />
+                          {!templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) && <span className="text-gray-500 text-lg">✦</span>}
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full border border-white/20" style={{ background: activeColor }} />
+                        <span className="text-[10px] font-mono text-gray-500">{activeColor}</span>
+                        {/* Live badge preview */}
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full ml-2"
+                          style={{ background: `${activeColor}30`, color: activeColor }}>
+                          {(editingTemplate?.isCompetitive || isCompetitive) ? '⚔️ COMP' : '🥚 GERAL'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* POKEMON FIELDS — always shown in edit, shown in create only if editing */}
+                    <div className="space-y-4 pt-2 border-t border-white/5">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                        {editingTemplate ? 'Dados do Pokémon (deixe em branco para manter o atual)' : 'Dados da Encomenda'}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Espécie</label>
+                          <input type="text" value={editingTemplate ? editForm.pokemon : form.pokemon}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, pokemon: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder={editingTemplate ? `Atual: ${editingTemplate.pokemon}` : ''}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Natureza</label>
+                          <input type="text" value={editingTemplate ? editForm.nature : form.nature}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, nature: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder={editingTemplate ? `Atual: ${editingTemplate.nature || 'Aleatória'}` : ''}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Habilidade</label>
+                          <input type="text" value={editingTemplate ? editForm.ability : form.ability}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, ability: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder={editingTemplate ? `Atual: ${editingTemplate.ability || '—'}` : ''}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Gênero</label>
+                          <input type="text" value={editingTemplate ? editForm.gender : form.gender}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, gender: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder={editingTemplate ? `Atual: ${editingTemplate.gender || '—'}` : ''}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">IVs (4, 5 ou 6)</label>
+                          <input type="text" value={editingTemplate ? editForm.ivs : form.ivs}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, ivs: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder={editingTemplate ? `Atual: F${editingTemplate.ivs}` : ''}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Observações</label>
+                          <input type="text" value={editingTemplate ? editForm.observations : form.observations}
+                            onChange={e => editingTemplate ? setEditForm({ ...editForm, observations: e.target.value }) : undefined}
+                            readOnly={!editingTemplate}
+                            placeholder="Sem observações"
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Toggles */}
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                          <input type="checkbox"
+                            checked={editingTemplate ? editForm.isCastrated : form.isCastrated}
+                            onChange={e => editingTemplate && setEditForm({ ...editForm, isCastrated: e.target.checked })}
+                            disabled={!editingTemplate}
+                            className="w-4 h-4 rounded accent-indigo-500"
+                          />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Castrado</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                          <input type="checkbox"
+                            checked={editingTemplate ? editForm.hasHA : form.hasHA}
+                            onChange={e => editingTemplate && setEditForm({ ...editForm, hasHA: e.target.checked })}
+                            disabled={!editingTemplate}
+                            className="w-4 h-4 rounded accent-purple-500"
+                          />
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">Hidden Ability</span>
+                        </label>
+                      </div>
+
+                      {/* Competitive fields */}
+                      {(editingTemplate?.isCompetitive || isCompetitive) && (
+                        <div className="space-y-3 pt-3 border-t border-white/5">
+                          <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest">Build Competitiva</p>
+                          <div>
+                            <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Item</label>
+                            <input type="text" value={editingTemplate ? editForm.item : form.item}
+                              onChange={e => editingTemplate ? setEditForm({ ...editForm, item: e.target.value }) : undefined}
+                              readOnly={!editingTemplate}
+                              placeholder={editingTemplate ? `Atual: ${editingTemplate.item || '—'}` : ''}
+                              className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(editingTemplate ? editForm.moves : form.moves).map((mv, i) => (
+                              <div key={i}>
+                                <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Move {i+1}</label>
+                                <input type="text" value={mv}
+                                  onChange={e => { if (editingTemplate) { const m = [...editForm.moves]; m[i] = e.target.value; setEditForm({ ...editForm, moves: m }); } }}
+                                  readOnly={!editingTemplate}
+                                  placeholder={editingTemplate ? `Atual: ${editingTemplate.moves?.[i] || '—'}` : ''}
+                                  className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {['HP','Atk','Def','SpA','SpD','Spe'].map(stat => (
+                              <div key={stat}>
+                                <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">EV {stat}</label>
+                                <input type="number" min={0} max={252}
+                                  value={editingTemplate ? (editForm.evs[stat] || 0) : (form.evs[stat as keyof typeof form.evs] || 0)}
+                                  onChange={e => editingTemplate && setEditForm({ ...editForm, evs: { ...editForm.evs, [stat]: Number(e.target.value) } })}
+                                  readOnly={!editingTemplate}
+                                  className="w-full bg-black/50 border border-white/8 rounded-xl px-2 py-2 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 items-center">
+                            <div>
+                              <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Level</label>
+                              <select value={editingTemplate ? editForm.level : form.level}
+                                onChange={e => editingTemplate && setEditForm({ ...editForm, level: e.target.value })}
+                                disabled={!editingTemplate}
+                                className="bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none disabled:opacity-50"
+                              >
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                              </select>
+                            </div>
+                            <label className="flex items-center gap-2 cursor-pointer mt-4">
+                              <input type="checkbox"
+                                checked={editingTemplate ? editForm.ppMax : form.ppMax}
+                                onChange={e => editingTemplate && setEditForm({ ...editForm, ppMax: e.target.checked })}
+                                disabled={!editingTemplate}
+                                className="w-4 h-4 rounded accent-purple-500"
+                              />
+                              <span className="text-[10px] font-bold text-gray-500 uppercase">PP Max</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
+                        className="flex-1 py-3 rounded-2xl border border-white/10 text-gray-500 font-black text-xs uppercase tracking-wider hover:border-white/20 transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveTemplate}
+                        disabled={isSavingTemplate}
+                        className="flex-[2] py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                         style={{
-                          background: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : 'transparent',
-                          borderColor: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? 'white' : undefined,
-                          boxShadow: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? `0 0 12px ${templateCustomHex}` : undefined,
+                          background: `linear-gradient(135deg, ${activeColor}, ${activeColor}bb)`,
+                          color: contrastText,
+                          boxShadow: `0 4px 20px ${activeColor}50`
                         }}
                       >
-                        <input
-                          type="color"
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          value={templateCustomHex || '#6366f1'}
-                          onChange={e => setTemplateCustomHex(e.target.value)}
-                        />
-                        {!templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) && (
-                          <span className="text-gray-500 text-lg">✦</span>
-                        )}
-                      </label>
-                    </div>
-                    {/* Preview do hex */}
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-5 h-5 rounded-full border border-white/20"
-                        style={{ background: templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor }}
-                      />
-                      <span className="text-[10px] font-mono text-gray-500">
-                        {templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor}
-                      </span>
+                        {isSavingTemplate ? 'Salvando...' : editingTemplate ? '✓ Atualizar Template' : '✓ Salvar Template'}
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
-                      className="flex-1 py-3 rounded-2xl border border-white/10 text-gray-500 font-black text-xs uppercase tracking-wider hover:border-white/20 transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate}
-                      className="flex-[2] py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      style={{
-                        background: `linear-gradient(135deg, ${templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor}, ${templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor}aa)`,
-                        color: '#000',
-                        boxShadow: `0 4px 20px ${templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor}50`
-                      }}
-                    >
-                      {isSavingTemplate ? 'Salvando...' : editingTemplate ? '✓ Atualizar Template' : '✓ Salvar Template'}
-                    </button>
-                  </div>
-                </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
+            );
+          })()}
         </AnimatePresence>,
         document.body
       )}
