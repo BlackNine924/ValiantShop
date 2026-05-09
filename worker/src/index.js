@@ -259,30 +259,32 @@ function buildEmbedFromConfig(cfg, order) {
 
 async function getEmbedConfig(env, type, idToken) {
   const doc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
-  let cfg = DEFAULT_EMBEDS[type] || {};
+  let cfg = DEFAULT_EMBEDS[type] || { fields: [], components: [], selects: [], modals: [] };
   if (doc && doc.fields && doc.fields[type]) {
     const f = doc.fields[type].mapValue.fields;
     cfg = {
+      ...cfg,
       title: f.title?.stringValue || cfg.title,
       description: f.description?.stringValue || cfg.description,
       color: f.color?.stringValue || cfg.color,
-      banner: f.banner?.stringValue || cfg.banner,
-      footer: f.footer?.stringValue || cfg.footer,
       author: f.author?.stringValue || cfg.author,
       thumbnail: f.thumbnail?.stringValue || cfg.thumbnail,
+      banner: f.banner?.stringValue || cfg.banner,
+      footer: f.footer?.stringValue || cfg.footer,
       content: f.content?.stringValue || cfg.content,
       channel: f.channel?.stringValue || cfg.channel,
       fields: f.fields?.arrayValue?.values?.map(v => ({
         name: v.mapValue.fields.name.stringValue,
         value: v.mapValue.fields.value.stringValue,
         inline: v.mapValue.fields.inline.booleanValue
-      })) || cfg.fields,
+      })) || cfg.fields || [],
       components: f.components?.arrayValue?.values?.map(v => ({
         label: v.mapValue.fields.label.stringValue,
         style: parseInt(v.mapValue.fields.style.integerValue || v.mapValue.fields.style.stringValue),
         custom_id: v.mapValue.fields.custom_id.stringValue,
-        url: v.mapValue.fields.url.stringValue
-      })) || cfg.components,
+        url: v.mapValue.fields.url?.stringValue || undefined,
+        emoji: v.mapValue.fields.emoji?.mapValue?.fields?.name?.stringValue ? { name: v.mapValue.fields.emoji.mapValue.fields.name.stringValue } : null
+      })) || cfg.components || [],
       selects: f.selects?.arrayValue?.values?.map(v => ({
         placeholder: v.mapValue.fields.placeholder.stringValue,
         custom_id: v.mapValue.fields.custom_id.stringValue,
@@ -296,6 +298,10 @@ async function getEmbedConfig(env, type, idToken) {
       })) || cfg.modals || []
     };
   }
+  cfg.fields = cfg.fields || [];
+  cfg.components = cfg.components || [];
+  cfg.selects = cfg.selects || [];
+  cfg.modals = cfg.modals || [];
   return cfg;
 }
 
@@ -349,27 +355,27 @@ function buildConfirmCancelButtons(orderId) {
 function buildEmbedEditorButtons(type) {
   return [
     { type: 1, components: [
-      { type: 2, label: 'Título', style: 2, custom_id: `editembed_title_${type}` },
-      { type: 2, label: 'Descrição', style: 2, custom_id: `editembed_description_${type}` },
-      { type: 2, label: 'Cor', style: 2, custom_id: `editembed_color_${type}` },
-      { type: 2, label: 'Autor', style: 2, custom_id: `editembed_author_${type}` }
+      { type: 2, label: 'Título', style: 2, custom_id: `editembed_title_${type}`, emoji: { name: '📝' } },
+      { type: 2, label: 'Descrição', style: 2, custom_id: `editembed_description_${type}`, emoji: { name: '📄' } },
+      { type: 2, label: 'Cor', style: 2, custom_id: `editembed_color_${type}`, emoji: { name: '🎨' } },
+      { type: 2, label: 'Autor', style: 2, custom_id: `editembed_author_${type}`, emoji: { name: '👤' } }
     ]},
     { type: 1, components: [
-      { type: 2, label: 'Thumbnail', style: 2, custom_id: `editembed_thumbnail_${type}` },
-      { type: 2, label: 'Banner', style: 2, custom_id: `editembed_banner_${type}` },
-      { type: 2, label: 'Rodapé', style: 2, custom_id: `editembed_footer_${type}` },
-      { type: 2, label: 'Mensagem', style: 2, custom_id: `editembed_content_${type}` }
+      { type: 2, label: 'Thumbnail', style: 2, custom_id: `editembed_thumbnail_${type}`, emoji: { name: '🖼️' } },
+      { type: 2, label: 'Banner', style: 2, custom_id: `editembed_banner_${type}`, emoji: { name: '🎇' } },
+      { type: 2, label: 'Rodapé', style: 2, custom_id: `editembed_footer_${type}`, emoji: { name: '🦶' } },
+      { type: 2, label: 'Mensagem', style: 2, custom_id: `editembed_content_${type}`, emoji: { name: '💬' } }
     ]},
     { type: 1, components: [
-      { type: 2, label: 'Campos', style: 1, custom_id: `menu_fields_${type}` },
-      { type: 2, label: 'Botões', style: 1, custom_id: `menu_buttons_${type}` },
-      { type: 2, label: 'Menus', style: 1, custom_id: `menu_selects_${type}` },
-      { type: 2, label: 'Modais', style: 1, custom_id: `menu_modals_${type}` }
+      { type: 2, label: 'Campos', style: 1, custom_id: `menu_fields_${type}`, emoji: { name: '🗂️' } },
+      { type: 2, label: 'Botões', style: 1, custom_id: `menu_buttons_${type}`, emoji: { name: '🔘' } },
+      { type: 2, label: 'Menus', style: 1, custom_id: `menu_selects_${type}`, emoji: { name: '📜' } },
+      { type: 2, label: 'Modais', style: 1, custom_id: `menu_modals_${type}`, emoji: { name: '📦' } }
     ]},
     { type: 1, components: [
-      { type: 2, label: 'Canal', style: 2, custom_id: `editembed_channel_${type}` },
-      { type: 2, label: '💾 SALVAR', style: 3, custom_id: `verify_saveconfig_${type}` },
-      { type: 2, label: '❌ CANCELAR', style: 4, custom_id: `action_cancelconfig_${type}` }
+      { type: 2, label: 'Canal', style: 2, custom_id: `editembed_channel_${type}`, emoji: { name: '📺' } },
+      { type: 2, label: 'SALVAR', style: 3, custom_id: `verify_saveconfig_${type}`, emoji: { name: '💾' } },
+      { type: 2, label: 'CANCELAR', style: 4, custom_id: `action_cancelconfig_${type}`, emoji: { name: '❌' } }
     ]}
   ];
 }
@@ -395,13 +401,19 @@ function buildFieldDeleteMenu(type, fields) {
 }
 
 function buildButtonButtons(type, buttons) {
-  const btns = buttons.map((b, i) => ({ type: 2, label: b.label.slice(0, 15), style: b.style, custom_id: `editbutton_modal_${i}_${type}` }));
+  const btns = buttons.map((b, i) => ({ 
+    type: 2, 
+    label: b.label.slice(0, 15), 
+    style: 2, // Force style 2 (Secondary) in editor to allow clicking any button to edit
+    custom_id: `editbutton_modal_${i}_${type}`,
+    emoji: b.emoji || { name: '🔘' }
+  }));
   const rows = [];
   for (let i = 0; i < btns.length; i += 5) rows.push({ type: 1, components: btns.slice(i, i + 5) });
   rows.push({ type: 1, components: [
-    { type: 2, label: '➕ Adicionar', style: 3, custom_id: `editbutton_add_${type}` },
-    { type: 2, label: '🗑️ Deletar', style: 4, custom_id: `menu_buttons_delete_${type}` },
-    { type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_back_config_${type}` }
+    { type: 2, label: 'Adicionar', style: 3, custom_id: `editbutton_add_${type}`, emoji: { name: '➕' } },
+    { type: 2, label: 'Deletar', style: 4, custom_id: `menu_buttons_delete_${type}`, emoji: { name: '🗑️' } },
+    { type: 2, label: 'Voltar', style: 2, custom_id: `menu_back_config_${type}`, emoji: { name: '⬅️' } }
   ]});
   return rows;
 }
@@ -415,13 +427,19 @@ function buildButtonDeleteMenu(type, buttons) {
 }
 
 function buildSelectButtons(type, selects) {
-  const btns = selects.map((s, i) => ({ type: 2, label: `Menu ${i + 1}`, style: 2, custom_id: `editselect_modal_${i}_${type}` }));
+  const btns = selects.map((s, i) => ({ 
+    type: 2, 
+    label: `Menu ${i + 1}`, 
+    style: 2, 
+    custom_id: `editselect_modal_${i}_${type}`,
+    emoji: { name: '📜' }
+  }));
   const rows = [];
   for (let i = 0; i < btns.length; i += 5) rows.push({ type: 1, components: btns.slice(i, i + 5) });
   rows.push({ type: 1, components: [
-    { type: 2, label: '➕ Adicionar', style: 3, custom_id: `editselect_add_${type}` },
-    { type: 2, label: '🗑️ Deletar', style: 4, custom_id: `menu_selects_delete_${type}` },
-    { type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_back_config_${type}` }
+    { type: 2, label: 'Adicionar', style: 3, custom_id: `editselect_add_${type}`, emoji: { name: '➕' } },
+    { type: 2, label: 'Deletar', style: 4, custom_id: `menu_selects_delete_${type}`, emoji: { name: '🗑️' } },
+    { type: 2, label: 'Voltar', style: 2, custom_id: `menu_back_config_${type}`, emoji: { name: '⬅️' } }
   ]});
   return rows;
 }
@@ -435,13 +453,19 @@ function buildSelectDeleteMenu(type, selects) {
 }
 
 function buildModalButtons(type, modals) {
-  const btns = modals.map((m, i) => ({ type: 2, label: `Modal ${i + 1}`, style: 2, custom_id: `editmodal_modal_${i}_${type}` }));
+  const btns = modals.map((m, i) => ({ 
+    type: 2, 
+    label: `Modal ${i + 1}`, 
+    style: 2, 
+    custom_id: `editmodal_modal_${i}_${type}`,
+    emoji: { name: '📦' }
+  }));
   const rows = [];
   for (let i = 0; i < btns.length; i += 5) rows.push({ type: 1, components: btns.slice(i, i + 5) });
   rows.push({ type: 1, components: [
-    { type: 2, label: '➕ Adicionar', style: 3, custom_id: `editmodal_add_${type}` },
-    { type: 2, label: '🗑️ Deletar', style: 4, custom_id: `menu_modals_delete_${type}` },
-    { type: 2, label: '⬅️ Voltar', style: 2, custom_id: `menu_back_config_${type}` }
+    { type: 2, label: 'Adicionar', style: 3, custom_id: `editmodal_add_${type}`, emoji: { name: '➕' } },
+    { type: 2, label: 'Deletar', style: 4, custom_id: `menu_modals_delete_${type}`, emoji: { name: '🗑️' } },
+    { type: 2, label: 'Voltar', style: 2, custom_id: `menu_back_config_${type}`, emoji: { name: '⬅️' } }
   ]});
   return rows;
 }
@@ -550,6 +574,30 @@ export default {
 
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
+          
+          // Check for custom modal triggers
+          const embedsDoc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
+          if (embedsDoc?.fields) {
+            for (const type of Object.keys(embedsDoc.fields)) {
+              const f = embedsDoc.fields[type].mapValue.fields;
+              if (f.modals?.arrayValue?.values) {
+                const modals = f.modals.arrayValue.values.map(v => ({
+                  trigger_id: v.mapValue.fields.trigger_id.stringValue,
+                  title: v.mapValue.fields.title.stringValue,
+                  questions: v.mapValue.fields.questions.stringValue
+                }));
+                const triggerId = interaction.type === 3 ? interaction.data.values?.[0] : interaction.data.custom_id;
+                const match = modals.find(m => m.trigger_id === triggerId);
+                if (match) {
+                  const qList = match.questions.split(',').map(q => q.trim()).filter(q => q.length > 0).slice(0, 5);
+                  const components = qList.map((q, i) => ({ type: 1, components: [{ type: 4, custom_id: `q_${i}`, label: q, style: 1, required: true }] }));
+                  await fetch(`https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 9, data: { title: match.title, custom_id: `submitmodal_${match.trigger_id}`, components } }) });
+                  return;
+                }
+              }
+            }
+          }
+
           const stockDoc = await getFirestoreDoc(env, 'bot_config', 'stock', idToken);
           if (!stockDoc) {
             await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: "❌ Erro ao carregar estoque." }) });
@@ -986,7 +1034,8 @@ export default {
         if (parts[0] === 'editbutton' && parts[1] === 'add') {
            return jsonResponse({ type: 9, data: { title: 'Adicionar Botão', custom_id: `modalbutton_add_${type}`, components: [
              { type: 1, components: [{ type: 4, custom_id: 'label', label: 'Texto do Botão', style: 1, required: true }] },
-             { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-Blurple, 2-Gray, 3-Green, 4-Red)', placeholder: '2', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-Blurple, 2-Gray, 3-Green, 4-Red, 5-Link)', placeholder: '2', style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'emoji', label: 'Emoji (ex: 🔘 ou <:nome:id>)', style: 1, required: false }] },
              { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado (Ação)', placeholder: 'ex: status_check', style: 1 }] },
              { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL (Opcional)', placeholder: 'https://...', style: 1, required: false }] }
            ]}});
@@ -995,12 +1044,14 @@ export default {
         if (parts[0] === 'editbutton' && parts[1] === 'modal') {
            const idToken = await getFirebaseToken(env);
            const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+           if (!draftDoc?.fields?.config?.stringValue) return jsonResponse({ type: 4, data: { flags: 64, content: "❌ Erro ao carregar rascunho." } });
            const cfg = JSON.parse(draftDoc.fields.config.stringValue);
            const index = parseInt(parts[2]);
            const btn = cfg.components[index];
            return jsonResponse({ type: 9, data: { title: 'Editar Botão', custom_id: `modalbutton_edit_${index}_${type}`, components: [
              { type: 1, components: [{ type: 4, custom_id: 'label', label: 'Texto do Botão', value: btn.label, style: 1, required: true }] },
-             { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-4)', value: btn.style.toString(), style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'style', label: 'Estilo (1-5)', value: btn.style.toString(), style: 1, required: true }] },
+             { type: 1, components: [{ type: 4, custom_id: 'emoji', label: 'Emoji', value: btn.emoji?.name || '', style: 1, required: false }] },
              { type: 1, components: [{ type: 4, custom_id: 'custom_id', label: 'ID Customizado', value: btn.custom_id || '', style: 1 }] },
              { type: 1, components: [{ type: 4, custom_id: 'url', label: 'Link URL', value: btn.url || '', style: 1, required: false }] }
            ]}});
@@ -1309,7 +1360,19 @@ export default {
           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
           if (!cfg.components) cfg.components = [];
           
-          const newBtn = { label: getVal('label'), style: parseInt(getVal('style')), custom_id: getVal('custom_id'), url: getVal('url') };
+          const emojiVal = getVal('emoji');
+          let emoji = null;
+          if (emojiVal) {
+            if (emojiVal.startsWith('<') && emojiVal.includes(':')) {
+              const name = emojiVal.split(':')[1];
+              const id = emojiVal.split(':')[2].replace('>', '');
+              emoji = { name, id };
+            } else {
+              emoji = { name: emojiVal };
+            }
+          }
+          
+          const newBtn = { label: getVal('label'), style: parseInt(getVal('style')), custom_id: getVal('custom_id'), url: getVal('url'), emoji };
           if (action === 'add') cfg.components.push(newBtn);
           else cfg.components[index] = newBtn;
           
