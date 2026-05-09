@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, MessageSquare, Swords, ChevronDown, Package, Zap, Target } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { POKEMON_DATA, NATURES } from '../data/pokemonData';
+import { POKEMON_DATA } from '../data/pokemonData';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { MALE_ONLY_POKEMON, GENDERLESS_POKEMON } from '../data/pokemonCategories';
@@ -76,7 +76,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
 
   const initialForm = {
     pokemon: '',
-    nature: '', 
     ability: '',
     gender: '', 
     ivs: '4' as IVOption,
@@ -110,7 +109,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
           return {
             ...baseForm,
             pokemon: s.pokemon,
-            nature: s.nature === 'Aleatória' ? '' : s.nature || '',
             ability: s.ability || '',
             gender: s.gender || '',
             ivs: ivValue as IVOption,
@@ -131,9 +129,12 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     return safeStorage.getItem('pokemon_favorites', []);
   });
   const [hotPokemon, setHotPokemon] = useState<{name: string, count: number}[]>([]);
-  const [_wishlist, setWishlist] = useState<any[]>([]);
-  const [wishlistSuccessModal, setWishlistSuccessModal] = useState<{isOpen: boolean, pokemon: string}>({isOpen: false, pokemon: ''});
-  const [wishlistRemoveConfirm, setWishlistRemoveConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
+  const [isHotPokemonOpen, setIsHotPokemonOpen] = useState(false);
+  const [successModal, setSuccessModal] = useState<{isOpen: boolean, pokemon: string}>({isOpen: false, pokemon: ''});
+  const [deleteConfirm, setDeleteConfirm] = useState<{isOpen: boolean, id: string, name: string} | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [editMoveSearches, setEditMoveSearches] = useState<string[]>(['', '', '', '']);
+  const [editMoveDropdownOpen, setEditMoveDropdownOpen] = useState<number | null>(null);
   // Templates V2
   const [templates, setTemplates] = useState<any[]>([]);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -143,6 +144,16 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  
+  // Template Editor Search States
+  const [editSearch, setEditSearch] = useState('');
+  const [showEditPokemonList, setShowEditPokemonList] = useState(false);
+  const [editItemSearch, setEditItemSearch] = useState('');
+  const [showEditItemDropdown, setShowEditItemDropdown] = useState(false);
+  const editSearchRef = useRef<HTMLDivElement>(null);
+  const editItemRef = useRef<HTMLDivElement>(null);
+  const moveRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const editMoveRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const TEMPLATE_PALETTE = [
     { color: '#ef4444', label: 'Vermelho' },
@@ -157,11 +168,11 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
 
   // Edit form state for full template editing
   const [editForm, setEditForm] = useState<{
-    pokemon: string; nature: string; ability: string; gender: string;
+    pokemon: string; ability: string; gender: string;
     ivs: string; isCastrated: boolean; hasHA: boolean; observations: string;
     evs: Record<string,number>; level: string; item: string; moves: string[]; ppMax: boolean;
   }>({
-    pokemon: '', nature: '', ability: '', gender: '', ivs: '',
+    pokemon: '', ability: '', gender: '', ivs: '',
     isCastrated: false, hasHA: false, observations: '',
     evs: { HP: 0, Atk: 0, Def: 0, SpA: 0, SpD: 0, Spe: 0 },
     level: '50', item: '', moves: ['', '', '', ''], ppMax: false,
@@ -178,26 +189,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     return luminance > 0.5 ? '#000000' : '#ffffff';
   };
 
-  // Load wishlist (legacy, kept for backward compat)
-  useEffect(() => {
-    if (!user) {
-      setWishlist([]);
-      return;
-    }
-    const q = query(collection(db, 'wishlists'), where('uid', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a: any, b: any) => {
-        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-        return timeB - timeA;
-      });
-      setWishlist(data);
-    }, (err) => {
-      console.error("Error fetching wishlist:", err);
-    });
-    return unsubscribe;
-  }, [user]);
+
 
   // Load Templates V2
   useEffect(() => {
@@ -270,16 +262,95 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
   }, [isGenderless, isMaleOnly]);
 
 
+  // Auto-HA Logic
+  useEffect(() => {
+    if (!selectedPokemon) return;
+    
+    // If pokemon has no HA, turn off hasHA toggle
+    if (!selectedPokemon.hiddenAbility && form.hasHA) {
+      setForm(prev => ({ ...prev, hasHA: false }));
+    }
+    
+    // If hasHA is true, ensure ability is the HA
+    if (form.hasHA && selectedPokemon.hiddenAbility) {
+      if (form.ability !== selectedPokemon.hiddenAbility) {
+        setForm(prev => ({ ...prev, ability: selectedPokemon.hiddenAbility as string }));
+      }
+    }
+  }, [form.hasHA, form.pokemon]);
+
   const filteredPokemon = useMemo(() => {
     if (!search || search.trim() === '') return [];
     return POKEMON_DATA.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 5);
   }, [search]);
+
+  // Template Editor Helpers
+  const selectedEditPokemon = useMemo(() => {
+    return POKEMON_DATA.find(p => p.name.toLowerCase() === editForm.pokemon.toLowerCase());
+  }, [editForm.pokemon]);
+
+  const editFilteredPokemon = useMemo(() => {
+    if (!editSearch || editSearch.trim() === '') return [];
+    return POKEMON_DATA.filter(p => p.name.toLowerCase().includes(editSearch.toLowerCase())).slice(0, 5);
+  }, [editSearch]);
+
+  const editAbilityOptions = useMemo(() => {
+    if (!selectedEditPokemon) return [];
+    const abs = [...selectedEditPokemon.abilities];
+    if (selectedEditPokemon.hiddenAbility) abs.push(selectedEditPokemon.hiddenAbility);
+    return abs;
+  }, [selectedEditPokemon]);
+
+  const editGenderOptions = useMemo(() => {
+    if (!selectedEditPokemon) return ['Male', 'Female'];
+    if (GENDERLESS_POKEMON.includes(selectedEditPokemon.name)) return ['Genderless'];
+    if (MALE_ONLY_POKEMON.includes(selectedEditPokemon.name)) return ['Male'];
+    return ['Male', 'Female'];
+  }, [selectedEditPokemon]);
+
+
+
+  const editFilteredItems = useMemo(() => {
+    if (!editItemSearch) return COMPETITIVE_ITEMS;
+    return COMPETITIVE_ITEMS.filter(i => i.toLowerCase().includes(editItemSearch.toLowerCase()));
+  }, [editItemSearch]);
+
+  // Auto-HA Logic for Edit Form
+  useEffect(() => {
+    if (!selectedEditPokemon) return;
+    if (!selectedEditPokemon.hiddenAbility && editForm.hasHA) {
+      setEditForm(prev => ({ ...prev, hasHA: false }));
+    }
+    if (editForm.hasHA && selectedEditPokemon.hiddenAbility) {
+      if (editForm.ability !== selectedEditPokemon.hiddenAbility) {
+        setEditForm(prev => ({ ...prev, ability: selectedEditPokemon.hiddenAbility as string }));
+      }
+    }
+  }, [editForm.hasHA, editForm.pokemon]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowPokemonList(false);
       }
+      if (editSearchRef.current && !editSearchRef.current.contains(event.target as Node)) {
+        setShowEditPokemonList(false);
+      }
+      
+      // Held Item closing
+      if (itemRef.current && !itemRef.current.contains(event.target as Node)) {
+        setShowItemDropdown(false);
+      }
+      if (editItemRef.current && !editItemRef.current.contains(event.target as Node)) {
+        setShowEditItemDropdown(false);
+      }
+      
+      // Close move dropdowns if clicking outside any of them
+      const isOutsideMoves = !moveRefs.current.some(ref => ref?.contains(event.target as Node));
+      if (isOutsideMoves) setMoveDropdownOpen(null);
+
+      const isOutsideEditMoves = !editMoveRefs.current.some(ref => ref?.contains(event.target as Node));
+      if (isOutsideEditMoves) setEditMoveDropdownOpen(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -513,6 +584,13 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
       fetchItemDetails();
     }
   }, [form.pokemon, isCompetitive, fetchPokemonMoves, fetchItemDetails]);
+
+  // Sync moves for Template Editor
+  useEffect(() => {
+    if (editForm.pokemon && isCompetitive) {
+      fetchPokemonMoves(editForm.pokemon);
+    }
+  }, [editForm.pokemon, isCompetitive, fetchPokemonMoves]);
   // ------------------------------------------------
 
 
@@ -599,14 +677,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
       setError(`Selecione exatamente ${maxIgnored} Atributo(s) para remover.`);
       return false;
     }
-    if (form.nature && form.nature.trim() !== '') {
-      const isValidNature = NATURES.some(n => n.toLowerCase() === form.nature.trim().toLowerCase());
-      if (!isValidNature && form.nature.toLowerCase() !== 'qualquer') {
-        setError('Natureza inválida! Digite uma Natureza existente ou deixe em branco.');
-        setStep(1);
-        return false;
-      }
-    }
     if (!form.discordNick || form.discordNick.trim() === '') {
       setError('O Nick do Discord é obrigatório!');
       return false;
@@ -626,6 +696,20 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     setIsCartOpen(true);
   };
 
+  const resetForm = () => {
+    setForm({
+      ...initialForm,
+      discordNick: safeStorage.getItem('valiant_discord_nick', '')
+    });
+    setSearch('');
+    setStep(1);
+    setError(null);
+  };
+
+  const handleRequestReset = () => {
+    setClearConfirmOpen(true);
+  };
+
   const handleBuyNow = async () => {
     if (!user || !user.displayName) {
       alert('Você precisa estar logado com seu Nick para fazer uma encomenda!');
@@ -638,7 +722,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     try {
       const orderRef = await addDoc(collection(db, 'orders'), {
         pokemon: form.pokemon,
-        nature: (form.nature && form.nature.trim() !== '') ? form.nature.charAt(0).toUpperCase() + form.nature.slice(1).toLowerCase() : 'Aleatória',
         ability: form.ability,
         gender: form.gender,
         ivs: `${form.ivs} IVs ${form.isCastrated ? '(Castrado)' : '(Breedable)'}`,
@@ -677,7 +760,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
         isCompetitive,
         playerNick: user.displayName,
         totalPrice: totalPrice,
-        nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
       }, orderRef.id);
       if (messageId) {
         await updateDoc(doc(db, 'orders', orderRef.id), { discordMessageId: messageId });
@@ -695,45 +777,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     }
   };
 
-  const handleAddToWishlist = async () => {
-    if (!user) {
-      alert('Você precisa estar logado para salvar na Wishlist!');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, 'wishlists'), {
-        uid: user.uid,
-        pokemon: form.pokemon,
-        nature: form.nature || 'Aleatória',
-        ability: form.ability,
-        gender: form.gender,
-        ivs: form.ivs,
-        isCastrated: form.isCastrated,
-        ignoredIvs: form.ignoredIvs,
-        hasHA: form.hasHA,
-        totalPrice: totalPrice,
-        createdAt: serverTimestamp()
-      });
-      setWishlistSuccessModal({isOpen: true, pokemon: form.pokemon});
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao salvar na Wishlist.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Legacy wishlist handlers (kept for compatibility with existing wishlist confirmation modal)
-  const confirmRemoveWishlist = async () => {
-    if (!wishlistRemoveConfirm) return;
-    try {
-      await deleteDoc(doc(db, 'wishlists', wishlistRemoveConfirm.id));
-      setWishlistRemoveConfirm(null);
-    } catch (e) {
-      console.error('Erro ao remover da wishlist:', e);
-    }
-  };
 
   // === Templates V2 Logic ===
   const openSaveTemplateModal = () => {
@@ -755,7 +798,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
           name: templateName.trim() || orig.name,
           color: finalColor,
           pokemon: editForm.pokemon.trim() || orig.pokemon,
-          nature: editForm.nature.trim() || orig.nature,
           ability: editForm.ability.trim() || orig.ability,
           gender: editForm.gender.trim() || orig.gender,
           ivs: editForm.ivs.trim() || orig.ivs,
@@ -782,7 +824,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
           color: finalColor,
           isCompetitive,
           pokemon: form.pokemon,
-          nature: form.nature || 'Aleatória',
           ability: form.ability,
           gender: form.gender,
           ivs: form.ivs,
@@ -806,7 +847,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
       }
       setIsTemplateModalOpen(false);
       setEditingTemplate(null);
-      setWishlistSuccessModal({ isOpen: true, pokemon: editingTemplate?.pokemon || form.pokemon });
+      setSuccessModal({ isOpen: true, pokemon: editingTemplate?.pokemon || form.pokemon });
     } catch (e) {
       console.error(e);
       alert('Erro ao salvar template.');
@@ -819,7 +860,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     const baseApply = {
       ...initialForm,
       pokemon: tpl.pokemon,
-      nature: tpl.nature === 'Aleatória' ? '' : (tpl.nature || ''),
       ability: tpl.ability || '',
       gender: tpl.gender || '',
       ivs: (tpl.ivs || '4') as IVOption,
@@ -847,11 +887,16 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     setStep(1);
   };
 
-  const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteTemplate = (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Remover este template?')) return;
+    setDeleteConfirm({ isOpen: true, id, name });
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!deleteConfirm) return;
     try {
-      await deleteDoc(doc(db, 'order_templates', id));
+      await deleteDoc(doc(db, 'order_templates', deleteConfirm.id));
+      setDeleteConfirm(null);
     } catch (err) {
       console.error(err);
     }
@@ -866,7 +911,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     // Initialize editForm with template's current values so user can optionally override
     setEditForm({
       pokemon: tpl.pokemon || '',
-      nature: tpl.nature === 'Aleatória' ? '' : (tpl.nature || ''),
       ability: tpl.ability || '',
       gender: tpl.gender || '',
       ivs: tpl.ivs || '',
@@ -995,22 +1039,56 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
 
                  {/* ✨ TENDÊNCIAS */}
                  {hotPokemon.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 p-4 bg-secondary/5 border border-secondary/10 rounded-2xl animate-fade">
-                       <span className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] flex items-center gap-2 shrink-0">
-                         ✨ TENDÊNCIAS:
-                       </span>
-                       <div className="flex flex-wrap gap-2">
-                         {hotPokemon.map((p) => (
-                           <button
-                             key={p.name}
-                             type="button"
-                             onClick={() => { setForm({...form, pokemon: p.name, ability: ''}); setSearch(p.name); setShowPokemonList(false); }}
-                             className="px-4 py-1.5 bg-secondary/10 hover:bg-secondary/20 border border-secondary/20 rounded-full text-[10px] font-bold text-secondary transition-all hover:scale-105 active:scale-95"
-                           >
-                             {p.name}
-                           </button>
-                         ))}
-                       </div>
+                    <div className="mt-6">
+                      <button
+                        type="button"
+                        onClick={() => setIsHotPokemonOpen(!isHotPokemonOpen)}
+                        className="flex items-center gap-3 group hover:opacity-80 transition-all p-2"
+                      >
+                        <span className="text-lg">✨</span>
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] group-hover:text-white transition-colors">
+                          TENDÊNCIAS {isHotPokemonOpen ? '↑' : '↓'}
+                        </span>
+                      </button>
+
+                      <AnimatePresence>
+                        {isHotPokemonOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-visible"
+                          >
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 -m-4">
+                              {hotPokemon.map((p) => (
+                                <button
+                                  key={p.name}
+                                  type="button"
+                                  onClick={() => { 
+                                    setForm({...form, pokemon: p.name, ability: ''}); 
+                                    setSearch(p.name); 
+                                    setShowPokemonList(false); 
+                                  }}
+                                  className="group relative bg-secondary/5 border border-secondary/10 rounded-2xl p-4 flex flex-col items-center gap-3 hover:border-secondary/40 hover:bg-secondary/10 transition-all hover:scale-[1.05] active:scale-95 shadow-lg"
+                                >
+                                  <div className="w-16 h-16 flex items-center justify-center">
+                                    <img 
+                                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(poke => poke.name === p.name)?.id || 0}.png`} 
+                                      alt={p.name}
+                                      className="w-full h-full object-contain pixelated"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = `https://play.pokemonshowdown.com/sprites/ani/${p.name.toLowerCase()}.gif`;
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="font-black text-white text-[10px] uppercase tracking-wider">{p.name}</span>
+
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                  )}
 
@@ -1102,7 +1180,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                                            title="Editar template"
                                          >✏️</button>
                                          <button
-                                           onClick={(e) => handleDeleteTemplate(tpl.id, e)}
+                                           onClick={(e) => handleDeleteTemplate(tpl.id, tpl.name, e)}
                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-all"
                                            title="Remover template"
                                          ><X size={12} /></button>
@@ -1143,16 +1221,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                   />
 
 
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Natureza (Opcional)</label>
-                    <input 
-                      type="text"
-                      className="w-full bg-black/60 border-2 border-white/5 rounded-2xl px-6 py-5 text-white font-bold transition-all outline-none focus:border-secondary" 
-                      placeholder="Ex: Adamant..."
-                      value={form.nature}
-                      onChange={e => setForm({...form, nature: e.target.value})}
-                    />
-                  </div>
+
                   
                   <CustomSelect 
                     label="Habilidade" 
@@ -1209,7 +1278,8 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                 </div>
               </div>
               <div className="flex gap-4 pt-4">
-                <button onClick={() => setStep(1)} className="px-10 py-4 rounded-xl border-2 border-white/5 font-black uppercase text-[10px] hover:bg-white/5 transition-all">Limpar</button>
+                <button onClick={handleRequestReset} className="px-10 py-4 rounded-xl border-2 border-white/5 font-black uppercase text-[10px] hover:bg-white/5 transition-all">Limpar</button>
+
                 <button 
                   onClick={() => {
                     if (!form.pokemon || !form.ability || !form.gender) {
@@ -1379,10 +1449,11 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                       </button>
                       <button 
                         disabled={isSubmitting}
-                        onClick={handleAddToWishlist}
+                        type="button"
+                        onClick={openSaveTemplateModal}
                         className="flex items-center justify-center gap-2 py-2 text-[9px] font-black uppercase text-gray-500 hover:text-secondary transition-all"
                       >
-                        <Heart size={10} /> Salvar na Wishlist
+                        <Target size={10} /> Salvar Template
                       </button>
                     </div>
                     <button 
@@ -1555,7 +1626,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                         .filter(m => m.toLowerCase().includes((moveSearches[idx] || '').toLowerCase()))
                         .slice(0, 12);
                       return (
-                        <div key={idx} className="relative">
+                        <div key={idx} ref={el => { moveRefs.current[idx] = el; }} className="relative">
                           <div className="flex items-center gap-2 bg-black/60 border-2 border-white/5 rounded-xl px-4 py-3 focus-within:border-purple-500 transition-all">
                             <span className="text-[9px] font-black text-purple-400/60 uppercase w-4">{idx + 1}</span>
                             <input
@@ -1672,6 +1743,14 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                           {cooldown > 0 ? 'Anti-Spam' : 'Apenas 1'}
                         </span>
                       </button>
+                      <button 
+                        disabled={isSubmitting}
+                        type="button"
+                        onClick={openSaveTemplateModal}
+                        className="flex items-center justify-center gap-2 py-2 text-[9px] font-black uppercase text-gray-500 hover:text-purple-400 transition-all"
+                      >
+                        <Target size={10} /> Salvar Template
+                      </button>
                     </div>
                     <button 
                       disabled={isSubmitting}
@@ -1714,40 +1793,43 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
           {isTemplateModalOpen && (() => {
             const activeColor = templateCustomHex.match(/^#[0-9a-fA-F]{6}$/) ? templateCustomHex : templateColor;
             const contrastText = getContrastColor(activeColor);
+            const totalEVsUsed = Object.values(editForm.evs).reduce((a, b) => a + (b || 0), 0);
             return (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
                 onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
               >
                 <motion.div
                   initial={{ scale: 0.9, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
                   exit={{ scale: 0.9, y: 20 }}
-                  className="max-w-lg w-full rounded-3xl border border-white/10 bg-[#0d0d0f] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                  className="bg-[#0d0d0f] border-2 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative overflow-y-auto max-h-[90vh] custom-scrollbar"
+                  style={{ borderColor: `${activeColor}40` }}
                   onClick={e => e.stopPropagation()}
                 >
-                  {/* Header */}
-                  <div
-                    className="p-6 pb-4 shrink-0"
-                    style={{ background: `linear-gradient(135deg, ${activeColor}22, transparent)`, borderBottom: `1px solid ${activeColor}30` }}
-                  >
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-2xl">🗂️</span>
-                      <h3 className="font-black text-white text-lg uppercase tracking-wider">
-                        {editingTemplate ? 'Editar Template' : 'Salvar Template'}
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-30"></div>
+
+                  <div className="flex justify-between items-start mb-8">
+                    <div>
+                      <h3 className="pixel-title text-2xl text-white mb-2">
+                        {editingTemplate ? 'EDITAR TEMPLATE' : 'SALVAR TEMPLATE'}
                       </h3>
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-relaxed">
+                        Personalize as definições deste Pokémon para<br/> reutilizar em pedidos futuros.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider ml-10">
-                      {editingTemplate ? editingTemplate.pokemon : form.pokemon} · {(editingTemplate?.isCompetitive || isCompetitive) ? '⚔️ Competitivo' : '🥚 Geral'}
-                    </p>
+                    <button
+                      onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
+                      className="p-2 hover:bg-white/5 rounded-full transition-all group"
+                    >
+                      <X size={20} className="text-gray-500 group-hover:text-white" />
+                    </button>
                   </div>
 
-                  {/* Scrollable body */}
-                  <div className="p-6 space-y-5 overflow-y-auto flex-1">
-
+                  <div className="space-y-8">
                     {/* Nome */}
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome do Template</label>
@@ -1795,170 +1877,308 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full border border-white/20" style={{ background: activeColor }} />
                         <span className="text-[10px] font-mono text-gray-500">{activeColor}</span>
-                        {/* Live badge preview */}
                         <span className="text-[9px] font-black px-2 py-0.5 rounded-full ml-2"
-                          style={{ background: `${activeColor}30`, color: activeColor }}>
+                          style={{ background: activeColor, color: contrastText }}>
                           {(editingTemplate?.isCompetitive || isCompetitive) ? '⚔️ COMP' : '🥚 GERAL'}
                         </span>
                       </div>
                     </div>
 
-                    {/* POKEMON FIELDS — always shown in edit, shown in create only if editing */}
-                    <div className="space-y-4 pt-2 border-t border-white/5">
+                    {/* POKEMON FIELDS */}
+                    <div className="space-y-4 pt-4 border-t border-white/5">
                       <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                        {editingTemplate ? 'Dados do Pokémon (deixe em branco para manter o atual)' : 'Dados da Encomenda'}
+                        {editingTemplate ? 'Edição Completa do Pokémon' : 'Dados da Encomenda'}
                       </p>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Espécie</label>
-                          <input type="text" value={editingTemplate ? editForm.pokemon : form.pokemon}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, pokemon: e.target.value }) : undefined}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2 relative" ref={editSearchRef}>
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">Espécie</label>
+                          <input 
+                            type="text" 
+                            value={editingTemplate ? editSearch || editForm.pokemon : form.pokemon}
+                            onChange={e => {
+                              if (editingTemplate) {
+                                setEditSearch(e.target.value);
+                                setShowEditPokemonList(true);
+                              }
+                            }}
+                            onFocus={() => editingTemplate && setShowEditPokemonList(true)}
                             readOnly={!editingTemplate}
                             placeholder={editingTemplate ? `Atual: ${editingTemplate.pokemon}` : ''}
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50"
                           />
+                          {showEditPokemonList && editFilteredPokemon.length > 0 && (
+                            <div className="absolute top-full left-0 w-full mt-2 bg-[#0d0d0f] border-2 border-indigo-500 rounded-xl overflow-hidden z-[110] shadow-2xl">
+                              {editFilteredPokemon.map((p: any) => (
+                                <button 
+                                  key={p.id} 
+                                  className="w-full px-4 py-3 text-left hover:bg-indigo-500/10 flex items-center gap-3 transition-colors group"
+                                  onClick={() => { 
+                                    setEditForm({...editForm, pokemon: p.name, ability: ''}); 
+                                    setEditSearch(p.name); 
+                                    setShowEditPokemonList(false); 
+                                  }}
+                                >
+                                  <span className="text-indigo-400 font-black opacity-40 italic text-[10px]">#{p.id}</span>
+                                  <span className="font-bold text-white uppercase tracking-wider text-[10px]">{p.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Natureza</label>
-                          <input type="text" value={editingTemplate ? editForm.nature : form.nature}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, nature: e.target.value }) : undefined}
-                            readOnly={!editingTemplate}
-                            placeholder={editingTemplate ? `Atual: ${editingTemplate.nature || 'Aleatória'}` : ''}
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
-                          />
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">Habilidade</label>
+                          <select 
+                            value={editingTemplate ? editForm.ability : form.ability}
+                            onChange={e => {
+                              if (editingTemplate) {
+                                setEditForm({ 
+                                  ...editForm, 
+                                  ability: e.target.value,
+                                  hasHA: e.target.value === selectedEditPokemon?.hiddenAbility
+                                });
+                              }
+                            }}
+                            disabled={!editingTemplate}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+                          >
+                            <option value="">{editingTemplate ? `Atual: ${editingTemplate.ability || 'Escolha...'}` : 'Escolher...'}</option>
+                            {editAbilityOptions.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
                         </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Habilidade</label>
-                          <input type="text" value={editingTemplate ? editForm.ability : form.ability}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, ability: e.target.value }) : undefined}
-                            readOnly={!editingTemplate}
-                            placeholder={editingTemplate ? `Atual: ${editingTemplate.ability || '—'}` : ''}
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
-                          />
+
+
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">Gênero</label>
+                          <select 
+                            value={editingTemplate ? editForm.gender : form.gender}
+                            onChange={e => editingTemplate && setEditForm({ ...editForm, gender: e.target.value })}
+                            disabled={!editingTemplate}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+                          >
+                            <option value="">{editingTemplate ? `Atual: ${editingTemplate.gender || 'Escolha...'}` : 'Escolher...'}</option>
+                            {editGenderOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
                         </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Gênero</label>
-                          <input type="text" value={editingTemplate ? editForm.gender : form.gender}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, gender: e.target.value }) : undefined}
-                            readOnly={!editingTemplate}
-                            placeholder={editingTemplate ? `Atual: ${editingTemplate.gender || '—'}` : ''}
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
-                          />
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">IVS</label>
+                          <select 
+                            value={editingTemplate ? editForm.ivs : form.ivs}
+                            onChange={e => editingTemplate && setEditForm({ ...editForm, ivs: e.target.value })}
+                            disabled={!editingTemplate}
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+                          >
+                            <option value="4">4 IVs (F4)</option>
+                            <option value="5">5 IVs (F5)</option>
+                            <option value="6">6 IVs (F6)</option>
+                          </select>
                         </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">IVs (4, 5 ou 6)</label>
-                          <input type="text" value={editingTemplate ? editForm.ivs : form.ivs}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, ivs: e.target.value }) : undefined}
-                            readOnly={!editingTemplate}
-                            placeholder={editingTemplate ? `Atual: F${editingTemplate.ivs}` : ''}
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Observações</label>
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">Observações</label>
                           <input type="text" value={editingTemplate ? editForm.observations : form.observations}
-                            onChange={e => editingTemplate ? setEditForm({ ...editForm, observations: e.target.value }) : undefined}
+                            onChange={e => editingTemplate && setEditForm({ ...editForm, observations: e.target.value })}
                             readOnly={!editingTemplate}
-                            placeholder="Sem observações"
-                            className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                            placeholder="Ex: 0 Spe IVs..."
+                            className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-indigo-400 transition-all read-only:opacity-50"
                           />
                         </div>
                       </div>
 
-                      {/* Toggles */}
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer group">
+                      <div className="flex gap-6 py-2">
+                        <label className="flex items-center gap-3 cursor-pointer group">
                           <input type="checkbox"
                             checked={editingTemplate ? editForm.isCastrated : form.isCastrated}
                             onChange={e => editingTemplate && setEditForm({ ...editForm, isCastrated: e.target.checked })}
                             disabled={!editingTemplate}
-                            className="w-4 h-4 rounded accent-indigo-500"
+                            className="w-5 h-5 rounded-lg accent-indigo-500 cursor-pointer"
                           />
-                          <span className="text-[10px] font-bold text-gray-500 uppercase">Castrado</span>
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-white transition-colors">Castrado</span>
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer group">
+                        <label className="flex items-center gap-3 cursor-pointer group">
                           <input type="checkbox"
                             checked={editingTemplate ? editForm.hasHA : form.hasHA}
                             onChange={e => editingTemplate && setEditForm({ ...editForm, hasHA: e.target.checked })}
                             disabled={!editingTemplate}
-                            className="w-4 h-4 rounded accent-purple-500"
+                            className="w-5 h-5 rounded-lg accent-purple-500 cursor-pointer"
                           />
-                          <span className="text-[10px] font-bold text-gray-500 uppercase">Hidden Ability</span>
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-white transition-colors">Hidden Ability</span>
                         </label>
                       </div>
 
-                      {/* Competitive fields */}
                       {(editingTemplate?.isCompetitive || isCompetitive) && (
-                        <div className="space-y-3 pt-3 border-t border-white/5">
-                          <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest">Build Competitiva</p>
-                          <div>
-                            <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Item</label>
-                            <input type="text" value={editingTemplate ? editForm.item : form.item}
-                              onChange={e => editingTemplate ? setEditForm({ ...editForm, item: e.target.value }) : undefined}
+                        <div className="space-y-5 pt-5 border-t border-white/5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Build Competitiva</p>
+                            <span className={`text-[9px] font-black ${totalEVsUsed > 510 ? 'text-red-500' : 'text-purple-300'}`}>
+                              {totalEVsUsed} / 510 EVs
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 relative" ref={editItemRef}>
+                            <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">Item Segurado</label>
+                            <input 
+                              type="text" 
+                              value={editingTemplate ? editItemSearch || editForm.item : form.item}
+                              onChange={e => {
+                                if (editingTemplate) {
+                                  setEditItemSearch(e.target.value);
+                                  setShowEditItemDropdown(true);
+                                }
+                              }}
+                              onFocus={() => editingTemplate && setShowEditItemDropdown(true)}
                               readOnly={!editingTemplate}
-                              placeholder={editingTemplate ? `Atual: ${editingTemplate.item || '—'}` : ''}
-                              className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                              placeholder={editingTemplate ? `Atual: ${editingTemplate.item || 'Nenhum'}` : ''}
+                              className="w-full bg-black/50 border border-white/8 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50"
                             />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(editingTemplate ? editForm.moves : form.moves).map((mv, i) => (
-                              <div key={i}>
-                                <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Move {i+1}</label>
-                                <input type="text" value={mv}
-                                  onChange={e => { if (editingTemplate) { const m = [...editForm.moves]; m[i] = e.target.value; setEditForm({ ...editForm, moves: m }); } }}
-                                  readOnly={!editingTemplate}
-                                  placeholder={editingTemplate ? `Atual: ${editingTemplate.moves?.[i] || '—'}` : ''}
-                                  className="w-full bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
-                                />
+                            {showEditItemDropdown && (
+                              <div className="absolute top-full left-0 w-full mt-2 bg-[#0d0d0f] border-2 border-purple-500 rounded-xl overflow-hidden z-[110] shadow-2xl max-h-48 overflow-y-auto">
+                                {editFilteredItems.map(item => (
+                                  <button 
+                                    key={item} 
+                                    className="w-full px-4 py-3 text-left hover:bg-purple-500/10 flex items-center gap-3 transition-colors group"
+                                    onClick={() => { 
+                                      setEditForm({...editForm, item}); 
+                                      setEditItemSearch(item); 
+                                      setShowEditItemDropdown(false); 
+                                    }}
+                                  >
+                                    <span className="font-bold text-white uppercase tracking-wider text-[10px]">{item}</span>
+                                  </button>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="mt-2">
+                            <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block">MOVESET</label>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {editForm.moves.map((mv, idx) => {
+                              const filtered = availableMoves
+                                .filter(m => !editForm.moves.includes(m))
+                                .filter(m => m.toLowerCase().includes((editMoveSearches[idx] || '').toLowerCase()))
+                                .slice(0, 12);
+                              return (
+                                <div key={idx} ref={el => { editMoveRefs.current[idx] = el; }} className="relative">
+                                  <div className="flex items-center gap-2 bg-black/60 border-2 border-white/5 rounded-xl px-4 py-3 focus-within:border-purple-500 transition-all">
+                                    <span className="text-[9px] font-black text-purple-400/60 uppercase w-4">{idx + 1}</span>
+                                    <input
+                                      type="text"
+                                      value={mv || editMoveSearches[idx]}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setEditMoveSearches(prev => { const n = [...prev]; n[idx] = val; return n; });
+                                        setEditForm(prev => { const m = [...prev.moves]; m[idx] = ''; return { ...prev, moves: m }; });
+                                        setEditMoveDropdownOpen(idx);
+                                      }}
+                                      onFocus={() => editingTemplate && setEditMoveDropdownOpen(idx)}
+                                      readOnly={!editingTemplate}
+                                      placeholder={`Escolher golpe ${idx + 1}...`}
+                                      className="flex-1 bg-transparent text-white font-bold text-sm outline-none placeholder:text-gray-600"
+                                    />
+                                    {mv && editingTemplate && <button onClick={() => {
+                                      setEditForm(prev => { const m = [...prev.moves]; m[idx] = ''; return { ...prev, moves: m }; });
+                                      setEditMoveSearches(prev => { const n = [...prev]; n[idx] = ''; return n; });
+                                    }} className="text-gray-600 hover:text-red-400 transition-colors"><X size={12} /></button>}
+                                  </div>
+                                  {editMoveDropdownOpen === idx && filtered.length > 0 && !mv && (
+                                    <div className="absolute top-full left-0 w-full mt-2 bg-[#0a0a0a] border border-purple-500/30 rounded-2xl overflow-hidden z-[110] shadow-2xl max-h-64 overflow-y-auto custom-scrollbar animate-fade-in">
+                                      {filtered.map(m => {
+                                        const det = moveDetails[m];
+                                        return (
+                                          <button 
+                                            key={m} 
+                                            type="button"
+                                            className="w-full px-4 py-3 text-left hover:bg-purple-500/10 border-b border-white/5 last:border-0 flex flex-col gap-1 transition-all group"
+                                            onClick={() => {
+                                              setEditForm(prev => { const moves = [...prev.moves]; moves[idx] = m; return { ...prev, moves }; });
+                                              setEditMoveSearches(prev => { const n = [...prev]; n[idx] = ''; return n; });
+                                              setEditMoveDropdownOpen(null);
+                                            }}
+                                          >
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-sm font-black text-white uppercase group-hover:text-purple-400 transition-colors">{m}</span>
+                                              <div className="flex gap-2">
+                                                 {det?.category && (
+                                                   <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                     det.category === 'physical' ? 'bg-red-500/20 text-red-400' :
+                                                     det.category === 'special' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                                                   }`}>{det.category}</span>
+                                                 )}
+                                              </div>
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                             {['HP','Atk','Def','SpA','SpD','Spe'].map(stat => (
-                              <div key={stat}>
-                                <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">EV {stat}</label>
-                                <input type="number" min={0} max={252}
-                                  value={editingTemplate ? (editForm.evs[stat] || 0) : (form.evs[stat as keyof typeof form.evs] || 0)}
-                                  onChange={e => editingTemplate && setEditForm({ ...editForm, evs: { ...editForm.evs, [stat]: Number(e.target.value) } })}
-                                  readOnly={!editingTemplate}
-                                  className="w-full bg-black/50 border border-white/8 rounded-xl px-2 py-2 text-white text-xs font-bold outline-none focus:border-purple-400 transition-all read-only:opacity-50 read-only:cursor-not-allowed"
+                              <div key={stat} className="space-y-1">
+                                <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block text-center">{stat}</label>
+                                <input 
+                                  type="number" 
+                                  min={0} max={252}
+                                  value={editForm.evs[stat] || 0}
+                                  onChange={e => {
+                                    if (editingTemplate) {
+                                      const val = Math.min(252, Math.max(0, Number(e.target.value)));
+                                      const others = totalEVsUsed - (editForm.evs[stat] || 0);
+                                      const finalV = Math.min(val, 510 - others);
+                                      setEditForm({ ...editForm, evs: { ...editForm.evs, [stat]: finalV } });
+                                    }
+                                  }}
+                                  className="w-full bg-black/50 border border-white/8 rounded-xl px-1 py-2 text-white text-[10px] font-black text-center outline-none focus:border-purple-400 transition-all"
                                 />
                               </div>
                             ))}
                           </div>
-                          <div className="flex gap-3 items-center">
-                            <div>
+
+                          <div className="flex gap-6 items-center">
+                            <div className="flex-1">
                               <label className="text-[9px] font-black text-gray-600 uppercase tracking-wider block mb-1">Level</label>
-                              <select value={editingTemplate ? editForm.level : form.level}
-                                onChange={e => editingTemplate && setEditForm({ ...editForm, level: e.target.value })}
-                                disabled={!editingTemplate}
-                                className="bg-black/50 border border-white/8 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none disabled:opacity-50"
-                              >
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                              </select>
+                              <div className="flex gap-2">
+                                {['50', '100'].map(lv => (
+                                  <button 
+                                    key={lv}
+                                    type="button"
+                                    onClick={() => setEditForm({ ...editForm, level: lv })}
+                                    className={`flex-1 py-2 rounded-lg border font-black text-[10px] transition-all ${editForm.level === lv ? 'border-purple-500 bg-purple-500/20 text-purple-300' : 'border-white/10 text-gray-500'}`}
+                                  >
+                                    Lv {lv}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                            <label className="flex items-center gap-2 cursor-pointer mt-4">
+                            <label className="flex items-center gap-3 cursor-pointer mt-4 group">
                               <input type="checkbox"
-                                checked={editingTemplate ? editForm.ppMax : form.ppMax}
-                                onChange={e => editingTemplate && setEditForm({ ...editForm, ppMax: e.target.checked })}
-                                disabled={!editingTemplate}
-                                className="w-4 h-4 rounded accent-purple-500"
+                                checked={editForm.ppMax}
+                                onChange={e => setEditForm({ ...editForm, ppMax: e.target.checked })}
+                                className="w-5 h-5 rounded-lg accent-purple-500 cursor-pointer"
                               />
-                              <span className="text-[10px] font-bold text-gray-500 uppercase">PP Max</span>
+                              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-white transition-colors">PP Max</span>
                             </label>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex gap-3 pt-4">
                       <button
                         type="button"
                         onClick={() => { setIsTemplateModalOpen(false); setEditingTemplate(null); }}
-                        className="flex-1 py-3 rounded-2xl border border-white/10 text-gray-500 font-black text-xs uppercase tracking-wider hover:border-white/20 transition-all"
+                        className="flex-1 py-4 rounded-2xl border border-white/10 text-gray-500 font-black text-[10px] uppercase tracking-wider hover:border-white/20 transition-all"
                       >
                         Cancelar
                       </button>
@@ -1966,7 +2186,7 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
                         type="button"
                         onClick={handleSaveTemplate}
                         disabled={isSavingTemplate}
-                        className="flex-[2] py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        className="flex-[2] py-4 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 text-black shadow-xl"
                         style={{
                           background: `linear-gradient(135deg, ${activeColor}, ${activeColor}bb)`,
                           color: contrastText,
@@ -1985,38 +2205,36 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
         document.body
       )}
 
-      {/* MODAL DE SUCESSO - WISHLIST */}
+      {/* MODAL DE SUCESSO - TEMPLATE */}
       {createPortal(
         <AnimatePresence>
-          {wishlistSuccessModal.isOpen && (
+          {successModal.isOpen && (
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-              onClick={() => setWishlistSuccessModal({isOpen: false, pokemon: ''})}
+              onClick={() => setSuccessModal({isOpen: false, pokemon: ''})}
             >
               <motion.div 
                 initial={{ scale: 0.9, y: 20 }} 
                 animate={{ scale: 1, y: 0 }} 
                 exit={{ scale: 0.9, y: 20 }}
-                className="glow-card max-w-sm w-full p-8 text-center bg-black border border-primary/20 space-y-6"
+                className="max-w-xs w-full bg-[#0d0d0f] border border-white/10 rounded-3xl p-8 text-center shadow-2xl"
                 onClick={e => e.stopPropagation()}
               >
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto border-2 border-primary/20 shadow-[0_0_20px_var(--primary-glow)]">
-                  <Heart size={32} className="text-primary fill-primary" />
+                <div className="w-16 h-16 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle2 className="text-secondary" size={32} />
                 </div>
-                <div>
-                  <h3 className="pixel-title text-xl text-white mb-2 uppercase">Adicionado!</h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                    <span className="text-primary">{wishlistSuccessModal.pokemon}</span> foi salvo na sua Wishlist com sucesso.
-                  </p>
-                </div>
+                <h3 className="pixel-title text-lg text-white mb-2">SUCESSO!</h3>
+                <p className="text-gray-400 text-sm font-bold uppercase tracking-wider leading-relaxed">
+                  Seu template de <span className="text-secondary">{successModal.pokemon}</span> foi salvo com sucesso.
+                </p>
                 <button 
-                  onClick={() => setWishlistSuccessModal({isOpen: false, pokemon: ''})}
-                  className="w-full py-3 px-6 bg-primary text-black rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-primary/20 hover:scale-105"
+                  onClick={() => setSuccessModal({isOpen: false, pokemon: ''})}
+                  className="w-full mt-8 py-4 bg-secondary rounded-2xl font-black text-xs uppercase tracking-widest text-black hover:scale-105 active:scale-95 transition-all shadow-lg shadow-secondary/20"
                 >
-                  Continuar
+                  Ótimo!
                 </button>
               </motion.div>
             </motion.div>
@@ -2025,46 +2243,80 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
         document.body
       )}
 
-      {/* MODAL DE CONFIRMAÇÃO - REMOVER WISHLIST */}
+      {/* MODAL DE CONFIRMAÇÃO - REMOVER TEMPLATE */}
       {createPortal(
         <AnimatePresence>
-          {wishlistRemoveConfirm?.isOpen && (
+          {deleteConfirm?.isOpen && (
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-              onClick={() => setWishlistRemoveConfirm(null)}
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+              onClick={() => setDeleteConfirm(null)}
             >
               <motion.div 
                 initial={{ scale: 0.9, y: 20 }} 
                 animate={{ scale: 1, y: 0 }} 
                 exit={{ scale: 0.9, y: 20 }}
-                className="glow-card max-w-sm w-full p-8 text-center bg-black border border-white/10 space-y-6"
+                className="max-w-xs w-full bg-[#0d0d0f] border border-red-500/30 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden"
                 onClick={e => e.stopPropagation()}
               >
-                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
-                  <AlertCircle size={32} className="text-red-500" />
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                
+                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle className="text-red-500" size={32} />
                 </div>
-                <div>
-                  <h3 className="pixel-title text-xl text-white mb-2 uppercase">Remover?</h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                    Deseja remover <br/><span className="text-white">{wishlistRemoveConfirm.name}</span><br/> da sua Wishlist?
-                  </p>
-                </div>
-                <div className="flex gap-4">
+                
+                <h3 className="pixel-title text-lg text-red-500 mb-2">REMOVER TEMPLATE?</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
+                  Deseja remover <br/><span className="text-white text-xs">{deleteConfirm.name}</span><br/> permanentemente?
+                </p>
+                
+                <div className="flex gap-3 mt-8">
                   <button 
-                    onClick={() => setWishlistRemoveConfirm(null)}
-                    className="flex-1 py-3 px-6 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-black text-[10px] uppercase transition-all"
+                    onClick={() => setDeleteConfirm(null)}
+                    className="flex-1 py-4 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-widest text-gray-500 hover:bg-white/5 transition-all"
                   >
-                    Cancelar
+                    Não
                   </button>
                   <button 
-                    onClick={confirmRemoveWishlist}
-                    className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase transition-all shadow-lg shadow-red-900/20"
+                    onClick={confirmDeleteTemplate}
+                    className="flex-1 py-4 bg-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-red-700 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-600/20"
                   >
-                    Remover
+                    Sim, Remover
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE LIMPEZA */}
+      {createPortal(
+        <AnimatePresence>
+          {clearConfirmOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setClearConfirmOpen(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                className="bg-[#0d0d0f] border-2 border-white/10 rounded-[2.5rem] w-full max-w-sm p-8 shadow-2xl relative text-center"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Zap size={32} className="text-red-500" />
+                </div>
+                <h3 className="pixel-title text-xl text-white mb-4">LIMPAR CAMPOS?</h3>
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-8">
+                  Você está prestes a apagar todos os dados<br/>preenchidos nesta encomenda.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setClearConfirmOpen(false)} className="flex-1 py-4 rounded-2xl border border-white/10 text-gray-500 font-black text-[10px] uppercase tracking-wider hover:bg-white/5 transition-all">Manter</button>
+                  <button onClick={() => { resetForm(); setClearConfirmOpen(false); }} className="flex-1 py-4 rounded-2xl bg-red-500 text-white font-black text-[10px] uppercase tracking-wider hover:bg-red-600 transition-all shadow-lg shadow-red-500/20">Limpar Tudo</button>
                 </div>
               </motion.div>
             </motion.div>
@@ -2076,8 +2328,6 @@ export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isComp
     </div>
   );
 };
-
-
 
 const CustomSelect = ({ label, value, onChange, options, placeholder, disabled }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -2131,3 +2381,4 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, disabled }
     </div>
   );
 };
+

@@ -121,20 +121,19 @@ const DEFAULT_EMBEDS = {
     components: []
   },
   help: {
-    title: '🌟 CENTRAL DE AJUDA VALIANTSHOP',
-    description: 'Bem-vindo ao centro de comando do **ValiantShop**. Aqui você encontra todos os detalhes das funções operacionais logísticas do servidor.\n\nUtilize os comandos de barra (`/`) para acessar os sistemas abaixo.',
-    color: '0xFACC15',
-    footer: 'ValiantShop — Suporte Automático',
-    author: 'Central de Inteligência',
-    thumbnail: 'https://cdn-icons-png.flaticon.com/512/1067/1067566.png',
+    title: '🌌 CENTRAL DE AJUDA — VALIANTSHOP',
+    description: 'Bem-vindo à central de suporte e ferramentas do bot. Utilize o menu abaixo para navegar entre as categorias.',
+    color: '0x6366f1',
+    banner: 'https://valiantshop.pages.dev/assets/images/bot_banner.jpg', 
+    thumbnail: 'https://valiantshop.pages.dev/assets/images/bot_logo.png',
+    footer: 'ValiantShop | Modernizing your experience',
     fields: [
-      { name: '👤 `/cliente [discord]`', value: 'Busca o perfil e o histórico detalhado de compras de um jogador pelo seu **Nickname do Discord**.\n*Ex: /cliente discord: reskallaarthur*', inline: false },
-      { name: '📊 `/resumo`', value: 'Gera um relatório de performance mostrando o volume de operações (pendentes, breedings, entregues) e a receita gerada nas **últimas 24 horas**.', inline: false },
-      { name: '💰 `/balance`', value: 'Apresenta o balanço financeiro e o **lucro total histórico** já faturado pela ValiantShop.', inline: false },
-      { name: '🎨 `/editar_embed`', value: 'Painel administrativo para customizar **todas** as Embeds do bot de forma visual (título, cor, foto, textos).', inline: false },
-      { name: '📦 Outros Comandos', value: '`/salas_estoque` - Consulta do inventário de baús.\n`/tabela` - Lista de preços oficial.\n`/config_bot` - Ajuste de canal logístico.', inline: false }
+      { name: '🚀 Início Rápido', value: 'Selecione uma categoria no menu para ver os comandos disponíveis.', inline: false },
+      { name: '🌐 Links Úteis', value: '[Acesse nosso Site](https://valiantshop.pages.dev)\n[Tabela de Preços](https://valiantshop.pages.dev/tabela)', inline: false }
     ],
-    components: []
+    components: [
+      { label: 'Site Oficial', style: 5, url: 'https://valiantshop.pages.dev', emoji: { name: '🌐' } }
+    ]
   },
   cliente: {
     title: '👤 PERFIL DO CLIENTE',
@@ -631,7 +630,8 @@ export default {
           ]
         }
       ];
-      await fetch(`https://discord.com/api/v10/applications/1498061638941806833/commands`, { 
+      const appId = env.DISCORD_APPLICATION_ID || "1498061638941806833";
+      const syncRes = await fetch(`https://discord.com/api/v10/applications/${appId}/commands`, { 
         method: 'PUT', 
         headers: { 
           'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`, 
@@ -639,7 +639,20 @@ export default {
         }, 
         body: JSON.stringify(commands) 
       });
-      return new Response('Commands updated successfully (v2)');
+
+      if (syncRes.ok) {
+        const deployed = await syncRes.json();
+        return new Response(`✅ Comandos sincronizados com sucesso!\n\nAplicação: ${appId}\nComandos (${deployed.length}): ${deployed.map(c => '/' + c.name).join(', ')}\n\nNota: Comandos globais podem levar até 1 hora para aparecer em todos os servidores.`, { 
+          status: 200, 
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' } 
+        });
+      } else {
+        const errorText = await syncRes.text();
+        return new Response(`❌ Erro ao sincronizar comandos (${syncRes.status}): ${errorText}`, { 
+          status: syncRes.status,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' } 
+        });
+      }
     }
 
     const signature = request.headers.get('X-Signature-Ed25519');
@@ -836,8 +849,44 @@ export default {
         ctx.waitUntil((async () => {
           const idToken = await getFirebaseToken(env);
           const cfg = await getEmbedConfig(env, 'help', idToken);
-          const embed = buildEmbedFromConfig(cfg, {});
-          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) });
+          const embed = buildEmbedFromConfig(cfg, mockOrder);
+          
+          const components = [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 3,
+                  custom_id: 'help_menu',
+                  placeholder: cfg.selects?.[0]?.placeholder || 'Selecione uma categoria...',
+                  options: [
+                    { label: '🏠 Início', value: 'help_home', description: 'Voltar para a tela inicial.', emoji: { name: '🏠' } },
+                    { label: '📦 Logística & Pedidos', value: 'help_logistics', description: 'Comandos de balanço, resumo e histórico.', emoji: { name: '📦' } },
+                    { label: '🛠️ Ferramentas & Estoque', value: 'help_tools', description: 'Tabela de preços, salas de estoque e utilitários.', emoji: { name: '🛠️' } },
+                    { label: '⚙️ Configurações', value: 'help_settings', description: 'Ajustes de identidade, avatar e status.', emoji: { name: '⚙️' } },
+                    { label: '📄 Personalização', value: 'help_system', description: 'Edição de embeds, modais e botões.', emoji: { name: '📄' } }
+                  ]
+                }
+              ]
+            }
+          ];
+
+          if (cfg.components && cfg.components.length > 0) {
+            components.push({ type: 1, components: cfg.components.slice(0, 5) });
+          } else {
+            components.push({
+              type: 1,
+              components: [
+                { type: 2, label: 'Site Oficial', style: 5, url: 'https://valiantshop.pages.dev', emoji: { name: '🌐' } }
+              ]
+            });
+          }
+
+          await fetch(`https://discord.com/api/v10/webhooks/${interaction.application_id}/${interaction.token}/messages/@original`, { 
+            method: 'PATCH', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ embeds: [embed], components }) 
+          });
         })());
         return jsonResponse({ type: 5 });
       }
@@ -1087,7 +1136,60 @@ export default {
       }
 
       if (interaction.type === 3) {
-        if (interaction.data.custom_id && interaction.data.custom_id.startsWith('custommodal_')) {
+        const cid = interaction.data.custom_id;
+        let parts = cid ? cid.split('_') : [];
+
+        if (cid === 'help_menu') {
+          const category = interaction.data.values[0];
+          let embed = {
+            color: 0x6366f1,
+            image: { url: 'https://valiantshop.pages.dev/assets/images/bot_banner.jpg' },
+            footer: { text: "ValiantShop | Central de Comando" },
+            timestamp: new Date().toISOString()
+          };
+
+          if (category === 'help_home') {
+            embed.title = "🌌 CENTRAL DE COMANDO — VALIANTSHOP";
+            embed.description = "Bem-vindo à central de suporte e ferramentas do bot. Utilize o menu abaixo para navegar entre as categorias.";
+            embed.thumbnail = { url: 'https://valiantshop.pages.dev/assets/images/bot_logo.png' };
+            embed.fields = [
+              { name: "🚀 Início Rápido", value: "Selecione uma categoria no menu para ver os comandos disponíveis." },
+              { name: "🌐 Links Úteis", value: "[Acesse nosso Site](https://valiantshop.pages.dev)\n[Tabela de Preços](https://valiantshop.pages.dev/tabela)" }
+            ];
+          } else if (category === 'help_logistics') {
+            embed.title = "📦 LOGÍSTICA & PEDIDOS";
+            embed.description = "Controle o fluxo financeiro e o status das encomendas.";
+            embed.fields = [
+              { name: "`/balance`", value: "📊 Veja o saldo total e lucro das últimas 24h.", inline: true },
+              { name: "`/resumo`", value: "📋 Relatório detalhado de pedidos e valores.", inline: true },
+              { name: "`/cliente`", value: "👤 Consulte o histórico e gastos de um cliente.", inline: true }
+            ];
+          } else if (category === 'help_tools') {
+            embed.title = "🛠️ FERRAMENTAS & ESTOQUE";
+            embed.description = "Utilitários para gestão de preços e inventário.";
+            embed.fields = [
+              { name: "`/tabela`", value: "ℹ️ Exibe a tabela de preços oficial.", inline: true },
+              { name: "`/salas_estoque`", value: "📦 Lista o conteúdo das salas de estoque.", inline: true },
+              { name: "`/server`", value: "💾 Comandos de utilidade do servidor.", inline: true }
+            ];
+          } else if (category === 'help_settings') {
+            embed.title = "⚙️ CONFIGURAÇÕES DO BOT";
+            embed.description = "Ajuste a presença e identidade do bot.";
+            embed.fields = [
+              { name: "`/config_bot`", value: "🛠️ Abre o painel de configurações gerais.", inline: true }
+            ];
+          } else if (category === 'help_system') {
+            embed.title = "📄 PERSONALIZAÇÃO DO SISTEMA";
+            embed.description = "Configure como as mensagens são exibidas.";
+            embed.fields = [
+              { name: "`/editar_embed`", value: "🎨 Personalize textos e cores das notificações.", inline: true }
+            ];
+          }
+
+          return jsonResponse({ type: 7, data: { embeds: [embed] } });
+        }
+
+        if (cid && cid.startsWith('custommodal_')) {
            const idToken = await getFirebaseToken(env);
            const embedsDoc = await getFirestoreDoc(env, 'bot_config', 'embeds', idToken);
            if (embedsDoc && embedsDoc.fields) {
@@ -1277,7 +1379,7 @@ export default {
           ] } });
         }
 
-        const parts = interaction.data.custom_id ? interaction.data.custom_id.split('_') : [];
+        parts = interaction.data.custom_id ? interaction.data.custom_id.split('_') : [];
 
         if (interaction.data.custom_id === "config_category_select") {
           const category = interaction.data.values[0];
@@ -1570,24 +1672,24 @@ export default {
            const index = parseInt(parts[2]);
            const m = cfg.modals[index];
            return jsonResponse({ type: 9, data: { title: 'Editar Modal', custom_id: `modalconfig_edit_${index}_${type}`, components: [
-             { type: 1, components: [{ type: 4, custom_id: 'title', label: 'Título do Modal', value: m.title, style: 1, required: true }] },
-             { type: 1, components: [{ type: 4, custom_id: 'trigger_id', label: 'ID Gatilho (comece com custommodal_)', value: m.trigger_id, style: 1, required: true }] },
-             { type: 1, components: [{ type: 4, custom_id: 'questions', label: 'Perguntas (separadas por vírgula)', value: m.questions, style: 2, required: true }] },
-             { type: 1, components: [{ type: 4, custom_id: 'log_channel', label: 'Canal de Logs', value: m.log_channel, style: 1, required: true }] }
-           ]}});
-        }
-        
-        if (parts[0] === 'editmodal' && parts[1] === 'delete' && parts[2] === 'select') {
-           const idToken = await getFirebaseToken(env);
-           const index = parseInt(interaction.data.values[0]);
-           const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
-           const cfg = JSON.parse(draftDoc.fields.config.stringValue);
-           cfg.modals.splice(index, 1);
-           await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
-           return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
-        }
+              { type: 1, components: [{ type: 4, custom_id: 'title', label: 'Título do Modal', value: m.title, style: 1, required: true }] },
+              { type: 1, components: [{ type: 4, custom_id: 'trigger_id', label: 'ID Gatilho (comece com custommodal_)', value: m.trigger_id, style: 1, required: true }] },
+              { type: 1, components: [{ type: 4, custom_id: 'questions', label: 'Perguntas (separadas por vírgula)', value: m.questions, style: 2, required: true }] },
+              { type: 1, components: [{ type: 4, custom_id: 'log_channel', label: 'Canal de Logs', value: m.log_channel, style: 1, required: true }] }
+            ]}});
+         }
+         
+         if (parts[0] === 'editmodal' && parts[1] === 'delete' && parts[2] === 'select') {
+            const idToken = await getFirebaseToken(env);
+            const index = parseInt(interaction.data.values[0]);
+            const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
+            const cfg = JSON.parse(draftDoc.fields.config.stringValue);
+            cfg.modals.splice(index, 1);
+            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
+            return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
+         }
 
-        if (interaction.data.custom_id === "config_toggle_notif" || interaction.data.custom_id === "config_toggle_pings" || interaction.data.custom_id === "config_toggle_maint") {
+        if (cid === 'config_toggle_notif' || cid === 'config_toggle_pings' || cid === 'config_toggle_maint') {
           ctx.waitUntil((async () => {
             const idToken = await getFirebaseToken(env);
             const settingsDoc = await getFirestoreDoc(env, 'bot_config', 'settings', idToken);
@@ -1960,7 +2062,8 @@ export default {
            else { const index = parseInt(parts[2]); cfg.selects[index] = newSelect; }
            
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
-           return jsonResponse({ type: 7, data: { components: buildSelectButtons(type, cfg.selects) } });
+           const preview = buildEmbedFromConfig(cfg, mockOrder);
+           return jsonResponse({ type: 7, data: { embeds: [preview], components: buildSelectButtons(type, cfg.selects) } });
         }
 
         if (cid.startsWith('modalconfig_')) {
@@ -1974,7 +2077,8 @@ export default {
            else { const index = parseInt(parts[2]); cfg.modals[index] = newModal; }
            
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
-           return jsonResponse({ type: 7, data: { components: buildModalButtons(type, cfg.modals) } });
+           const preview = buildEmbedFromConfig(cfg, mockOrder);
+           return jsonResponse({ type: 7, data: { embeds: [preview], components: buildModalButtons(type, cfg.modals) } });
         }
 
          if (cid === 'modal_bot_identity') {
@@ -2040,8 +2144,7 @@ export default {
            
            if (action === 'field') return jsonResponse({ type: 7, data: { content: warning, embeds: [preview], components: buildFieldButtons(type, cfg.fields) } });
            if (action === 'channel') return jsonResponse({ type: 4, data: { flags: 64, content: warning || `✅ Canal de envio atualizado para \`${val}\`!` } });
-           return jsonResponse({ type: 7, data: { content: warning || cfg.content, embeds: [preview] } });
-        }
+           return jsonResponse({ type: 7, data: { content: warning || cfg.content, embeds: [preview], components: buildEmbedEditorButtons(type) } });
         }
       }
     }
