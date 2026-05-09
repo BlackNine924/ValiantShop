@@ -3,12 +3,38 @@
  * Handles button clicks, select menus, modals, and bidirectional sync.
  */
 import { POKEMON_DB } from './pokemonDb.js';
+import { POKEMON_TYPE_DATA } from '../../src/data/pokemonTypes.ts';
 
 const STATUS_CONFIG = {
   Pendente:   { color: 0xF97416, emoji: '🟠', label: 'Pendente' },
   Breeding:   { color: 0x7B2FBE, emoji: '🟣', label: 'Breeding' },
   Finalizado: { color: 0x00C851, emoji: '🟢', label: 'Finalizado' },
   Entregue:   { color: 0x427BD0, emoji: '🔵', label: 'Entregue' },
+};
+
+const TYPE_TRANSLATIONS = {
+  "normal": "normal", "fire": "fire", "fogo": "fire",
+  "water": "water", "água": "water", "agua": "water",
+  "grass": "grass", "grama": "grass", "planta": "grass",
+  "electric": "electric", "elétrico": "electric", "eletrico": "electric",
+  "ice": "ice", "gelo": "ice",
+  "fighting": "fighting", "lutador": "fighting",
+  "poison": "poison", "venenoso": "poison",
+  "ground": "ground", "terra": "ground",
+  "flying": "flying", "voador": "flying",
+  "psychic": "psychic", "psíquico": "psychic", "psiquico": "psychic",
+  "bug": "bug", "inseto": "bug",
+  "rock": "rock", "pedra": "rock",
+  "ghost": "ghost", "fantasma": "ghost",
+  "dragon": "dragon", "dragão": "dragon", "dragao": "dragon",
+  "dark": "dark", "noturno": "dark", "sombrio": "dark",
+  "steel": "steel", "aço": "steel", "aco": "steel",
+  "fairy": "fairy", "fada": "fairy"
+};
+
+const CATEGORY_TRANSLATIONS = {
+  "starter": "Iniciais",
+  "pseudo": "Semi-Lendários"
 };
 
 const DEFAULT_EMBEDS = {
@@ -26,6 +52,27 @@ const DEFAULT_EMBEDS = {
       { name: '👤 Treinador', value: '{treinador}', inline: true }, { name: '👾 Pokémon', value: '{pokemon}', inline: true }, { name: '📊 IVs', value: '{ivs}', inline: true },
       { name: '🧪 Ability', value: '{ability}', inline: true }, { name: '🧬 Gênero', value: '{genero}', inline: true }, { name: '💬 Discord', value: '{discord}', inline: true },
       { name: '📝 Observações', value: '{obs}', inline: true }, { name: '🥚 Egg Group', value: '{egg}', inline: true }, { name: '💰 Valor Total', value: '{total}', inline: true }
+    ],
+    components: [
+      { type: 2, label: '⚙️ Status', style: 1, custom_id: 'menu_status' },
+      { type: 2, label: '❌ Cancelar', style: 4, custom_id: 'confirm_cancel' }
+    ]
+  },
+  notificacao_competitiva: {
+    title: '⚔️ ENCOMENDA COMPETITIVA ⚔️',
+    description: '<@USER>, um novo pedido competitivo foi registrado.',
+    color: '0xA855F7',
+    banner: 'https://wallpapers-clan.com/wp-content/uploads/2024/08/ash-pikachu-adventure-pokemon-desktop-wallpaper-cover.jpg',
+    footer: 'ValiantShop | Logística Competitiva',
+    author: 'Aviso de Venda Competitiva',
+    thumbnail: '{sprite}',
+    content: '⚔️ Novo pedido competitivo!',
+    channel: '1501747572463894538',
+    fields: [
+      { name: '👤 Treinador', value: '{treinador}', inline: true }, { name: '👾 Pokémon', value: '{pokemon}', inline: true }, { name: '📊 IVs', value: '{ivs}', inline: true },
+      { name: '📈 EVs', value: '{evs}', inline: true }, { name: '🎒 Item', value: '{item}', inline: true }, { name: '🎖️ Level', value: '{level}', inline: true },
+      { name: '🌀 Moveset', value: '{moveset}', inline: false },
+      { name: '💰 Valor Total', value: '{total}', inline: true }
     ],
     components: [
       { type: 2, label: '⚙️ Status', style: 1, custom_id: 'menu_status' },
@@ -112,6 +159,25 @@ const DEFAULT_EMBEDS = {
 const ARCHIVE_CHANNEL_ID = '1498075679269458073';
 const VERIFY_CONFIRM = "SIM";
 
+const COMP_VARS = ['{evs}', '{item}', '{moveset}', '{level}', '{ppmax}'];
+
+function validateVars(text, type) {
+  if (type === 'notificacao_competitiva') return { hasProhibited: false, cleaned: text };
+  
+  let cleaned = text;
+  let hasProhibited = false;
+  
+  for (const v of COMP_VARS) {
+    if (text.includes(v)) {
+      const escapedV = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.replace(new RegExp(escapedV, 'g'), '');
+      hasProhibited = true;
+    }
+  }
+  
+  return { hasProhibited, cleaned };
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -176,12 +242,22 @@ async function queryFirestore(env, query, idToken) {
 
 function getPokeInfo(name) {
   if (!name) return null;
-  const entry = Object.entries(POKEMON_DB).find(([k]) => k.toLowerCase() === name.toLowerCase());
-  return entry ? { name: entry[0], ...entry[1] } : null;
+  const cleanName = name.trim().toLowerCase();
+  
+  // 1. Tentar pelo POKEMON_DB (chaves capitalizadas)
+  const entry = Object.entries(POKEMON_DB).find(([k]) => k.toLowerCase() === cleanName);
+  if (entry) return { name: entry[0], ...entry[1] };
+  
+  // 2. Fallback: Procurar no POKEMON_TYPE_DATA pelo nome
+  const typeEntry = POKEMON_TYPE_DATA.find(t => t.name.toLowerCase() === cleanName);
+  if (typeEntry) return { name: typeEntry.name, id: typeEntry.id };
+  
+  return null;
 }
 
-function replacePlaceholders(text, data) {
+function replacePlaceholders(text, data, templateType = 'notificacao') {
   if (!text) return text;
+  const isCompTemplate = templateType === 'notificacao_competitiva';
   const info = getPokeInfo(data.pokemon);
   
   // Formata IVs ignorados — exibe apenas "-HP -Atk" sem prefixo
@@ -220,7 +296,12 @@ function replacePlaceholders(text, data) {
     '{id}': data.id || 'N/A',
     '{gasto}': data.gasto || '0',
     '{historico}': data.historico || 'Nenhum pedido.',
-    '{tabela}': data.tabela || ''
+    '{tabela}': data.tabela || '',
+    '{evs}': isCompTemplate ? (data.build?.evs ? Object.entries(data.build.evs).filter(([_, v]) => Number(v) > 0).map(([s, v]) => `${s}: ${v}`).join(' | ') : 'N/A') : '',
+    '{item}': isCompTemplate ? (data.build?.item || 'Nenhum') : '',
+    '{moveset}': isCompTemplate ? ((data.build?.moves || []).filter(Boolean).join(' / ') || 'N/A') : '',
+    '{level}': isCompTemplate ? (data.build?.level || '50') : '',
+    '{ppmax}': isCompTemplate ? (data.build?.ppMax ? 'SIM' : 'NÃO') : ''
   };
   let result = text;
   for (const [k, v] of Object.entries(map)) {
@@ -229,34 +310,34 @@ function replacePlaceholders(text, data) {
   return result;
 }
 
-function buildEmbedFromConfig(cfg, order) {
+function buildEmbedFromConfig(cfg, order, templateType = 'notificacao') {
   const info = getPokeInfo(order.pokemon);
   const embed = {
     color: parseInt(cfg.color, 16) || 0xF97416,
   };
   
-  const title = replacePlaceholders(cfg.title, order);
+  const title = replacePlaceholders(cfg.title, order, templateType);
   if (title && title.trim() !== '') embed.title = title.substring(0, 256);
   
-  const desc = replacePlaceholders(cfg.description, order);
+  const desc = replacePlaceholders(cfg.description, order, templateType);
   if (desc && desc.trim() !== '') embed.description = desc.substring(0, 4096);
   
   if (cfg.fields && cfg.fields.length > 0) {
     embed.fields = cfg.fields.map(f => ({ 
-      name: (replacePlaceholders(f.name, order) || '\u200B').substring(0, 256), 
-      value: (replacePlaceholders(f.value, order) || '\u200B').substring(0, 1024), 
+      name: (replacePlaceholders(f.name, order, templateType) || '\u200B').substring(0, 256), 
+      value: (replacePlaceholders(f.value, order, templateType) || '\u200B').substring(0, 1024), 
       inline: f.inline 
     }));
   }
 
-  if (cfg.banner && cfg.banner.trim() !== '') embed.image = { url: replacePlaceholders(cfg.banner, order) };
-  if (cfg.footer && cfg.footer.trim() !== '') embed.footer = { text: replacePlaceholders(cfg.footer, order).substring(0, 2048) };
-  if (cfg.author && cfg.author.trim() !== '') embed.author = { name: replacePlaceholders(cfg.author, order).substring(0, 256) };
+  if (cfg.banner && cfg.banner.trim() !== '') embed.image = { url: replacePlaceholders(cfg.banner, order, templateType) };
+  if (cfg.footer && cfg.footer.trim() !== '') embed.footer = { text: replacePlaceholders(cfg.footer, order, templateType).substring(0, 2048) };
+  if (cfg.author && cfg.author.trim() !== '') embed.author = { name: replacePlaceholders(cfg.author, order, templateType).substring(0, 256) };
   
   if ((cfg.thumbnail === '{sprite}' || cfg.thumbnail === 'pokemon') && info) {
     embed.thumbnail = { url: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${info.id}.png` };
   } else if (cfg.thumbnail && cfg.thumbnail.trim() !== '') {
-    embed.thumbnail = { url: replacePlaceholders(cfg.thumbnail, order) };
+    embed.thumbnail = { url: replacePlaceholders(cfg.thumbnail, order, templateType) };
   }
 
   return embed;
@@ -439,7 +520,8 @@ export default {
             type: 3, 
             required: true, 
             choices: [
-              { name: "Notificação", value: "notificacao" }, 
+              { name: "Encomenda Geral", value: "notificacao" }, 
+              { name: "Encomenda Competitiva", value: "notificacao_competitiva" },
               { name: "Cancelamento", value: "cancelamento" },
               { name: "Caixa", value: "caixa" },
               { name: "Resumo", value: "resumo" },
@@ -553,8 +635,9 @@ export default {
         const fullOrder = orderObj || Object.fromEntries(Object.entries(doc.fields).map(([k, v]) => [k, v.stringValue || v.integerValue || v.doubleValue || v.booleanValue]));
         fullOrder.status = newStatus;
         
-        const cfg = await getEmbedConfig(env, 'notificacao', idToken);
-        const embed = buildEmbedFromConfig(cfg, fullOrder);
+        const templateType = fullOrder.isCompetitive ? 'notificacao_competitiva' : 'notificacao';
+        const cfg = await getEmbedConfig(env, templateType, idToken);
+        const embed = buildEmbedFromConfig(cfg, fullOrder, templateType);
         embed.color = STATUS_CONFIG[newStatus]?.color || embed.color;
         
         await updateFirestore(env, 'orders', orderId, { status: { stringValue: newStatus } }, idToken);
@@ -578,7 +661,7 @@ export default {
              await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'DELETE', headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
           }
         } else {
-          await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
+          await fetch(`https://discord.com/api/v10/channels/${currentChannelId}/messages/${currentMessageId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, fullOrder, templateType), embeds: [embed], components: buildMainMenuComponents(orderId, cfg.components, cfg.selects) }) });
         }
         
         if (newMessageId !== currentMessageId) {
@@ -588,9 +671,10 @@ export default {
       }
 
       if (data.action === 'send') {
-        const cfg = await getEmbedConfig(env, 'notificacao', idToken);
-        const embed = buildEmbedFromConfig(cfg, order);
-        const res = await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order), embeds: [embed], components: buildMainMenuComponents(data.orderId, cfg.components, cfg.selects) }) });
+        const templateType = order.isCompetitive ? 'notificacao_competitiva' : 'notificacao';
+        const cfg = await getEmbedConfig(env, templateType, idToken);
+        const embed = buildEmbedFromConfig(cfg, order, templateType);
+        const res = await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, order, templateType), embeds: [embed], components: buildMainMenuComponents(data.orderId, cfg.components, cfg.selects) }) });
         if (res.ok) {
            const msg = await res.json();
            return jsonResponse({ success: true, id: msg.id });
@@ -598,7 +682,8 @@ export default {
         return jsonResponse({ success: false });
       }
       if (data.action === 'update') {
-        const cfg = await getEmbedConfig(env, 'notificacao', idToken);
+        const templateType = order.isCompetitive ? 'notificacao_competitiva' : 'notificacao';
+        const cfg = await getEmbedConfig(env, templateType, idToken);
         let channelId = cfg.channel;
         let msgObj = await getDiscordMessage(env, channelId, data.messageId);
         if (!msgObj) { channelId = ARCHIVE_CHANNEL_ID; msgObj = await getDiscordMessage(env, channelId, data.messageId); }
@@ -610,8 +695,8 @@ export default {
       if (data.action === 'delete' || data.action === 'cancel') {
         const cfg = await getEmbedConfig(env, 'cancelamento', idToken);
         if (data.order && Object.keys(data.order).length > 0) {
-           const embed = buildEmbedFromConfig(cfg, data.order);
-           await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, data.order) || `⚠️ <@650763941462671394> Encomenda cancelada!`, embeds: [embed] }) });
+           const embed = buildEmbedFromConfig(cfg, data.order, 'cancelamento');
+           await fetch(`https://discord.com/api/v10/channels/${cfg.channel}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` }, body: JSON.stringify({ content: replacePlaceholders(cfg.content, data.order, 'cancelamento') || `⚠️ <@650763941462671394> Encomenda cancelada!`, embeds: [embed] }) });
         }
         if (data.messageId) {
            const notifCfg = await getEmbedConfig(env, 'notificacao', idToken);
@@ -794,28 +879,37 @@ export default {
                 if (!info) return false;
 
                 // 1. Egg Group
-                if (filterEgg && !info.e?.some(e => e.toLowerCase() === filterEgg)) return false;
+                const fEgg = filterEgg?.trim().toLowerCase();
+                if (fEgg && !info.e?.some(e => e.toLowerCase() === fEgg)) return false;
 
                 // 2. Tipos (Deve ter TODOS os tipos especificados)
                 if (filterTypes && filterTypes.length > 0) {
-                   const typesRaw = info.t || [];
-                   const pTypes = typesRaw.map(t => t.toLowerCase());
-                   if (!filterTypes.every(ft => pTypes.includes(ft))) return false;
+                   const typeEntry = POKEMON_TYPE_DATA.find(t => t.id == info.id) || POKEMON_TYPE_DATA.find(t => t.name.toLowerCase() === info.name.toLowerCase());
+                   if (!typeEntry) return false;
+                   
+                   const pTypesEn = typeEntry.types.map(t => t.toLowerCase());
+                   const normalizedFilters = filterTypes
+                     .map(ft => ft.trim().toLowerCase())
+                     .filter(ft => ft.length > 0)
+                     .map(ft => TYPE_TRANSLATIONS[ft] || ft);
+                   
+                   if (normalizedFilters.length > 0 && !normalizedFilters.every(nft => pTypesEn.includes(nft))) return false;
                 }
 
-                // 3. Gen (Lógica baseada em faixas de ID de Kanto a Paldea)
+                // 3. Gen (Lógica baseada em faixas de ID)
                 if (filterGen) {
-                  const id = info.id;
+                  const idNum = parseInt(info.id);
+                  if (isNaN(idNum)) return false;
                   let pGen = 0;
-                  if (id >= 1 && id <= 151) pGen = 1;
-                  else if (id >= 152 && id <= 251) pGen = 2;
-                  else if (id >= 252 && id <= 386) pGen = 3;
-                  else if (id >= 387 && id <= 493) pGen = 4;
-                  else if (id >= 494 && id <= 649) pGen = 5;
-                  else if (id >= 650 && id <= 721) pGen = 6;
-                  else if (id >= 722 && id <= 809) pGen = 7;
-                  else if (id >= 810 && id <= 905) pGen = 8;
-                  else if (id >= 906 && id <= 1025) pGen = 9;
+                  if (idNum >= 1 && idNum <= 151) pGen = 1;
+                  else if (idNum >= 152 && idNum <= 251) pGen = 2;
+                  else if (idNum >= 252 && idNum <= 386) pGen = 3;
+                  else if (idNum >= 387 && idNum <= 493) pGen = 4;
+                  else if (idNum >= 494 && idNum <= 649) pGen = 5;
+                  else if (idNum >= 650 && idNum <= 721) pGen = 6;
+                  else if (idNum >= 722 && idNum <= 809) pGen = 7;
+                  else if (idNum >= 810 && idNum <= 905) pGen = 8;
+                  else if (idNum >= 906 && idNum <= 1025) pGen = 9;
                   
                   if (pGen !== filterGen) return false;
                 }
@@ -824,7 +918,6 @@ export default {
                 if (filterCategory) {
                   const id = info.id;
                   if (filterCategory === 'starter') {
-                    // IDs dos iniciais (Bulbasaur, Charmander, Squirtle e suas evoluções, etc)
                     const starters = [
                       1,2,3, 4,5,6, 7,8,9, // Gen 1
                       152,153,154, 155,156,157, 158,159,160, // Gen 2
@@ -839,7 +932,6 @@ export default {
                     if (!starters.includes(id)) return false;
                   }
                   if (filterCategory === 'pseudo') {
-                    // Pseudos comuns
                     const pseudos = [
                       147,148,149, 246,247,248, 371,372,373, 374,375,376, 
                       443,444,445, 633,634,635, 704,705,706, 782,783,784, 
@@ -1321,6 +1413,7 @@ export default {
                   { name: "📊 Atributos", value: "`{ivs}`: Formato F5/F6\n`{ivs_detalhe}`: IVs faltantes\n`{genero}`: M/F/N", inline: true },
                   { name: "🧬 Genética", value: "`{ability}`: Habilidade\n`{egg}`: Egg Groups\n`{b/c}`: Breed/Castrado", inline: true },
                   { name: "💰 Financeiro", value: "`{total}`: Valor total (ex: 80k)\n`{caixa}`: Lucro total acumulado", inline: true },
+                  { name: "⚔️ Competitivo", value: "`{evs}`: Distribuição de EVs\n`{item}`: Item equipado\n`{moveset}`: Lista de ataques\n`{level}`: Nível alvo\n`{ppmax}`: PP Max Sim/Não", inline: false },
                   { name: "💡 Dica", value: "O campo **Canal** deve conter o ID numérico (Ex: 123456789).", inline: false }
                 ]
               }]
@@ -1909,10 +2002,15 @@ export default {
            const parts = cid.split('_'); const action = parts[1]; const type = parts.pop();
            const draftDoc = await getFirestoreDoc(env, 'bot_config', `draft_${type}`, idToken);
            const cfg = JSON.parse(draftDoc.fields.config.stringValue);
-           const val = getVal('val');
-           
+
+           const valRaw = getVal('val');
+           const validation = validateVars(valRaw, type);
+           const val = validation.cleaned;
+           let warning = validation.hasProhibited ? '⚠️ **AVISO:** Algumas variáveis competitivas foram removidas por serem incompatíveis com este tipo de notificação. Elas ficarão ocultas para garantir a limpeza do log.' : '';
+
            if (action === 'field') {
-              const index = parseInt(parts[2]); cfg.fields[index] = { name: getVal('name'), value: getVal('val'), inline: getVal('inline').toUpperCase() === 'S' };
+              const index = parseInt(parts[2]); 
+              cfg.fields[index] = { name: getVal('name'), value: val, inline: getVal('inline').toUpperCase() === 'S' };
            } else if (action === 'channel') {
               cfg.channel = val;
            } else {
@@ -1923,9 +2021,10 @@ export default {
            await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/bot_config/draft_${type}?updateMask.fieldPaths=config`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ fields: { config: { stringValue: JSON.stringify(cfg) } } }) });
            const preview = buildEmbedFromConfig(cfg, mockOrder);
            
-           if (action === 'field') return jsonResponse({ type: 7, data: { embeds: [preview], components: buildFieldButtons(type, cfg.fields) } });
-           if (action === 'channel') return jsonResponse({ type: 4, data: { flags: 64, content: `✅ Canal de envio atualizado para \`${val}\`!` } });
-           return jsonResponse({ type: 7, data: { content: cfg.content, embeds: [preview] } });
+           if (action === 'field') return jsonResponse({ type: 7, data: { content: warning, embeds: [preview], components: buildFieldButtons(type, cfg.fields) } });
+           if (action === 'channel') return jsonResponse({ type: 4, data: { flags: 64, content: warning || `✅ Canal de envio atualizado para \`${val}\`!` } });
+           return jsonResponse({ type: 7, data: { content: warning || cfg.content, embeds: [preview] } });
+        }
         }
       }
     }

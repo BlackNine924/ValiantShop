@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Search, Clock, Package, CheckCircle2, Coins, Star, X, RefreshCw, MessageSquare, ChevronDown, ChevronUp, Filter, Trash2 } from 'lucide-react';
+import { Search, Clock, Package, CheckCircle2, Coins, Star, X, RefreshCw, MessageSquare, ChevronDown, ChevronUp, Filter, Trash2, ShoppingBag, Egg, DollarSign, Swords } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,10 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, serverTimestamp, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/storageUtils';
 import { deleteOrderEmbed, notifyDeleteOrder } from '../utils/discordNotify';
+import { POKEMON_TYPE_DATA, ALL_TYPES } from '../data/pokemonTypes';
+import { EGG_GROUPS_MAP } from '../data/eggGroups';
+
+const EGG_GROUPS = ['Monster', 'Water 1', 'Bug', 'Flying', 'Field', 'Fairy', 'Grass', 'Human-Like', 'Water 3', 'Mineral', 'Amorphous', 'Water 2', 'Ditto', 'Dragon'];
 
 export const Status = () => {
   const { user, loading: authLoading } = useAuth();
@@ -18,9 +22,13 @@ export const Status = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showReviewModal, setShowReviewModal] = useState<any>(null);
-  const [statusFilter, setStatusFilter] = useState<'Tudo' | 'Pendentes' | 'Concluídos'>('Tudo');
-  const [monthFilter, setMonthFilter] = useState<string>('Todos');
-  const [priceFilter, setPriceFilter] = useState<'Tudo' | 'Inferior a 100k' | 'Acima de 100k' | 'Acima de 200k' | 'Acima de 500k' | 'Acima de 1M'>('Tudo');
+  const [statusFilter, setStatusFilter] = useState<'Tudo' | 'Pendente' | 'Breeding' | 'Finalizado' | 'Entregue'>('Tudo');
+  const [genderFilter, setGenderFilter] = useState<'Todos' | 'Macho' | 'Fêmea' | 'Genderless'>('Todos');
+  const [abilityFilter, setAbilityFilter] = useState<'Todos' | 'Com HA' | 'Sem HA'>('Todos');
+  const [ivsFilter, setIvsFilter] = useState<'Todos' | 'F4' | 'F5' | 'F6'>('Todos');
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [eggGroupFilter, setEggGroupFilter] = useState<string[]>([]);
+  const [cancellationsCount, setCancellationsCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<any>(null);
@@ -37,6 +45,18 @@ export const Status = () => {
       }
     }
   }, [user]);
+
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilters(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [uidOrders, setUidOrders] = useState<any[]>([]);
   const [nickOrders, setNickOrders] = useState<any[]>([]);
@@ -180,38 +200,63 @@ export const Status = () => {
     }
   };
 
+  useEffect(() => {
+    if (!user) return;
+    const qCancellations = query(collection(db, 'order_cancellations'), where('userUid', '==', user.uid));
+    const unsub = onSnapshot(qCancellations, (snapshot) => {
+      setCancellationsCount(snapshot.size);
+    });
+    return () => unsub();
+  }, [user]);
+
+  const getPokemonInfo = (name: string) => {
+    if (!name) return { types: [], eggGroups: [] };
+    const cleanName = name.trim().toLowerCase();
+    const typeEntry = POKEMON_TYPE_DATA.find(t => t.name.toLowerCase() === cleanName);
+    const eggGroups = EGG_GROUPS_MAP[cleanName] || [];
+    return { types: typeEntry?.types || [], eggGroups };
+  };
+
   const filteredOrders = orders.filter(o => {
     if (o.pokemon === 'SUPORTE GERAL') return false;
     
-    const matchesSearch = o.pokemon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         o.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = o.pokemon.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const orderDate = o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()) : null;
-    const orderMonth = orderDate ? orderDate.toLocaleString('pt-BR', { month: 'long' }) : null;
-    const matchesMonth = monthFilter === 'Todos' || (orderMonth && orderMonth.toLowerCase() === monthFilter.toLowerCase());
-    
-    const matchesPrice = priceFilter === 'Tudo' || 
-                         (priceFilter === 'Inferior a 100k' && (o.totalPrice / 1000) < 100) ||
-                         (priceFilter === 'Acima de 100k' && (o.totalPrice / 1000) >= 100) ||
-                         (priceFilter === 'Acima de 200k' && (o.totalPrice / 1000) >= 200) ||
-                         (priceFilter === 'Acima de 500k' && (o.totalPrice / 1000) >= 500) ||
-                         (priceFilter === 'Acima de 1M' && (o.totalPrice / 1000) >= 1000);
-
     let matchesStatus = true;
-    if (statusFilter === 'Pendentes') matchesStatus = (o.status === 'Pendente' || o.status === 'Breeding');
-    if (statusFilter === 'Concluídos') matchesStatus = (o.status === 'Finalizado' || o.status === 'Entregue');
+    if (statusFilter !== 'Tudo') {
+      matchesStatus = o.status === statusFilter;
+    }
     
-    return matchesSearch && matchesMonth && matchesPrice && matchesStatus;
+    let matchesGender = true;
+    if (genderFilter !== 'Todos') {
+      matchesGender = o.gender === genderFilter;
+    }
+    
+    let matchesAbility = true;
+    if (abilityFilter === 'Com HA') matchesAbility = o.hasHA === true;
+    else if (abilityFilter === 'Sem HA') matchesAbility = o.hasHA === false;
+    
+    let matchesIvs = true;
+    if (ivsFilter === 'F4') matchesIvs = typeof o.ivs === 'string' && (o.ivs.includes('4x31') || o.ivs.includes('4x 31') || o.ivs.includes('4V'));
+    else if (ivsFilter === 'F5') matchesIvs = typeof o.ivs === 'string' && (o.ivs.includes('5x31') || o.ivs.includes('5x 31') || o.ivs.includes('5V'));
+    else if (ivsFilter === 'F6') matchesIvs = typeof o.ivs === 'string' && (o.ivs.includes('6x31') || o.ivs.includes('6x 31') || o.ivs.includes('6V'));
+    
+    const pokeInfo = getPokemonInfo(o.pokemon);
+    
+    let matchesTypes = true;
+    if (typeFilter.length > 0) {
+       matchesTypes = typeFilter.every(t => pokeInfo.types.includes(t as any));
+    }
+    
+    let matchesEggGroups = true;
+    if (eggGroupFilter.length > 0) {
+       matchesEggGroups = eggGroupFilter.some(eg => pokeInfo.eggGroups.includes(eg));
+    }
+
+    return matchesSearch && matchesStatus && matchesGender && matchesAbility && matchesIvs && matchesTypes && matchesEggGroups;
   });
 
-  const availableMonths = Array.from(new Set(orders.map(o => {
-    const d = o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()) : null;
-    return d ? d.toLocaleString('pt-BR', { month: 'long' }) : null;
-  }).filter(Boolean))).sort();
-
   const handleRepeatOrder = (order: any) => {
-    // Salva na sessionStorage como ponte — location.state é destruído
-    // quando ProtectedOrderRoute re-monta o componente durante o loading do auth
     sessionStorage.setItem('repeat_order_data', JSON.stringify({
       pokemon: order.pokemon,
       nature: order.nature,
@@ -235,9 +280,12 @@ export const Status = () => {
     }
   };
 
-  const totalSpent = filteredOrders.reduce((acc, o) => acc + (o.totalPrice || 0), 0);
-  const pendingCount = filteredOrders.filter(o => o.status === 'Pendente' || o.status === 'Breeding').length;
-  const completedCount = filteredOrders.filter(o => o.status === 'Finalizado' || o.status === 'Entregue').length;
+  const pendingCount = orders.filter(o => o.status === 'Pendente').length;
+  const breedingCount = orders.filter(o => o.status === 'Breeding').length;
+  const completedCount = orders.filter(o => o.status === 'Finalizado').length;
+  const deliveredCount = orders.filter(o => o.status === 'Entregue').length;
+  const totalSpent = orders.filter(o => ['Pendente', 'Breeding', 'Finalizado'].includes(o.status)).reduce((acc, o) => acc + (o.totalPrice || 0), 0);
+  const totalSpentAll = orders.filter(o => ['Pendente', 'Breeding', 'Finalizado', 'Entregue'].includes(o.status)).reduce((acc, o) => acc + (o.totalPrice || 0), 0);
 
   if (authLoading) {
     return (
@@ -281,13 +329,13 @@ export const Status = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={16} />
             <input 
               className="w-full bg-black/40 border-2 border-white/5 rounded-xl pl-12 pr-6 py-3 focus:border-primary outline-none text-xs font-bold transition-all" 
-              placeholder="Pokémon ou ID..."
+              placeholder="Pokémon..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div className="relative">
+          <div className="relative" ref={filterRef}>
             <button 
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-6 py-3 rounded-xl border-2 transition-all font-black text-[10px] uppercase tracking-widest ${showFilters ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-black/40 border-white/5 text-gray-500 hover:text-white hover:bg-white/5'}`}
@@ -305,15 +353,44 @@ export const Status = () => {
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   className="absolute top-full right-0 mt-3 w-80 bg-black/95 border-2 border-primary/20 rounded-2xl p-6 shadow-2xl z-[100] backdrop-blur-xl"
                 >
-                  <div className="space-y-6">
+                  <div className="space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
                     <div className="space-y-3">
-                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Status da Forja</label>
-                      <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-                        {(['Tudo', 'Pendentes', 'Concluídos'] as const).map(f => (
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Status</label>
+                      <select 
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-primary text-[10px] font-bold text-gray-300"
+                      >
+                        <option value="Tudo">Tudo</option>
+                        <option value="Pendente">Pendente</option>
+                        <option value="Breeding">Breeding</option>
+                        <option value="Finalizado">Finalizado</option>
+                        <option value="Entregue">Entregue</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Gênero</label>
+                      <select 
+                        value={genderFilter}
+                        onChange={(e) => setGenderFilter(e.target.value as any)}
+                        className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-primary text-[10px] font-bold text-gray-300"
+                      >
+                        <option value="Todos">Todos</option>
+                        <option value="Macho">Macho</option>
+                        <option value="Fêmea">Fêmea</option>
+                        <option value="Genderless">Genderless</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Hidden Ability</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['Todos', 'Com HA', 'Sem HA'] as const).map(f => (
                           <button 
                             key={f}
-                            onClick={() => setStatusFilter(f)}
-                            className={`flex-1 px-2 py-2 rounded-md text-[8px] font-black uppercase tracking-tighter transition-all ${statusFilter === f ? 'bg-secondary text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}
+                            onClick={() => setAbilityFilter(f)}
+                            className={`px-2 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all ${abilityFilter === f ? 'border-primary bg-primary/10 text-primary' : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
                           >
                             {f}
                           </button>
@@ -322,48 +399,63 @@ export const Status = () => {
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Mês de Referência</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={() => setMonthFilter('Todos')}
-                          className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all ${monthFilter === 'Todos' ? 'border-primary bg-primary/10 text-primary' : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
-                        >
-                          Todos
-                        </button>
-                        {availableMonths.map((m: any) => (
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">IVS</label>
+                      <select 
+                        value={ivsFilter}
+                        onChange={(e) => setIvsFilter(e.target.value as any)}
+                        className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-primary text-[10px] font-bold text-gray-300"
+                      >
+                        <option value="Todos">Todos</option>
+                        <option value="F4">F4</option>
+                        <option value="F5">F5</option>
+                        <option value="F6">F6</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex justify-between">
+                        <span>Tipos</span>
+                        {typeFilter.length > 0 && <span className="text-secondary">{typeFilter.length} ativos</span>}
+                      </label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {ALL_TYPES.map((t) => (
                           <button 
-                            key={m}
-                            onClick={() => setMonthFilter(m)}
-                            className={`px-3 py-2 rounded-lg text-[9px] font-bold uppercase border transition-all truncate ${monthFilter === m ? 'border-primary bg-primary/10 text-primary' : 'border-white/5 text-gray-500 hover:bg-white/5'}`}
+                            key={t}
+                            onClick={() => setTypeFilter(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                            className={`px-1 py-1.5 rounded-md text-[8px] font-black uppercase tracking-tighter border transition-all ${typeFilter.includes(t) ? 'border-secondary bg-secondary/20 text-white' : 'border-white/5 text-gray-500 hover:bg-white/5 hover:text-white'}`}
                           >
-                            {m}
+                            {t}
                           </button>
                         ))}
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Faixa de Valor</label>
-                      <select 
-                        value={priceFilter}
-                        onChange={(e) => setPriceFilter(e.target.value as any)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-primary text-[10px] font-bold text-gray-300"
-                      >
-                        <option value="Tudo">Qualquer Valor</option>
-                        <option value="Inferior a 100k">Inferior a 100k</option>
-                        <option value="Acima de 100k">Acima de 100k</option>
-                        <option value="Acima de 200k">Acima de 200k</option>
-                        <option value="Acima de 500k">Acima de 500k</option>
-                        <option value="Acima de 1M">Acima de 1M</option>
-                      </select>
+                      <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex justify-between">
+                        <span>Egg Groups</span>
+                        {eggGroupFilter.length > 0 && <span className="text-secondary">{eggGroupFilter.length} ativos</span>}
+                      </label>
+                      <div className="grid grid-cols-2 gap-1">
+                        {EGG_GROUPS.map((eg) => (
+                          <button 
+                            key={eg}
+                            onClick={() => setEggGroupFilter(prev => prev.includes(eg) ? prev.filter(x => x !== eg) : [...prev, eg])}
+                            className={`px-1 py-1.5 rounded-md text-[8px] font-black uppercase tracking-tighter border transition-all ${eggGroupFilter.includes(eg) ? 'border-primary bg-primary/20 text-white' : 'border-white/5 text-gray-500 hover:bg-white/5 hover:text-white'}`}
+                          >
+                            {eg}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <button 
                       onClick={() => {
                         setStatusFilter('Tudo');
-                        setMonthFilter('Todos');
-                        setPriceFilter('Tudo');
-                        setShowFilters(false);
+                        setGenderFilter('Todos');
+                        setAbilityFilter('Todos');
+                        setIvsFilter('Todos');
+                        setTypeFilter([]);
+                        setEggGroupFilter([]);
                       }}
                       className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 transition-all"
                     >
@@ -382,8 +474,8 @@ export const Status = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-white/5">
-                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">ID/Pedido</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Data</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] w-12 text-center"> </th>
+                  <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] text-center">Data</th>
                   <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Pokémon</th>
                   <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Especificações</th>
                   <th className="px-8 py-5 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Valor</th>
@@ -402,14 +494,18 @@ export const Status = () => {
                       onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                     >
                       <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${order.status === 'Finalizado' ? 'bg-green-500' : 'bg-secondary animate-pulse'}`}></div>
-                          <span className="text-xs font-mono text-gray-400">#{order.id.slice(0, 8).toUpperCase()}</span>
+                        <div className="flex items-center justify-center">
+                          <div className={`w-3 h-3 rounded-full ${
+                            order.status === 'Finalizado' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 
+                            order.status === 'Entregue' ? 'bg-blue-500 shadow-[0_0_10px_#3b82f6]' : 
+                            order.status === 'Breeding' ? 'bg-secondary shadow-[0_0_10px_#a855f7] animate-pulse' : 
+                            'bg-orange-500 shadow-[0_0_10px_#f97316]'
+                          }`}></div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-8 py-6 text-center">
                         <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">
-                          {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Agora...'}
+                          {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Agora...'}
                         </span>
                       </td>
                       <td className="px-8 py-6">
@@ -495,6 +591,62 @@ export const Status = () => {
                               </button>
                             </div>
                           </div>
+
+                          {order.isCompetitive && order.build && (
+                            <div className="mt-8 pt-8 border-t border-white/5 animate-fade-in">
+                              <div className="flex items-center gap-3 mb-6">
+                                <Swords className="text-purple-400" size={18} />
+                                <h4 className="pixel-title text-sm text-purple-400">Especificações de Treinamento</h4>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* EVs */}
+                                <div className="space-y-3 bg-black/40 p-5 rounded-2xl border border-purple-500/10">
+                                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Distribuição de EVs</p>
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                                    {Object.entries(order.build.evs).map(([stat, val]: any) => (
+                                      val > 0 && (
+                                        <div key={stat} className="flex justify-between items-center border-b border-white/5 pb-1 last:border-0">
+                                          <span className="text-[10px] font-bold text-gray-400 uppercase">{stat}</span>
+                                          <span className="text-[10px] font-black text-purple-400">{val}</span>
+                                        </div>
+                                      )
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Level & Item */}
+                                <div className="space-y-4">
+                                  <div className="bg-black/40 p-5 rounded-2xl border border-purple-500/10 flex justify-between items-center">
+                                     <div>
+                                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Nível</p>
+                                       <p className="text-sm font-black text-white uppercase">Lv {order.build.level}</p>
+                                     </div>
+                                     <div className="text-right">
+                                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Item</p>
+                                       <p className="text-sm font-black text-white uppercase">{order.build.item || 'Nenhum'}</p>
+                                     </div>
+                                  </div>
+                                  <div className="bg-black/40 p-5 rounded-2xl border border-purple-500/10 flex justify-between items-center">
+                                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">PP Max</p>
+                                     <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md ${order.build.ppMax ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-white/5'}`}>
+                                       {order.build.ppMax ? 'ATIVADO' : 'NORMAL'}
+                                     </span>
+                                  </div>
+                                </div>
+                                {/* Moveset */}
+                                <div className="bg-black/40 p-5 rounded-2xl border border-purple-500/10 space-y-4">
+                                  <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Moveset Solicitado</p>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {order.build.moves && order.build.moves.length > 0 ? order.build.moves.map((mv: string, i: number) => (
+                                      <div key={i} className="flex items-center gap-3 bg-white/5 p-2 rounded-lg border border-white/5">
+                                        <span className="text-[8px] font-black text-purple-400/50 w-3">{i+1}</span>
+                                        <span className="text-[10px] font-black text-gray-200 uppercase tracking-wide">{mv}</span>
+                                      </div>
+                                    )) : <span className="text-[10px] font-bold text-gray-600 italic">Nenhum golpe específico</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -553,11 +705,17 @@ export const Status = () => {
         />
       )}
 
-      <div className="mt-12 mb-20 grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatusCard icon={<Package className="text-white" />} label="Total de Pedidos" value={filteredOrders.length} border="border-white/10" />
+      <div className="mt-12 mb-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+        <StatusCard icon={<ShoppingBag className="text-white" />} label="Pedidos Totais" value={orders.length} border="border-white/10" />
         <StatusCard icon={<Clock className="text-orange-400" />} label="Pedidos Pendentes" value={pendingCount} border="border-orange-400/30" />
-        <StatusCard icon={<CheckCircle2 className="text-green-400" />} label="Entregues / Finalizados" value={completedCount} border="border-green-400/30" />
-        <StatusCard icon={<Coins className="text-secondary" />} label="Total Gasto" value={`${totalSpent / 1000}k`} border="border-secondary/30 bg-secondary/5" />
+        <StatusCard icon={<Egg className="text-secondary" />} label="Pedidos em Breeding" value={breedingCount} border="border-secondary/30" />
+        <StatusCard icon={<CheckCircle2 className="text-green-400" />} label="Pedidos Finalizados" value={completedCount} border="border-green-400/30" />
+        
+        <StatusCard icon={<Package className="text-blue-400" />} label="Pedidos Entregues" value={deliveredCount} border="border-blue-400/30" />
+        <StatusCard icon={<X className="text-red-500" />} label="Pedidos Cancelados" value={cancellationsCount} border="border-red-500/30 bg-red-500/5" />
+        
+        <StatusCard icon={<Coins className="text-orange-500" />} label="Total Pendente" value={`${totalSpent / 1000}k`} border="border-orange-500/30 bg-orange-500/5" />
+        <StatusCard icon={<DollarSign className="text-green-400" />} label="Total Gasto" value={`${totalSpentAll / 1000}k`} border="border-green-400/30 bg-green-400/5" />
       </div>
 
       <ConfirmationModal 
@@ -574,8 +732,7 @@ export const Status = () => {
 const OrderTimeline = ({ status }: { status: string }) => {
   const stages = [
     { id: 'Pendente', label: 'Recebido', icon: <Package size={14} />, description: 'Pedido na fila' },
-    { id: 'Breeding', label: 'Forjando', icon: <RefreshCw size={14} />, description: 'Em processo de breed' },
-    { id: 'Testing', label: 'Testando', icon: <Star size={14} />, description: 'Validando IVs e EVs' },
+    { id: 'Breeding', label: 'Breedando', icon: <RefreshCw size={14} />, description: 'Em processo de breed' },
     { id: 'Finalizado', label: 'Pronto', icon: <CheckCircle2 size={14} />, description: 'Disponível para entrega' },
     { id: 'Entregue', label: 'Entregue', icon: <Package size={14} />, description: 'Pedido recebido' },
   ];

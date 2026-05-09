@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
-  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, DollarSign
+  Users, PieChart, ShoppingBag, Search, ShieldCheck, ChevronDown, X, Filter, Trash2, Bell, MessageSquare, Star, Warehouse, Plus, AlertCircle, Edit2, Package, Headset, Crosshair, DollarSign, Swords
 } from 'lucide-react';
 
 import { adminDb, adminAuth as auth } from '../firebase';
@@ -33,11 +33,14 @@ export const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [trainersSearch, setTrainersSearch] = useState('');
   const [newBreederEmail, setNewBreederEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'pedidos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'comunidade' | 'ferramentas'>('pedidos');
+  const [newBuilderEmail, setNewBuilderEmail] = useState('');
+  const [activeTab, setActiveTab] = useState<'pedidos' | 'pedidos_competitivos' | 'entregues' | 'treinadores' | 'analytics' | 'stock_rooms' | 'feedbacks' | 'inbox' | 'equipe' | 'builders' | 'comunidade' | 'ferramentas'>('pedidos');
 
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [breeders, setBreeders] = useState<any[]>([]);
+  const [builders, setBuilders] = useState<any[]>([]);
   const [selectedBreeder, setSelectedBreeder] = useState<any | null>(null);
+  const [selectedBuilder, setSelectedBuilder] = useState<any | null>(null);
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
@@ -90,6 +93,7 @@ export const AdminDashboard = () => {
   const [filterTrainer, setFilterTrainer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [isAutoOrderModalOpen, setIsAutoOrderModalOpen] = useState(false);
+  const [expandedOrderInModal, setExpandedOrderInModal] = useState<string | null>(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -450,14 +454,34 @@ export const AdminDashboard = () => {
             });
             
             await updateDoc(doc(adminDb, 'orders', orderId), { 
-              status: newStatus,
               commissionPaid: true 
             });
-            // FIX: chama Discord ANTES do return para não pular a atualização
-            await syncDiscordEmbed();
-            return;
           }
         }
+
+        if (order.assignedToBuilder && !order.builderCommissionPaid) {
+          const builderRef = doc(adminDb, 'builder_profiles', order.assignedToBuilder);
+          const bSnap = await getDoc(builderRef);
+          if (bSnap.exists()) {
+            const bData = bSnap.data();
+            const currentCount = bData.ordersCompleted || 0;
+            const currentWallet = bData.walletAmount || 0;
+            const commissionEarned = (order.totalPrice || 0) * 0.15; // Taxa fixa 15%
+            
+            await updateDoc(builderRef, {
+              ordersCompleted: currentCount + 1,
+              walletAmount: currentWallet + commissionEarned
+            });
+            
+            await updateDoc(doc(adminDb, 'orders', orderId), { 
+              builderCommissionPaid: true 
+            });
+          }
+        }
+
+        await updateDoc(doc(adminDb, 'orders', orderId), { status: newStatus });
+        await syncDiscordEmbed();
+        return;
       }
 
       await updateDoc(doc(adminDb, 'orders', orderId), { status: newStatus });
@@ -801,10 +825,19 @@ export const AdminDashboard = () => {
       console.error("Admin breeders stream error:", error);
     });
 
+    // 4. Listen to Builder Profiles
+    const qBuilders = query(collection(adminDb, 'builder_profiles'));
+    const unsubscribeBuilders = onSnapshot(qBuilders, (snapshot) => {
+      setBuilders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Admin builders stream error:", error);
+    });
+
     return () => {
       unsubscribeOrders();
       unsubscribeSupport();
       unsubscribeBreeders();
+      unsubscribeBuilders();
     };
   }, [isAuthenticated]);
 
@@ -946,7 +979,10 @@ export const AdminDashboard = () => {
     } catch (error: any) {
       console.error("Erro no login do admin via Google:", error);
       if (error.code !== 'auth/popup-closed-by-user') {
-        setAuthError({ email: 'erro de autenticação' });
+        const msg = error.message?.includes('permission') || error.message?.includes('authorized')
+          ? 'Acesso não autorizado: Este e-mail não está cadastrado como Administrador'
+          : (error.message || 'Erro de autenticação');
+        setAuthError({ email: msg });
       }
     } finally {
       setIsLoadingAuth(false);
@@ -989,17 +1025,17 @@ export const AdminDashboard = () => {
                 <div>
                   <h2 className="pixel-title text-xl mb-2 text-red-400">Acesso Negado</h2>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                    Esta conta não é autorizada
+                    Acesso não autorizado: Este e-mail não possui permissão administrativa
                   </p>
                 </div>
 
                 <div className="bg-black/40 border border-red-500/20 rounded-2xl p-4 text-left space-y-1">
-                  <p className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Conta usada:</p>
+                  <p className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Conta detectada:</p>
                   <p className="text-xs text-red-400 font-mono font-bold truncate">{authError.email}</p>
                 </div>
 
                 <p className="text-[10px] text-gray-600 leading-relaxed">
-                  Apenas administradores autorizados podem acessar este painel.
+                  Apenas membros oficiais da equipe Valiant possuem acesso a este painel.
                 </p>
 
                 <button
@@ -1019,17 +1055,17 @@ export const AdminDashboard = () => {
                 className="relative z-10 space-y-8"
               >
                 <div>
-                  <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-primary/40 shadow-[0_0_20px_var(--primary-glow)]">
-                    <ShieldCheck size={32} className="text-primary" />
+                  <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.4)]">
+                    <ShieldCheck size={32} className="text-purple-400" />
                   </div>
-                  <h2 className="pixel-title text-2xl">Valiant Access</h2>
+                  <h2 className="pixel-title text-2xl text-purple-400">Valiant Access</h2>
                   <p className="text-[10px] text-gray-500 mt-2 font-bold uppercase tracking-[0.3em]">Terminal Administrativo</p>
                 </div>
 
                 <button
                   onClick={handleGoogleLogin}
                   disabled={isLoadingAuth}
-                  className="btn-manda w-full flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-3 px-8 py-3 rounded-xl font-black uppercase tracking-widest transition-all duration-200 bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isLoadingAuth ? (
                     <>
@@ -1040,15 +1076,7 @@ export const AdminDashboard = () => {
                       VERIFICANDO...
                     </>
                   ) : (
-                    <>
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      ENTRAR COM O GOOGLE
-                    </>
+                    "ENTRAR COM O GOOGLE"
                   )}
                 </button>
 
@@ -1093,10 +1121,11 @@ export const AdminDashboard = () => {
                           (o.playerNick?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                           (o.id?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     
-    if (activeTab === 'pedidos' && o.status === 'Entregue') return false;
+    if (activeTab === 'pedidos' && (o.status === 'Entregue' || o.isCompetitive)) return false;
+    if (activeTab === 'pedidos_competitivos' && (o.status === 'Entregue' || !o.isCompetitive)) return false;
     if (activeTab === 'entregues' && o.status !== 'Entregue') return false;
 
-    if (activeTab !== 'pedidos' && activeTab !== 'entregues') return matchesSearch;
+    if (activeTab !== 'pedidos' && activeTab !== 'pedidos_competitivos' && activeTab !== 'entregues') return matchesSearch;
     if (o.type === 'support' || o.pokemon === 'SUPORTE GERAL') return false; 
     
     const matchesIvs = filterIvs ? (o.ivs || '').includes(filterIvs) : true;
@@ -1200,7 +1229,10 @@ export const AdminDashboard = () => {
           <aside className="space-y-4">
             <div className="glow-card p-6 space-y-2">
               <button onClick={() => setActiveTab('pedidos')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'pedidos' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                <ShoppingBag size={18} /> Pedidos ({orders.filter(o => o.status !== 'Entregue' && (o.pokemon !== 'SUPORTE GERAL' && o.type !== 'support' && o.type !== 'Support')).length})
+                <ShoppingBag size={18} /> Pedidos ({orders.filter(o => o.status !== 'Entregue' && !o.isCompetitive && (o.pokemon !== 'SUPORTE GERAL' && o.type !== 'support' && o.type !== 'Support')).length})
+              </button>
+              <button onClick={() => setActiveTab('pedidos_competitivos')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'pedidos_competitivos' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                <Swords size={18} /> <span className="whitespace-nowrap">Pedidos Comp. ({orders.filter(o => o.status !== 'Entregue' && o.isCompetitive).length})</span>
               </button>
               <button 
                 onClick={() => setActiveTab('entregues')} 
@@ -1259,6 +1291,13 @@ export const AdminDashboard = () => {
                 className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'equipe' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
               >
                 <ShieldCheck size={18} /> Equipe Breeders ({breeders.length})
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('builders' as any)} 
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg font-bold text-sm transition-all ${(activeTab as any) === 'builders' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+              >
+                <Swords size={18} /> Equipe Builders ({builders.length})
               </button>
 
               <button 
@@ -1722,7 +1761,12 @@ export const AdminDashboard = () => {
                           { v: '{ability}', d: 'Habilidade (Ability) escolhida.' },
                           { v: '{genero}', d: 'Macho, Fêmea ou Genderless.' },
                           { v: '{total}', d: 'Valor da encomenda atual (ex: 100k).' },
-                          { v: '{obs}', d: 'Observações extras do pedido.' }
+                          { v: '{obs}', d: 'Observações extras do pedido.' },
+                          { v: '{evs}', d: 'Distribuição de EVs (ex: HP: 252 | Spe: 252).' },
+                          { v: '{item}', d: 'Item equipado na build competitiva.' },
+                          { v: '{moveset}', d: 'Lista de ataques (ex: Tackle / Growl).' },
+                          { v: '{level}', d: 'Nível alvo da build (ex: 50, 100).' },
+                          { v: '{ppmax}', d: 'Sim/Não para aplicação de PP Max.' }
                         ].map(item => (
                           <div key={item.v} className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl group hover:bg-white/[0.05] transition-all">
                             <code className="text-blue-400 font-bold text-xs shrink-0">{item.v}</code>
@@ -1931,7 +1975,7 @@ export const AdminDashboard = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    {(activeTab === 'pedidos' || activeTab === 'entregues') && (
+                    {(activeTab === 'pedidos' || activeTab === 'pedidos_competitivos' || activeTab === 'entregues') && (
                       <>
                         <thead>
                           <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
@@ -1955,11 +1999,11 @@ export const AdminDashboard = () => {
                                 />
                               </th>
                             )}
-                            <th className="px-8 py-5">Treinador & Tempo</th>
-                            <th className="px-8 py-5">Produto</th>
-                            <th className="px-8 py-5 text-primary">$$$</th>
-                            <th className="px-8 py-5 min-w-[200px]">Status & Delegação</th>
-                            <th className="px-8 py-5 w-24">Ações</th>
+                            <th className="px-4 py-5">Treinador & Tempo</th>
+                            <th className="px-4 py-5">Produto</th>
+                            <th className="px-4 py-5 text-primary">$$$</th>
+                            <th className="px-4 py-5 min-w-[200px]">Status & Delegação</th>
+                            <th className="px-4 py-5 w-24">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -1981,20 +2025,41 @@ export const AdminDashboard = () => {
                                   />
                                 </td>
                               )}
-                              <td className="px-8 py-6">
+                              <td className="px-4 py-6">
                                 <p className="font-bold text-white mb-0.5">{o.playerNick || 'Veterano Anônimo'}</p>
-                                <p className="text-[10px] text-gray-600 uppercase font-black">ID: {o.id.slice(0,8)} | {o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()).toLocaleDateString('pt-BR', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Agora'}</p>
+                                <p className="text-[10px] text-gray-600 uppercase font-black">{o.createdAt?.toMillis ? new Date(o.createdAt.toMillis()).toLocaleDateString('pt-BR', {month:'2-digit', day:'2-digit'}) : 'Hoje'}</p>
                               </td>
-                                <td className="px-8 py-6">
+                                <td className="px-4 py-6">
                                   <div className="flex flex-col gap-2">
                                     <div className="flex items-center gap-2">
                                       <p className="text-white font-black uppercase tracking-wider text-sm">{o.pokemon}</p>
+                                      {o.isCompetitive && (
+                                        <span className="text-[8px] px-1.5 py-0.5 bg-purple-500 text-white rounded font-black uppercase shadow-[0_0_10px_rgba(168,85,247,0.4)]">Comp</span>
+                                      )}
                                       {o.gender && o.gender !== 'Aleatório' && (
                                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${o.gender === 'Macho' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' : o.gender === 'Fêmea' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/20' : o.gender === 'Qualquer' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/20' : 'bg-green-500/20 text-green-400 border border-green-500/20'}`}>
                                           {o.gender}
                                         </span>
                                       )}
                                     </div>
+                                    
+                                    {/* COMPETITIVE METADATA PREVIEW */}
+                                    {o.isCompetitive && o.build && (
+                                      <div className="p-2 bg-purple-500/5 border border-purple-500/10 rounded-lg space-y-1">
+                                        <div className="flex gap-3 text-[8px] font-black uppercase">
+                                          <span className="text-purple-400">Lv {o.build.level || '50'}</span>
+                                          <span className="text-gray-400">{o.build.item || 'Sem Item'}</span>
+                                          {o.build.ppMax && <span className="text-primary">PP MAX</span>}
+                                        </div>
+                                        <div className="text-[8px] text-gray-500 font-bold uppercase truncate">
+                                          Moves: {(o.build.moves || []).filter(Boolean).join(' / ')}
+                                        </div>
+                                        <div className="text-[8px] text-gray-500 font-bold uppercase truncate">
+                                          EVs: {Object.entries(o.build.evs || {}).filter(([_,v])=>(v as number)>0).map(([k,v])=>`${k}:${v}`).join(' | ')}
+                                        </div>
+                                      </div>
+                                    )}
+
                                     <div className="flex flex-wrap gap-2 items-center">
                                       <span className="text-[10px] text-primary font-black uppercase tracking-tighter bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
                                         {o.ivs}
@@ -2031,7 +2096,7 @@ export const AdminDashboard = () => {
                                     </div>
                                   </div>
                                 </td>
-                              <td className="px-8 py-6 font-black text-primary">{o.totalPrice / 1000}k</td>
+                              <td className="px-8 py-6 font-black text-primary">{Math.ceil((o.totalPrice || 0) / 1000)}k</td>
                               <td className="px-8 py-6 min-w-[200px]">
                                 <div className="flex flex-col gap-2 relative">
                                   <div className="relative group/status">
@@ -2056,7 +2121,7 @@ export const AdminDashboard = () => {
                                       }}
                                       className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all w-full ${o.assignedTo ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-500 border-white/10'}`}
                                     >
-                                      <option value="" className="bg-black text-gray-500 font-bold">Atribuir a ninguém</option>
+                                      <option value="" className="bg-black text-gray-500 font-bold">🥚 Designar Breeder</option>
                                       {breeders.map(b => (
                                         <option key={b.id} value={b.id} className="bg-black text-blue-400 font-bold">
                                           {b.name || b.email}
@@ -2065,6 +2130,29 @@ export const AdminDashboard = () => {
                                     </select>
                                     <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
                                   </div>
+                                  {o.isCompetitive && (
+                                    <div className="relative group/builder">
+                                      <select
+                                        value={o.assignedToBuilder || ''}
+                                        onChange={async (e) => {
+                                          const val = e.target.value;
+                                          const { updateDoc, doc } = await import('firebase/firestore');
+                                          await updateDoc(doc(adminDb, 'orders', o.id), {
+                                            assignedToBuilder: val || null,
+                                          });
+                                        }}
+                                        className={`appearance-none cursor-pointer outline-none px-4 pt-2 pb-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all w-full ${o.assignedToBuilder ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-white/5 text-gray-500 border-white/10'}`}
+                                      >
+                                        <option value="" className="bg-black text-gray-500 font-bold">⚔️ Designar Builder</option>
+                                        {builders.map(b => (
+                                          <option key={b.id} value={b.email} className="bg-black text-purple-400 font-bold">
+                                            {b.name || b.email}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-8 py-6">
@@ -2142,14 +2230,13 @@ export const AdminDashboard = () => {
                                   <div className={`p-1 rounded bg-primary/20 transition-transform ${expandedTrainerNick === t.nick ? 'rotate-180' : ''}`}>
                                     <ChevronDown size={12} className="text-primary" />
                                   </div>
-                                  <span className="text-gray-600 text-[10px] uppercase font-black">ID: {t.sequentialId}</span>
                                   {t.nick}
                                 </td>
                                 <td className="px-8 py-6 text-sm font-black text-secondary tracking-tight">{t.discordNick}</td>
                                 <td className="px-8 py-6 text-center text-primary font-black">{t.totalSpent / 1000}k</td>
                                 <td className="px-8 py-6 text-center text-gray-400 font-bold">{t.orderCount} Encomendas</td>
                                 <td className="px-8 py-6 text-center text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                                  {t.lastOrder > 0 ? new Date(t.lastOrder).toLocaleDateString('pt-BR', {month:'short', day:'numeric'}) : 'N/A'}
+                                  {t.lastOrder > 0 ? new Date(t.lastOrder).toLocaleDateString('pt-BR', {month:'2-digit', day:'2-digit'}) : 'N/A'}
                                 </td>
                               </tr>
                               {expandedTrainerNick === t.nick && (
@@ -2238,10 +2325,10 @@ export const AdminDashboard = () => {
                                                     <div className="flex items-center gap-2">
                                                       <span className="text-[10px] font-bold text-gray-400">{new Date(o.createdAt?.toMillis ? o.createdAt.toMillis() : Date.now()).toLocaleDateString('pt-BR')}</span>
                                                       <span className={`w-2 h-2 rounded-full ${
-                                                        o.status === 'Finalizado' ? 'bg-green-500' : 
-                                                        o.status === 'Breeding' ? 'bg-secondary' :
-                                                        o.status === 'Entregue' ? 'bg-blue-500' :
-                                                        'bg-orange-400'
+                                                        o.status === 'Finalizado' ? 'bg-green-500 shadow-[0_0_5px_#22c55e]' : 
+                                                        o.status === 'Breeding' ? 'bg-secondary shadow-[0_0_5px_#a855f7] animate-pulse' :
+                                                        o.status === 'Entregue' ? 'bg-blue-500 shadow-[0_0_5px_#3b82f6]' :
+                                                        'bg-orange-400 shadow-[0_0_5px_#fb923c]'
                                                       }`}></span>
                                                     </div>
                                                   </div>
@@ -2368,10 +2455,105 @@ export const AdminDashboard = () => {
                 </div>
               )}
 
+              {(activeTab as any) === 'builders' && (
+                <div className="overflow-x-auto rounded-3xl border border-white/5">
+                  <table className="w-full">
+                    <thead>
+                      <tr>
+                        <th colSpan={4} className="px-8 py-6 text-left border-b border-white/5">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center border border-purple-500/30">
+                                <Swords size={20} className="text-purple-400" />
+                              </div>
+                              <div>
+                                <h3 className="font-black text-white uppercase tracking-widest text-sm">Equipe de Builders</h3>
+                                <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Gerenciar acesso ao Painel Builder</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                              <input
+                                type="email"
+                                value={newBuilderEmail}
+                                onChange={e => setNewBuilderEmail(e.target.value)}
+                                placeholder="email@gmail.com"
+                                className="flex-1 sm:w-64 bg-black/60 border border-white/10 rounded-xl px-4 py-2 text-sm text-white font-bold outline-none focus:border-purple-500 transition-all"
+                              />
+                              <button
+                                onClick={async () => {
+                                  if (!newBuilderEmail.trim()) return;
+                                  try {
+                                    const { setDoc, doc } = await import('firebase/firestore');
+                                    await setDoc(doc(adminDb, 'builder_profiles', newBuilderEmail.trim()), {
+                                      email: newBuilderEmail.trim(),
+                                      name: newBuilderEmail.split('@')[0],
+                                      ordersCompleted: 0,
+                                      walletAmount: 0,
+                                    });
+                                    setNewBuilderEmail('');
+                                  } catch (e) { alert('Erro ao adicionar Builder.'); }
+                                }}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap"
+                              >
+                                <Plus size={14} className="inline mr-1" /> Liberar Acesso
+                              </button>
+                            </div>
+                          </div>
+                        </th>
+                      </tr>
+                      <tr className="border-b border-white/5 text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white/[0.02]">
+                        <th className="px-8 py-5 text-left">Builder / E-mail</th>
+                        <th className="px-8 py-5 text-center">Builds</th>
+                        <th className="px-8 py-5 text-center">A Receber</th>
+                        <th className="px-8 py-5 text-center">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {builders.length === 0 && (
+                        <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-500 italic font-bold">Nenhum builder cadastrado na plataforma...</td></tr>
+                      )}
+                      {builders.map((b: any) => (
+                        <tr key={b.id} className="hover:bg-white/[0.03] transition-colors cursor-pointer group" onClick={() => setSelectedBuilder(b)}>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-purple-500/20 text-purple-400 rounded-lg flex items-center justify-center border border-purple-500/30 group-hover:bg-purple-500/30 transition-all">
+                                <Swords size={18} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-white text-sm uppercase">{b.name || 'Sem nome'}</p>
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{b.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-center text-gray-300 font-bold">{b.ordersCompleted || 0} builds</td>
+                          <td className="px-8 py-6 text-center">
+                            <span className="font-black text-purple-400">{((b.walletAmount || 0) / 1000).toFixed(1)}k Poké</span>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`Remover Builder ${b.email}?`)) return;
+                                try {
+                                  const { deleteDoc, doc } = await import('firebase/firestore');
+                                  await deleteDoc(doc(adminDb, 'builder_profiles', b.id));
+                                } catch (e) { alert('Erro ao remover.'); }
+                              }}
+                              className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                            >
+                              <Trash2 size={12} className="inline mr-1" /> Remover
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
 
               {/* Pagination Controls */}
-              {(activeTab === 'pedidos' || activeTab === 'entregues') && filteredOrders.length > PAGE_SIZE && (
+              {(activeTab === 'pedidos' || activeTab === 'pedidos_competitivos' || activeTab === 'entregues') && filteredOrders.length > PAGE_SIZE && (
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-8 py-6 bg-white/[0.02] border border-white/5 rounded-2xl">
                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
                     Mostrando <span className="text-white">{(currentPage - 1) * PAGE_SIZE + 1}</span>-
@@ -2688,92 +2870,86 @@ export const AdminDashboard = () => {
                                   </h4>
                                   <div className="space-y-4">
                                      <div className="space-y-2">
-                                        <p className="text-[8px] text-gray-500 font-black uppercase ml-1">Comissão Manual (Override)</p>
-                                        <div className="flex gap-1 bg-black rounded-xl border border-white/5 p-1 relative overflow-hidden">
-                                           {[null, 0.15, 0.20, 0.30].map(val => (
-                                             <button 
-                                               key={val === null ? 'auto' : val}
-                                               onClick={() => handleUpdateBreederRank(selectedBreeder!.id, val)}
-                                               className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${
-                                                 selectedBreeder?.rankOverride === val 
-                                                  ? 'bg-blue-600 text-white shadow-lg' 
-                                                  : 'text-gray-600 hover:text-gray-400 hover:bg-white/5'
-                                               }`}
-                                             >
-                                               {val === null ? 'AUTO' : `${val * 100}%`}
-                                             </button>
-                                           ))}
+                                        <label className="text-[8px] text-gray-600 font-black uppercase">Sobrescrever Rank (%)</label>
+                                        <div className="flex gap-2">
+                                          <input 
+                                            type="number"
+                                            placeholder="Ex: 0.50"
+                                            value={selectedBreeder?.rankOverride || ''}
+                                            onChange={(e) => setSelectedBreeder({...selectedBreeder, rankOverride: Number(e.target.value)})}
+                                            className="flex-1 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                                          />
+                                          <button 
+                                            onClick={() => handleUpdateBreederRank(selectedBreeder.id, selectedBreeder.rankOverride)}
+                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase"
+                                          >OK</button>
                                         </div>
                                      </div>
                                      <div className="space-y-2">
-                                        <p className="text-[8px] text-gray-500 font-black uppercase ml-1">Notas Internas Privadas</p>
+                                        <label className="text-[8px] text-gray-600 font-black uppercase">Notas Internas</label>
                                         <textarea 
-                                          defaultValue={selectedBreeder?.internalNotes || ''}
-                                          onBlur={(e) => handleUpdateBreederNotes(selectedBreeder!.id, e.target.value)}
-                                          placeholder="Escreva segredos ou observações sobre este breeder..."
-                                          className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-[10px] font-bold text-gray-400 focus:text-white focus:border-blue-500/50 outline-none transition-all resize-none h-24 custom-scrollbar"
+                                          value={selectedBreeder?.internalNotes || ''}
+                                          onChange={(e) => setSelectedBreeder({...selectedBreeder, internalNotes: e.target.value})}
+                                          className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs text-white outline-none focus:border-blue-500 h-24 resize-none"
                                         />
+                                        <button 
+                                          onClick={() => handleUpdateBreederNotes(selectedBreeder.id, selectedBreeder.internalNotes)}
+                                          className="w-full py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-[10px] font-black uppercase"
+                                        >SALVAR NOTAS</button>
                                      </div>
+                                     <button 
+                                       onClick={() => handlePayBreeder(selectedBreeder.id)}
+                                       className="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-600/20 transition-all flex items-center justify-center gap-2"
+                                     >
+                                       <DollarSign size={16} /> EFETUAR PAGAMENTO
+                                     </button>
                                   </div>
                                 </div>
                              </div>
                           </div>
 
                           <div className="flex-1 flex flex-col overflow-hidden bg-black/20">
-                            <div className="p-8 border-b border-white/5">
-                               <div className="flex items-center gap-3 mb-2">
-                                 <Package size={18} className="text-gray-500" />
-                                 <h3 className="text-sm text-white font-black uppercase tracking-widest">Histórico de Encomendas Designadas</h3>
+                             <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                               <div>
+                                 <h3 className="text-sm text-white font-black uppercase tracking-widest">Histórico de Produção</h3>
+                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Crias atribuídas e finalizadas por este breeder</p>
                                </div>
-                               <p className="text-[10px] text-gray-500 font-bold uppercase">Abaixo estão listadas apenas as ordens vinculadas a este funcionário.</p>
-                            </div>
-                            
-                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                               {orders.filter(o => o.assignedTo === selectedBreeder?.email).length === 0 ? (
-                                 <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
-                                    <Package size={48} className="mb-4" />
-                                    <p className="text-xs font-black uppercase tracking-widest">Nenhuma encomenda vinculada</p>
-                                 </div>
-                               ) : (
-                                 <div className="space-y-4">
+                             </div>
+
+                             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                {orders.filter(o => o.assignedTo === selectedBreeder?.email).length === 0 ? (
+                                  <div className="h-full flex flex-col items-center justify-center opacity-20">
+                                    <Package size={48} className="text-gray-500 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">Nenhum pedido vinculado</p>
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-1 gap-4">
                                     {orders.filter(o => o.assignedTo === selectedBreeder?.email).map(o => (
-                                      <div key={o.id} className="p-5 bg-white/5 border border-white/5 rounded-2xl hover:border-white/10 transition-all">
-                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                      <div key={o.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/20 transition-all group">
+                                         <div 
+                                           onClick={() => setExpandedOrderInModal(expandedOrderInModal === o.id ? null : o.id)}
+                                           className="p-5 flex items-center justify-between cursor-pointer"
+                                         >
                                             <div className="flex items-center gap-4">
-                                               <div className="w-12 h-12 bg-black/40 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
-                                                {(() => {
-                                                  const name = (o.pokemon || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                                                  return name ? (
-                                                    <img 
-                                                      src={`https://play.pokemonshowdown.com/sprites/ani/${name}.gif`} 
-                                                      className="w-10 h-10 object-contain" 
-                                                      alt="" 
-                                                      onError={(e) => {
-                                                        const target = e.target as HTMLImageElement;
-                                                        target.src = `https://play.pokemonshowdown.com/sprites/dex/${name}.png`;
-                                                        target.onerror = () => {
-                                                           target.style.display = 'none';
-                                                           if (target.parentElement) {
-                                                              target.parentElement.innerHTML = '<svg class="text-gray-700" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
-                                                           }
-                                                        };
-                                                      }}
-                                                    />
-                                                  ) : <Package size={20} className="text-gray-700" />;
-                                                })()}
-                                             </div>
-                                               <div>
-                                                  <h4 className="font-black text-white uppercase tracking-tighter text-sm">{o.pokemon}</h4>
-                                                  <p className="text-[10px] text-gray-400 font-bold uppercase">{o.playerNick}</p>
+                                               <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5">
+                                                  <img 
+                                                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(p => p.name === getBasePokemonName(o.pokemon))?.id || POKEMON_DATA.find(p => p.name === o.pokemon)?.id}.png`} 
+                                                    alt={o.pokemon}
+                                                    className="w-10 h-10 object-contain"
+                                                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png'; }}
+                                                  />
+                                               </div>
+                                               <div className="text-left">
+                                                  <p className="text-sm font-black text-white uppercase group-hover:text-blue-400 transition-colors">{o.pokemon}</p>
+                                                  <p className="text-[9px] text-gray-600 font-black uppercase">{o.playerNick}</p>
                                                </div>
                                             </div>
                                             
                                             <div className="flex flex-wrap items-center gap-4">
                                                <div className="text-right">
-                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">IVs Solicitados</p>
-                                                  <p className="text-[10px] text-primary font-black uppercase">{o.ivs}</p>
+                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">IVs / Ability</p>
+                                                  <p className="text-[10px] text-primary font-black uppercase">{o.ivs} | {getDisplayAbility(o)}</p>
                                                </div>
-                                               <div className="h-8 w-px bg-white/5 hidden md:block"></div>
                                                <div className="min-w-[80px] text-right">
                                                   <p className="text-[8px] text-gray-600 font-black uppercase mb-1">Status</p>
                                                   <span className={`text-[9px] font-black uppercase px-2 py-1 rounded inline-block ${
@@ -2783,22 +2959,320 @@ export const AdminDashboard = () => {
                                                     {o.status}
                                                   </span>
                                                </div>
+                                               <ChevronDown size={14} className={`text-gray-600 transition-transform ${expandedOrderInModal === o.id ? 'rotate-180 text-blue-400' : ''}`} />
                                             </div>
                                          </div>
+
+                                         <AnimatePresence>
+                                            {expandedOrderInModal === o.id && (
+                                              <motion.div 
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="overflow-hidden bg-black/40 border-t border-white/5"
+                                              >
+                                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                   <div className="space-y-4">
+                                                      <div>
+                                                         <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-2">Detalhes Técnicos</p>
+                                                         <div className="grid grid-cols-2 gap-2">
+                                                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                               <p className="text-[8px] text-gray-600 font-black uppercase">Gênero</p>
+                                                               <p className="text-[10px] text-white font-bold">{o.gender || 'Aleatório'}</p>
+                                                            </div>
+                                                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                               <p className="text-[8px] text-gray-600 font-black uppercase">Ability</p>
+                                                               <p className="text-[10px] text-white font-bold">{getDisplayAbility(o)} {o.hasHA && <span className="text-primary text-[8px] ml-1">(HA)</span>}</p>
+                                                            </div>
+                                                            <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                               <p className="text-[8px] text-gray-600 font-black uppercase">Tipo</p>
+                                                               <p className="text-[10px] text-white font-bold">{o.isCastrated ? 'Castrado' : 'Breedable'}</p>
+                                                            </div>
+                                                            {o.ignoredIvs && o.ignoredIvs.length > 0 && (
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5 col-span-2">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">IVs Faltantes</p>
+                                                                  <p className="text-[10px] text-red-400 font-bold">-{o.ignoredIvs.join(', -')}</p>
+                                                               </div>
+                                                            )}
+                                                         </div>
+                                                      </div>
+                                                      {o.observations && (
+                                                        <div className="bg-yellow-500/5 border border-yellow-500/20 p-4 rounded-2xl">
+                                                           <p className="text-[8px] text-yellow-500/70 font-black uppercase mb-1">Observação do Cliente</p>
+                                                           <p className="text-[11px] text-yellow-200/80 italic font-bold">"{o.observations}"</p>
+                                                        </div>
+                                                      )}
+                                                   </div>
+                                                   <div className="flex items-center justify-center p-4">
+                                                      <div className="text-center space-y-2">
+                                                         <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Valor da Encomenda</p>
+                                                         <p className="text-3xl font-black text-primary">{Math.ceil((o.totalPrice || 0) / 1000)}k</p>
+                                                         <button 
+                                                           onClick={() => toggleChat(o)}
+                                                           className="w-full py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                                                         >
+                                                            Abrir Chat com Cliente
+                                                         </button>
+                                                      </div>
+                                                   </div>
+                                                </div>
+                                              </motion.div>
+                                            )}
+                                         </AnimatePresence>
                                       </div>
                                     ))}
-                                 </div>
-                               )}
-                            </div>
+                                  </div>
+                                )}
+                             </div>
 
-                            <div className="p-8 border-t border-white/5 bg-white/[0.01]">
-                               <button 
-                                 onClick={() => setSelectedBreeder(null)}
-                                 className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
-                               >
-                                 FECHAR DETALHES
-                               </button>
-                            </div>
+                             <div className="p-8 border-t border-white/5 bg-white/[0.01]">
+                                <button 
+                                  onClick={() => setSelectedBreeder(null)}
+                                  className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                                >
+                                  FECHAR DETALHES
+                                </button>
+                             </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+
+                  {selectedBuilder && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-md"
+                      onClick={() => setSelectedBuilder(null)}
+                    >
+                      <motion.div 
+                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        className="glow-card max-w-[95vw] xl:max-w-7xl w-full h-[90vh] overflow-hidden flex flex-col bg-[#050505] relative border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.1)]"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <button onClick={() => setSelectedBuilder(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors z-20">
+                          <X size={24} />
+                        </button>
+
+                        <div className="flex flex-col md:flex-row h-full overflow-hidden">
+                          <div className="w-full md:w-80 p-8 border-b md:border-b-0 md:border-r border-white/5 bg-white/[0.01] overflow-y-auto custom-scrollbar">
+                             <div className="flex flex-col items-center text-center mb-8">
+                               <div className="w-20 h-20 bg-purple-500/20 rounded-3xl flex items-center justify-center border border-purple-500/40 mb-4 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+                                  <Swords size={40} className="text-purple-400" />
+                               </div>
+                               <h3 className="pixel-title text-lg uppercase mb-1">{selectedBuilder.name || 'Builder'}</h3>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest break-all mb-4">{selectedBuilder.email}</p>
+                               
+                               <div className="w-full bg-white/5 p-4 rounded-2xl border border-white/10 space-y-3">
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Cargo</span>
+                                   <span className="text-[10px] text-purple-400 font-black uppercase tracking-widest">Builder Oficial</span>
+                                 </div>
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Comissão</span>
+                                   <span className="text-[10px] text-primary font-black uppercase tracking-widest">15% (Fixa)</span>
+                                 </div>
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-[10px] text-gray-500 font-black uppercase">Builds Concluídas</span>
+                                   <span className="text-xs text-white font-black">{selectedBuilder?.ordersCompleted || 0}</span>
+                                 </div>
+                               </div>
+                             </div>
+
+                             <div className="space-y-6">
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-primary/20 transition-all group">
+                                  <p className="text-[8px] text-gray-500 font-black uppercase mb-1">Saldo a Receber</p>
+                                  <p className="text-lg font-black text-white group-hover:text-primary transition-colors">{(selectedBuilder?.walletAmount || 0) / 1000}k <span className="text-[10px] text-gray-600">POKÉ</span></p>
+                                </div>
+                                <button 
+                                  onClick={async () => {
+                                    if (!selectedBuilder.id) return;
+                                    if (!confirm('Zerar saldo e marcar como pago?')) return;
+                                    try {
+                                      const { updateDoc, doc } = await import('firebase/firestore');
+                                      await updateDoc(doc(adminDb, 'builder_profiles', selectedBuilder.id), {
+                                        walletAmount: 0,
+                                        totalHistoryPaid: (selectedBuilder.totalHistoryPaid || 0) + (selectedBuilder.walletAmount || 0)
+                                      });
+                                      setSelectedBuilder(null);
+                                    } catch (e) { alert('Erro ao pagar.'); }
+                                  }}
+                                  className="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                >
+                                  <DollarSign size={16} /> EFETUAR PAGAMENTO
+                                </button>
+                             </div>
+                          </div>
+
+                          <div className="flex-1 flex flex-col overflow-hidden bg-black/20">
+                             <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                               <div>
+                                 <h3 className="text-sm text-white font-black uppercase tracking-widest">Fila de Produção</h3>
+                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Pedidos competitivos atribuídos</p>
+                               </div>
+                             </div>
+
+                             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                {orders.filter(o => o.assignedToBuilder === selectedBuilder?.email).length === 0 ? (
+                                  <div className="h-full flex flex-col items-center justify-center opacity-20">
+                                    <Package size={48} className="text-gray-500 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">Nenhum pedido vinculado</p>
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-1 gap-4">
+                                    {orders.filter(o => o.assignedToBuilder === selectedBuilder?.email).map(o => (
+                                      <div key={o.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/20 transition-all group">
+                                         <div 
+                                           onClick={() => setExpandedOrderInModal(expandedOrderInModal === o.id ? null : o.id)}
+                                           className="p-5 flex items-center justify-between cursor-pointer"
+                                         >
+                                            <div className="flex items-center gap-4">
+                                               <div className="w-12 h-12 bg-black/40 rounded-xl flex items-center justify-center border border-white/5">
+                                                  <img 
+                                                    src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${POKEMON_DATA.find(p => p.name === getBasePokemonName(o.pokemon))?.id || POKEMON_DATA.find(p => p.name === o.pokemon)?.id}.png`} 
+                                                    alt={o.pokemon}
+                                                    className="w-10 h-10 object-contain"
+                                                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png'; }}
+                                                  />
+                                               </div>
+                                               <div className="text-left">
+                                                  <p className="text-sm font-black text-white uppercase group-hover:text-purple-400 transition-colors">{o.pokemon}</p>
+                                                  <p className="text-[9px] text-gray-600 font-black uppercase">{o.playerNick}</p>
+                                               </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-4">
+                                               <div className="text-right">
+                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">IVs / Ability</p>
+                                                  <p className="text-[10px] text-purple-400 font-black uppercase">{o.ivs} | {getDisplayAbility(o)}</p>
+                                               </div>
+                                               <div className="min-w-[80px] text-right">
+                                                  <p className="text-[8px] text-gray-600 font-black uppercase mb-1">Status</p>
+                                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded inline-block ${
+                                                    o.status === 'Finalizado' || o.status === 'Entregue' ? 'text-green-400 bg-green-400/10' :
+                                                    o.status === 'Breeding' ? 'text-secondary bg-secondary/10' : 'text-gray-500 bg-white/5'
+                                                  }`}>
+                                                    {o.status}
+                                                  </span>
+                                               </div>
+                                               <ChevronDown size={14} className={`text-gray-600 transition-transform ${expandedOrderInModal === o.id ? 'rotate-180 text-purple-400' : ''}`} />
+                                            </div>
+                                         </div>
+
+                                         <AnimatePresence>
+                                            {expandedOrderInModal === o.id && (
+                                              <motion.div 
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="overflow-hidden bg-black/40 border-t border-white/5"
+                                              >
+                                                <div className="p-6 space-y-6">
+                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                      <div className="space-y-4">
+                                                         <div>
+                                                            <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-2">Especificações</p>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">Gênero</p>
+                                                                  <p className="text-[10px] text-white font-bold">{o.gender || 'Aleatório'}</p>
+                                                               </div>
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">IVs</p>
+                                                                  <p className="text-[10px] text-white font-bold">{o.ivs}</p>
+                                                               </div>
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">Item</p>
+                                                                  <p className="text-[10px] text-white font-bold">{o.build?.item || 'Nenhum'}</p>
+                                                               </div>
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">Ability</p>
+                                                                  <p className="text-[10px] text-white font-bold">{getDisplayAbility(o)} {o.hasHA && <span className="text-primary text-[8px] ml-1">(HA)</span>}</p>
+                                                               </div>
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">Level</p>
+                                                                  <p className="text-[10px] text-white font-bold">{o.build?.level || '50'}</p>
+                                                               </div>
+                                                               <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                                                                  <p className="text-[8px] text-gray-600 font-black uppercase">Tipo</p>
+                                                                  <p className="text-[10px] text-white font-bold">{o.isCastrated ? 'Castrado' : 'Breedable'}</p>
+                                                               </div>
+                                                            </div>
+                                                         </div>
+                                                         <div>
+                                                            <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-2">Moveset</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                               {(o.build?.moves || []).filter((m:string)=>m).map((m:string, i:number) => (
+                                                                 <span key={i} className="text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-1 rounded-lg font-bold uppercase">{m}</span>
+                                                               ))}
+                                                               {(o.build?.moves || []).length === 0 && <span className="text-[9px] text-gray-600 italic">Nenhum move selecionado</span>}
+                                                            </div>
+                                                         </div>
+                                                      </div>
+                                                      <div className="space-y-4">
+                                                         <div>
+                                                            <p className="text-[8px] text-gray-500 font-black uppercase tracking-widest mb-2">Distribuição de EVs</p>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                               {Object.entries(o.build?.evs || {}).filter(([_,v]) => (v as number) > 0).map(([stat, val]) => (
+                                                                 <div key={stat} className="bg-white/5 p-2 rounded-lg border border-white/5 text-center">
+                                                                    <p className="text-[7px] text-gray-600 font-black uppercase">{stat}</p>
+                                                                    <p className="text-[10px] text-orange-400 font-black">{val as number}</p>
+                                                                 </div>
+                                                               ))}
+                                                               {Object.keys(o.build?.evs || {}).length === 0 && (
+                                                                  <div className="col-span-3 text-center py-2 bg-white/5 rounded-lg border border-white/5">
+                                                                     <p className="text-[8px] text-gray-600 uppercase font-black">Sem EVs Treinados</p>
+                                                                  </div>
+                                                                )}
+                                                            </div>
+                                                         </div>
+                                                         {o.observations && (
+                                                           <div className="bg-yellow-500/5 border border-yellow-500/20 p-4 rounded-2xl">
+                                                              <p className="text-[8px] text-yellow-500/70 font-black uppercase mb-1">Observação</p>
+                                                              <p className="text-[11px] text-yellow-200/80 italic font-bold">"{o.observations}"</p>
+                                                           </div>
+                                                         )}
+                                                      </div>
+                                                   </div>
+                                                   <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                                      <div className="flex items-center gap-4">
+                                                         <div>
+                                                            <p className="text-[8px] text-gray-500 font-black uppercase">Valor Bruto</p>
+                                                            <p className="text-xl font-black text-primary">{Math.ceil((o.totalPrice || 0) / 1000)}k</p>
+                                                         </div>
+                                                         <div>
+                                                            <p className="text-[8px] text-gray-500 font-black uppercase">Sua Comissão (15%)</p>
+                                                            <p className="text-xl font-black text-green-400">{Math.ceil(((o.totalPrice || 0) * 0.15) / 1000)}k</p>
+                                                         </div>
+                                                      </div>
+                                                      <button 
+                                                        onClick={() => toggleChat(o)}
+                                                        className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-600/20"
+                                                      >
+                                                         Chat com Cliente
+                                                      </button>
+                                                   </div>
+                                                </div>
+                                              </motion.div>
+                                            )}
+                                         </AnimatePresence>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                             </div>
+
+                             <div className="p-8 border-t border-white/5 bg-white/[0.01]">
+                                <button 
+                                  onClick={() => setSelectedBuilder(null)}
+                                  className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                                >
+                                  FECHAR DETALHES
+                                </button>
+                             </div>
                           </div>
                         </div>
                       </motion.div>

@@ -44,6 +44,16 @@ export const CartModal = () => {
           giftNick: item.giftNick || null,
           discordNick: item.discordNick || '',
           observations: item.observations || null,
+          isCompetitive: item.isCompetitive || false,
+          ...(item.isCompetitive && {
+            build: {
+              evs: item.evs,
+              level: item.level,
+              item: item.item,
+              moves: item.moves ? item.moves.filter((m: any) => m && m.trim() !== '') : [],
+              ppMax: item.ppMax,
+            }
+          }),
           status: 'Pendente',
           createdAt: serverTimestamp()
         })

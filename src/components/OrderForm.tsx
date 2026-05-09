@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, MessageSquare } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Search, AlertCircle, CheckCircle2, X, ShoppingBag, Heart, Gift, MessageSquare, Swords, ChevronDown, Package, Zap, Target } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { POKEMON_DATA, NATURES } from '../data/pokemonData';
@@ -12,6 +13,7 @@ import { safeStorage } from '../utils/storageUtils';
 import { updateUserStats } from '../utils/rankUtils';
 import { createPortal } from 'react-dom';
 import { notifyNewOrder } from '../utils/discordNotify';
+import moveTranslations from '../data/moveTranslations.json';
 
 type IVOption = '4' | '5' | '6';
 
@@ -27,14 +29,29 @@ const STATS = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'];
 
 const HA_FEE = 15000;
 
-export const OrderForm = () => {
+const COMPETITIVE_ITEMS = [
+  'Leftovers', 'Life Orb', 'Focus Sash', 'Choice Scarf', 'Choice Specs',
+  'Choice Band', 'Assault Vest', 'Eviolite', 'Rocky Helmet', 'Heavy-Duty Boots',
+  'Black Sludge', 'Light Clay', 'Toxic Orb', 'Flame Orb', 'Expert Belt'
+];
+const ITEM_PRICE = 20000;
+const VITAMIN_PRICE = 300;
+const PP_MAX_PRICE = 5000;
+const EV_STATS = ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe'] as const;
+type EVStat = typeof EV_STATS[number];
+
+export const OrderForm = ({ isCompetitive: isCompetitiveProp = false }: { isCompetitive?: boolean }) => {
   const { user } = useAuth();
+  const location = useLocation();
+  const isCompetitive = isCompetitiveProp || location.pathname === '/competitive-order';
 
   const { addToCart, setIsCartOpen } = useCart();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
 
   const [cooldown, setCooldown] = useState(() => {
     const saved = localStorage.getItem('valiant_order_cooldown');
@@ -68,7 +85,12 @@ export const OrderForm = () => {
     ignoredIvs: [] as string[],
     giftNick: '',
     discordNick: '',
-    observations: ''
+    observations: '',
+    evs: { HP: 0, Atk: 0, Def: 0, SpA: 0, SpD: 0, Spe: 0 } as Record<EVStat, number>,
+    level: '50' as '50' | '100',
+    item: '',
+    moves: ['', '', '', ''] as string[],
+    ppMax: false,
   };
 
   const [form, setForm] = useState(() => {
@@ -207,7 +229,237 @@ export const OrderForm = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, []);  // ----- Competitive: PokéAPI move fetching -----
+  const [availableMoves, setAvailableMoves] = useState<string[]>([]);
+  const [moveDetails, setMoveDetails] = useState<Record<string, any>>({});
+  const [itemDetails, setItemDetails] = useState<Record<string, any>>({});
+  const [moveSearches, setMoveSearches] = useState(['', '', '', '']);
+  const [moveDropdownOpen, setMoveDropdownOpen] = useState<number | null>(null);
+
+  // ─── TRADUÇÃO 100% PT-BR ───
+  const COMMON_TERMS: Record<string, string> = {
+    'damage': 'dano', 'inflicts': 'causa', 'opponent': 'oponente', 'target': 'alvo',
+    'held': 'item segurado', 'power': 'poder', 'accuracy': 'precisão', 'level': 'nível',
+    'switch': 'trocar', 'effect': 'efeito', 'chance': 'chance', 'increases': 'aumenta',
+    'decreases': 'diminui', 'stats': 'atributos', 'attack': 'ataque', 'defense': 'defesa',
+    'speed': 'velocidade', 'special': 'especial', 'lowers': 'reduz', 'raises': 'eleva',
+    'user': 'usuário', 'restore': 'restaura', 'health': 'vida', 'healing': 'cura',
+    'status': 'condição', 'paralysis': 'paralisia', 'burn': 'queimadura', 'poison': 'veneno',
+    'sleep': 'sono', 'freeze': 'congelamento', 'confusion': 'confusão', 'priority': 'prioridade',
+    'avoid': 'evitar', 'immune': 'imune', 'resist': 'resistir', 'critical': 'crítico',
+    'hit': 'golpe', 'turn': 'turno', 'weather': 'clima', 'terrain': 'terreno',
+    'entry': 'entrada', 'hazards': 'armadilhas', 'recoil': 'recuo', 'drain': 'drenar',
+    'absorb': 'absorver', 'items': 'itens', 'berries': 'frutas', 'moves': 'ataques',
+    'ability': 'habilidade', 'nature': 'natureza', 'egg': 'ovo', 'groups': 'grupos',
+    'breeding': 'breeding', 'hidden': 'oculta', 'physical': 'físico', 'category': 'categoria',
+    'contact': 'contato', 'protect': 'proteção', 'piercing': 'perfurante', 'multi': 'múltiplo',
+    'single': 'único', 'field': 'campo', 'active': 'ativo', 'bench': 'banco',
+    'faint': 'desmaiar', 'knocked out': 'nocauteado', 'victory': 'vitória', 'defeat': 'derrota',
+    'battle': 'batalha', 'trainer': 'treinador', 'gym': 'ginásio', 'team': 'equipe',
+    'forest': 'floresta', 'cave': 'caverna', 'mountain': 'montanha', 'sea': 'mar',
+    'ocean': 'oceano', 'lake': 'lago', 'river': 'rio', 'island': 'ilha', 'region': 'região',
+    'always': 'sempre', 'never': 'nunca', 'sometimes': 'às vezes', 'often': 'frequentemente',
+    'usually': 'geralmente', 'normal': 'normal', 'fighting': 'lutador', 'flying': 'voador',
+    'ground': 'terrestre', 'rock': 'pedra', 'bug': 'inseto',
+    'ghost': 'fantasma', 'steel': 'metálico', 'fire': 'fogo', 'water': 'água',
+    'grass': 'planta', 'electric': 'elétrico', 'psychic': 'psíquico', 'ice': 'gelo',
+    'dragon': 'dragão', 'dark': 'sombrio', 'fairy': 'fada', 'type': 'tipo',
+    'damage.': 'dano.', 'hit.': 'golpe.', 'turn.': 'turno.', 'stats.': 'atributos.',
+    'target.': 'alvo.', 'opponent.': 'oponente.', 'user.': 'usuário.',
+    'first': 'primeiro', 'second': 'segundo', 'third': 'terceiro', 'fourth': 'quarto',
+    'random': 'aleatório', 'randomly': 'aleatoriamente', 'chooses': 'escolhe', 'selects': 'seleciona',
+    'ignores': 'ignora', 'bypasses': 'ignora', 'prevents': 'previne', 'stops': 'impede',
+    'cancels': 'cancela', 'removes': 'remove', 'clears': 'limpa', 'heals': 'cura',
+    'damage,': 'dano,', 'hit,': 'golpe,', 'turn,': 'turno,', 'stats,': 'atributos,',
+    'target,': 'alvo,', 'opponent,': 'oponente,', 'user,': 'usuário,',
+    'misses': 'erra', 'misses.': 'erra.', 'misses,': 'erra,',
+    'fails': 'falha', 'fails.': 'falha.', 'fails,': 'falha,',
+    'protects': 'protege', 'changes': 'muda', 'has': 'tem', 'no': 'nenhum',
+    'additional': 'adicional', 'effect.': 'efeito.', 'effects.': 'efeitos.',
+    'flinch': 'recuar', 'flinch.': 'recuar.', 'accuracy.': 'precisão.',
+    'evasion': 'evasiva', 'evasion.': 'evasiva.', 'receives': 'recebe',
+    'takes': 'sofre', 'causes': 'causa', 'paralyze': 'paralisar',
+    'paralyzes': 'paralisa', 'burns': 'queima', 'poisons': 'envenena',
+    'freezes': 'congela', 'confuses': 'confunde', 'may': 'pode', 'must': 'deve',
+    'recharges': 'recarrega', 'next': 'próximo', 'this': 'este', 'that': 'aquele',
+    'can': 'pode', 'cannot': 'não pode', 'its': 'sua', 'their': 'sua',
+    'or': 'ou', 'and': 'e', 'but': 'mas', 'if': 'se', 'it': 'ele', 'is': 'é',
+    'are': 'são', 'not': 'não', 'when': 'quando', 'used': 'usado', 'use': 'usar',
+    'by': 'por', 'for': 'por', 'with': 'com', 'without': 'sem', 'from': 'de',
+    'to': 'para', 'in': 'em', 'on': 'no', 'at': 'em', 'all': 'todos',
+    'any': 'qualquer', 'other': 'outro', 'pokemon': 'pokémon', 'pokemon.': 'pokémon.'
+  };
+
+  const MANUAL_SPRITES: Record<string, string> = {
+    'Heavy-Duty Boots': 'https://archives.bulbagarden.net/media/upload/9/9b/Bag_Heavy-Duty_Boots_SV_Sprite.png'
+  };
+
+  const MANUAL_ITEMS: Record<string, string> = {
+    'Life Orb': 'Aumenta o dano dos ataques em 30%, mas o usuário perde 10% de vida a cada golpe.',
+    'Choice Specs': 'Aumenta o Ataque Especial em 50%, mas permite o uso de apenas um golpe.',
+    'Choice Scarf': 'Aumenta a Velocidade em 50%, mas permite o uso de apenas um golpe.',
+    'Choice Band': 'Aumenta o Ataque em 50%, mas permite o uso de apenas um golpe.',
+    'Focus Sash': 'Se o usuário estiver com vida cheia, ele sobrevive a qualquer golpe com 1 de HP. Consumível.',
+    'Heavy-Duty Boots': 'Protege o usuário de armadilhas na entrada (como Stealth Rock e Spikes).',
+    'Leftovers': 'Restaura uma pequena quantidade de vida a cada turno.',
+    'Assault Vest': 'Aumenta a Defesa Especial em 50%, mas impede o uso de golpes de status.',
+    'Rocky Helmet': 'Se o oponente fizer contato físico, ele perde 1/6 de sua vida máxima.',
+    'Eviolite': 'Aumenta a Defesa e Defesa Especial em 50% se o Pokémon ainda puder evoluir.',
+    'Air Balloon': 'O usuário flutua no ar, ficando imune a golpes do tipo Terra. Estoura ao receber dano.',
+    'White Herb': 'Restaura qualquer atributo que tenha sido reduzido. Consumível.',
+    'Power Herb': 'Permite o uso instantâneo de golpes que levariam dois turnos para carregar. Consumível.',
+    'Expert Belt': 'Aumenta o dano de ataques super efetivos em 20%.',
+    'Black Sludge': 'Restaura vida de tipos Veneno; causa dano a outros tipos.',
+    'Flame Orb': 'Queima o usuário no final do turno.',
+    'Toxic Orb': 'Envenena gravemente o usuário no final do turno.',
+    'Light Clay': 'Aumenta a duração de Reflect e Light Screen para 8 turnos.',
+    'Choice': 'Escolha', 'Band': 'Faixa', 'Specs': 'Óculos', 'Scarf': 'Lenço', 'Orb': 'Esfera', 'Vest': 'Colete'
+  };
+
+  const translateEffect = (text: string) => {
+    if (!text) return 'Sem descrição disponível';
+    let translated = text.replace(/[\f\n\r]/g, ' ');
+
+    // ─── Frases Coesas (Regras de Ouro para PT-BR) ───
+    const PHRASES: [RegExp, string | ((...args: any[]) => string)][] = [
+      [/Has an increased chance for a critical hit\.?/gi, 'Possui uma chance maior de acerto crítico.'],
+      [/Has double power if the user has no held item\.?/gi, 'O poder dobra se o usuário não estiver segurando nenhum item.'],
+      [/Never misses\.?/gi, 'Nunca erra.'],
+      [/Inflicts regular damage with no additional effect\.?/gi, 'Causa dano normal sem efeitos adicionais.'],
+      [/Inflicts regular damage\.?/gi, 'Causa dano normal.'],
+      [/User recovers half the HP inflicted on target\.?/gi, 'O usuário recupera metade do dano causado ao alvo.'],
+      [/Protects the user from all effects of moves that target it during the turn it is used\.?/gi, 'Protege o usuário de todos os ataques no turno em que é usado.'],
+      [/Hits twice in one turn\.?/gi, 'Atinge duas vezes no mesmo turno.'],
+      [/Hits (2-5|two to five) times in one turn\.?/gi, 'Atinge de 2 a 5 vezes no mesmo turno.'],
+      [/User faints\.?/gi, 'O usuário desmaia.'],
+      [/If the user faints, the target faints\.?/gi, 'Se o usuário desmaiar, o alvo também desmaia.'],
+      [/Destroys the target's held item\.?/gi, 'Destrói o item segurado pelo alvo.'],
+      [/Has a \$effect_chance% chance to burn the target\.?/gi, 'Tem $effect_chance% de chance de queimar o alvo.'],
+      [/Has a \$effect_chance% chance to paralyze the target\.?/gi, 'Tem $effect_chance% de chance de paralisar o alvo.'],
+      [/Has a \$effect_chance% chance to freeze the target\.?/gi, 'Tem $effect_chance% de chance de congelar o alvo.'],
+      [/Has a \$effect_chance% chance to poison the target\.?/gi, 'Tem $effect_chance% de chance de envenenar o alvo.'],
+      [/Has a \$effect_chance% chance to confuse the target\.?/gi, 'Tem $effect_chance% de chance de confundir o alvo.'],
+      [/Has a \$effect_chance% chance to make the target flinch\.?/gi, 'Tem $effect_chance% de chance de fazer o alvo recuar.'],
+      [/Has a \$effect_chance% chance to lower the target's (.*?) by (one|two|three) stage(s)?\.?/gi, (_match, stat, amount) => {
+         const s = COMMON_TERMS[stat.toLowerCase()] || stat;
+         const a = amount.toLowerCase() === 'one' ? 'um' : amount.toLowerCase() === 'two' ? 'dois' : 'três';
+         return `Tem $effect_chance% de chance de reduzir ${s} do alvo em ${a} estágio(s).`;
+      }],
+      [/Has a \$effect_chance% chance to (.*?)\.?/gi, 'Tem $effect_chance% de chance de $1.'],
+      [/Changes the weather to (.*?)\.?/gi, 'Muda o clima para $1.'],
+      [/Lowers the target's (.*?) by (one|two|three) stage(s)?\.?/gi, (_match, stat, amount) => {
+         const s = COMMON_TERMS[stat.toLowerCase()] || stat;
+         const a = amount.toLowerCase() === 'one' ? 'um' : amount.toLowerCase() === 'two' ? 'dois' : 'três';
+         return `Reduz o atributo de ${s} do alvo em ${a} estágio(s).`;
+      }],
+      [/Raises the user's (.*?) by (one|two|three) stage(s)?\.?/gi, (_match, stat, amount) => {
+         const s = COMMON_TERMS[stat.toLowerCase()] || stat;
+         const a = amount.toLowerCase() === 'one' ? 'um' : amount.toLowerCase() === 'two' ? 'dois' : 'três';
+         return `Aumenta o atributo de ${s} do usuário em ${a} estágio(s).`;
+      }]
+    ];
+
+    PHRASES.forEach(([regex, replacement]) => {
+      translated = translated.replace(regex, replacement as any);
+    });
+
+    translated = translated.replace(/Held: /gi, 'Item: ').replace(/Inflicts /gi, 'Causa ');
+    
+    // Fallback: Tradução palavra por palavra apenas para o que não foi coberto pela gramática de frases
+    const words = translated.split(' ');
+    const result = words.map(word => {
+      const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+      if (clean === 'the' || clean === 'a' || clean === 'an' || clean === 'of') {
+        const trans: any = { 'the': 'o', 'a': 'um', 'an': 'um', 'of': 'de' };
+        return word.replace(new RegExp(clean, 'i'), trans[clean]);
+      }
+      if (COMMON_TERMS[clean]) {
+        // Preservar pontuação e caixa alta na medida do possível
+        return word.replace(new RegExp(clean, 'i'), COMMON_TERMS[clean]);
+      }
+      return word;
+    }).join(' ');
+
+    return result.charAt(0).toUpperCase() + result.slice(1);
+  };
+
+  const fetchPokemonMoves = useCallback(async (pokemonName: string) => {
+    if (!pokemonName || !isCompetitive) return;
+    try {
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const moveList = data.moves.map((m: any) => ({
+        name: m.move.name.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        url: m.move.url
+      }));
+
+      setAvailableMoves(moveList.map((m: any) => m.name).sort());
+
+      // Fetch move details in chunks to avoid rate limiting or massive parallel requests
+      const details: Record<string, any> = {};
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < moveList.length; i += CHUNK_SIZE) {
+        const chunk = moveList.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (m: any) => {
+          try {
+            const r = await fetch(m.url);
+            if (r.ok) {
+              const md = await r.json();
+              const ptDesc = md.flavor_text_entries.find((e: any) => e.language.name.toLowerCase() === 'pt-br' || e.language.name.toLowerCase() === 'pt')?.flavor_text;
+              const enDesc = md.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect;
+              const cleanEnDesc = enDesc ? enDesc.replace(/\n/g, ' ').replace(/\r/g, '') : '';
+              const finalTranslation = ptDesc || (moveTranslations as Record<string, string>)[cleanEnDesc] || translateEffect(enDesc);
+              
+              details[m.name] = {
+                type: md.type.name,
+                category: md.damage_class.name,
+                power: md.power,
+                accuracy: md.accuracy,
+                effect: finalTranslation
+              };
+            }
+          } catch (e) {}
+        }));
+        setMoveDetails(prev => ({ ...prev, ...details }));
+      }
+    } catch (e) {
+      setAvailableMoves([]);
+    }
+  }, [isCompetitive]);
+
+  const fetchItemDetails = useCallback(async () => {
+    if (!isCompetitive) return;
+    try {
+      const results: Record<string, any> = {};
+      await Promise.all(COMPETITIVE_ITEMS.map(async (item) => {
+        const slug = item.toLowerCase().replace(/ /g, '-');
+        try {
+          const res = await fetch(`https://pokeapi.co/api/v2/item/${slug}`);
+          if (res.ok) {
+            const data = await res.json();
+            const ptDesc = data.flavor_text_entries.find((e: any) => e.language.name.toLowerCase() === 'pt-br' || e.language.name.toLowerCase() === 'pt')?.text;
+            const enDesc = data.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect;
+            
+            results[item] = {
+              sprite: MANUAL_SPRITES[item] || data.sprites.default,
+              effect: MANUAL_ITEMS[item] || translateEffect(ptDesc || enDesc)
+            };
+          }
+        } catch (e) {}
+      }));
+      setItemDetails(results);
+    } catch (e) {}
+  }, [isCompetitive]);
+
+  useEffect(() => {
+    if (form.pokemon && isCompetitive) {
+      fetchPokemonMoves(form.pokemon);
+      fetchItemDetails();
+    }
+  }, [form.pokemon, isCompetitive, fetchPokemonMoves, fetchItemDetails]);
+  // ------------------------------------------------
 
 
 
@@ -247,21 +499,36 @@ export const OrderForm = () => {
     }
   }, [error]);
 
-  const formatPrice = (p: number) => `${p / 1000}k`;
+  const formatPrice = (p: number) => `${Math.ceil(p / 1000)}k`;
 
   const calculateItemPrice = (item: any) => {
     let base = IV_DETAILS[item.ivs as IVOption].price;
-    if (GENDERLESS_POKEMON.includes(item.pokemon) || MALE_ONLY_POKEMON.includes(item.pokemon)) base *= 2; // Preço Genderless / Male-Only é o dobro
-    
-    // Indeedee Macho só pode breedar com Ditto, então recebe taxa de Genderless
+    if (GENDERLESS_POKEMON.includes(item.pokemon) || MALE_ONLY_POKEMON.includes(item.pokemon)) base *= 2;
     if (item.pokemon === 'Indeedee' && item.gender === 'Macho') base *= 2;
-
     if (item.isCastrated && item.ivs !== '4') base -= CASTRATED_DISCOUNT;
     if (item.hasHA) base += HA_FEE;
     return base;
   };
 
-  const totalPrice = useMemo(() => calculateItemPrice(form), [form]);
+  // Competitive extra cost
+  const competitiveExtra = useMemo(() => {
+    if (!isCompetitive) return 0;
+    const vitamins = EV_STATS.reduce((sum, s) => sum + Math.ceil((form.evs[s] || 0) / 10), 0);
+    const vitaminCost = vitamins * VITAMIN_PRICE;
+    const levelCost = form.level === '100' ? 80000 : 40000;
+    const itemCost = form.item ? ITEM_PRICE : 0;
+    const ppCost = form.ppMax ? PP_MAX_PRICE : 0;
+    const moveCount = form.moves.filter(m => m && m.trim() !== '').length;
+    const moveCost = moveCount * 10000;
+    return vitaminCost + levelCost + itemCost + ppCost + moveCost;
+  }, [isCompetitive, form.evs, form.level, form.item, form.ppMax, form.moves]);
+
+  const totalPrice = useMemo(() => {
+    const base = calculateItemPrice(form);
+    // Only include competitive cost if we are in the build phase (step 42) or final summary (step 4)
+    if (!isCompetitive || (step !== 42 && step !== 4)) return base;
+    return base + competitiveExtra;
+  }, [form, competitiveExtra, isCompetitive, step]);
 
   const abilityOptions = useMemo(() => {
     const opts = [
@@ -297,7 +564,7 @@ export const OrderForm = () => {
     if (!handleValidation()) return;
     const nick = form.discordNick;
     safeStorage.setItem('valiant_discord_nick', nick);
-    addToCart({ ...form, price: totalPrice });
+    addToCart({ ...form, price: totalPrice, isCompetitive });
     // Reset form but preserve the discord nick for next cart item
     setForm({ ...initialForm, discordNick: nick });
     setSearch('');
@@ -330,7 +597,18 @@ export const OrderForm = () => {
         discordNick: form.discordNick,
         observations: form.observations.trim() || null,
         status: 'Pendente',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        // Competitive fields
+        isCompetitive: isCompetitive || false,
+        ...(isCompetitive && {
+          build: {
+            evs: form.evs,
+            level: form.level,
+            item: form.item,
+            moves: form.moves.filter(m => m.trim() !== ''),
+            ppMax: form.ppMax,
+          }
+        })
       });
       
       // Atualiza stats do próprio perfil (usuário tem permissão de escrita)
@@ -341,6 +619,7 @@ export const OrderForm = () => {
       // Notify Discord e salvar messageId no Firestore
       const messageId = await notifyNewOrder({
         ...form,
+        isCompetitive,
         playerNick: user.displayName,
         totalPrice: totalPrice,
         nature: (form.nature && form.nature.trim() !== '') ? form.nature : 'Aleatória'
@@ -426,11 +705,30 @@ export const OrderForm = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 animate-fade">
       <div className="mb-12 text-center">
-        <h2 className="pixel-title text-3xl mb-4"><span className="text-primary underline underline-offset-8 decoration-secondary">Encomendas</span></h2>
+        <h2 className="pixel-title text-3xl mb-4">
+          <span className="text-primary underline underline-offset-8 decoration-secondary">
+            {isCompetitive ? 'ENCOMENDAS COMPETITIVAS' : 'ENCOMENDAS'}
+          </span>
+        </h2>
         <div className="flex justify-center gap-2">
-          {[1, 2].map(i => (
-            <div key={i} className={`h-1.5 w-16 rounded-full transition-all duration-500 ${step >= i ? 'bg-secondary shadow-[0_0_15px_var(--secondary-glow)]' : 'bg-white/5'}`}></div>
-          ))}
+          {[1, 2, ...(isCompetitive ? [3] : [])].map(i => {
+            let isActive = false;
+            if (!isCompetitive) {
+              isActive = step >= i;
+            } else {
+              if (i === 1) isActive = step >= 1;
+              if (i === 2) isActive = step >= 3; 
+              if (i === 3) isActive = step >= 42; 
+            }
+            return (
+              <div 
+                key={i} 
+                className={`h-1.5 w-16 rounded-full transition-all duration-500 ${
+                  isActive ? 'bg-secondary shadow-[0_0_15px_var(--secondary-glow)]' : 'bg-white/5'
+                }`}
+              ></div>
+            );
+          })}
         </div>
       </div>
 
@@ -820,36 +1118,48 @@ export const OrderForm = () => {
                   {form.hasHA && <p className="text-xs text-primary font-bold mt-2 uppercase tracking-widest">+15k Taxa Hidden Ability</p>}
                 </div>
 
-                <div className="flex flex-col sm:flex-row w-full gap-4 z-10">
-                  <div className="flex flex-col flex-1 gap-2">
-                    <button 
-                      disabled={isSubmitting || cooldown > 0}
-                      onClick={handleBuyNow} 
-                      className={`btn-manda w-full !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${(isSubmitting || cooldown > 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <span className="font-extrabold uppercase text-sm">
-                        {isSubmitting ? 'Enviando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : 'Comprar Agora'}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                        {cooldown > 0 ? 'Anti-Spam' : 'Apenas 1'}
-                      </span>
-                    </button>
+                {isCompetitive ? (
+                  <button
+                    onClick={() => {
+                      if (!handleValidation()) return;
+                      setStep(42);
+                    }}
+                    className="btn-manda w-full !bg-secondary !shadow-secondary-glow flex items-center justify-center gap-3 !py-5 text-lg"
+                  >
+                    <Swords size={20} /> Prosseguir para Build Competitiva
+                  </button>
+                ) : (
+                  <div className="flex flex-col sm:flex-row w-full gap-4 z-10">
+                    <div className="flex flex-col flex-1 gap-2">
+                      <button 
+                        disabled={isSubmitting || cooldown > 0}
+                        onClick={handleBuyNow} 
+                        className={`btn-manda w-full !p-4 !bg-transparent border-2 border-primary/20 hover:border-primary text-primary transition-all flex flex-col items-center justify-center gap-1 ${(isSubmitting || cooldown > 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span className="font-extrabold uppercase text-sm">
+                          {isSubmitting ? 'Enviando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : 'Comprar Agora'}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                          {cooldown > 0 ? 'Anti-Spam' : 'Apenas 1'}
+                        </span>
+                      </button>
+                      <button 
+                        disabled={isSubmitting}
+                        onClick={handleAddToWishlist}
+                        className="flex items-center justify-center gap-2 py-2 text-[9px] font-black uppercase text-gray-500 hover:text-secondary transition-all"
+                      >
+                        <Heart size={10} /> Salvar na Wishlist
+                      </button>
+                    </div>
                     <button 
                       disabled={isSubmitting}
-                      onClick={handleAddToWishlist}
-                      className="flex items-center justify-center gap-2 py-2 text-[9px] font-black uppercase text-gray-500 hover:text-secondary transition-all"
+                      onClick={handleAddToCart} 
+                      className="btn-manda flex-[2] !px-8 !py-5 text-lg !bg-secondary !shadow-[0_0_30px_var(--secondary-glow)] flex flex-col sm:flex-row items-center justify-center gap-3"
                     >
-                      <Heart size={10} /> Salvar na Wishlist
+                      <span className="font-extrabold">Ao Carrinho</span> <ShoppingBag size={20} />
                     </button>
                   </div>
-                  <button 
-                    disabled={isSubmitting}
-                    onClick={handleAddToCart} 
-                    className="btn-manda flex-[2] !px-8 !py-5 text-lg !bg-secondary !shadow-[0_0_30px_var(--secondary-glow)] flex flex-col sm:flex-row items-center justify-center gap-3"
-                  >
-                    <span className="font-extrabold">Ao Carrinho</span> <ShoppingBag size={20} />
-                  </button>
-                </div>
+                )}
               </div>
 
               <div className="text-center">
@@ -857,6 +1167,294 @@ export const OrderForm = () => {
               </div>
             </motion.div>
           )}
+
+          {/* ===== STEP 42: COMPETITIVE BUILD ===== */}
+          {step === 42 && (() => {
+            const totalEVsUsed = EV_STATS.reduce((s, k) => s + (form.evs[k] || 0), 0);
+            const totalVitamins = EV_STATS.reduce((s, k) => s + Math.ceil((form.evs[k] || 0) / 10), 0);
+            const vitaminCost = totalVitamins * VITAMIN_PRICE;
+            return (
+              <motion.div key="step42" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                    <Swords size={22} className="text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="pixel-title text-xl text-purple-400">04. Build Competitiva</h3>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Configure EVs, Level, Item e Moveset</p>
+                  </div>
+                </div>
+
+                {/* EV Section */}
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Distribuição de EVs</label>
+                    <div className="flex items-center gap-4 text-xs font-black">
+                      <span className={totalEVsUsed > 510 ? 'text-red-500' : totalEVsUsed === 510 ? 'text-green-400' : 'text-gray-400'}>
+                        {totalEVsUsed} / 510 EVs
+                      </span>
+                      <span className="text-purple-400">{totalVitamins} vitaminas</span>
+                      <span className="text-orange-400">+{Math.ceil(vitaminCost / 1000)}k</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {EV_STATS.map(stat => {
+                      const val = form.evs[stat] || 0;
+                      return (
+                        <div key={stat} className="bg-black/40 border border-white/5 rounded-2xl p-4 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat}</span>
+                            <input
+                              type="number"
+                              min={0} max={252}
+                              value={val}
+                              onChange={e => {
+                                const v = Math.min(252, Math.max(0, Number(e.target.value)));
+                                const others = totalEVsUsed - val;
+                                const finalV = Math.min(v, 510 - others);
+                                setForm(prev => ({ ...prev, evs: { ...prev.evs, [stat]: finalV } }));
+                              }}
+                              className="w-16 bg-black/60 border border-white/10 rounded-lg px-2 py-1 text-center text-white font-black text-sm outline-none focus:border-purple-500"
+                            />
+                          </div>
+                          <input
+                            type="range" min={0} max={Math.min(252, 510 - (totalEVsUsed - val))} value={val}
+                            onChange={e => {
+                              const v = Number(e.target.value);
+                              const others = totalEVsUsed - val;
+                              const finalV = Math.min(v, 510 - others);
+                              setForm(prev => ({ ...prev, evs: { ...prev.evs, [stat]: finalV } }));
+                            }}
+                            className="w-full accent-purple-500"
+                          />
+                          <div className="flex justify-between text-[8px] text-gray-600 font-bold">
+                            <span>0</span>
+                            <span className="text-purple-400/60">{Math.ceil(val / 10)} vitamina{Math.ceil(val / 10) !== 1 ? 's' : ''}</span>
+                            <span>{Math.min(252, 510 - (totalEVsUsed - val))}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Level + Item */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Level de Treinamento</label>
+                    <div className="flex gap-3">
+                      {(['50', '100'] as const).map(lv => (
+                        <button key={lv} onClick={() => setForm(prev => ({ ...prev, level: lv }))}
+                          className={`flex-1 py-4 rounded-xl border-2 font-black transition-all text-sm ${
+                            form.level === lv ? 'border-purple-500 bg-purple-500/10 text-purple-300' : 'border-white/5 text-gray-500 hover:border-white/20'
+                          }`}>
+                          Lv {lv}
+                          <span className="block text-[9px] font-bold opacity-70 mt-0.5">+{lv === '50' ? '40k' : '80k'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3 relative" ref={itemRef}>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Item Segurado (+20k)</label>
+                    <button 
+                      type="button"
+                      onClick={() => setShowItemDropdown(!showItemDropdown)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-white font-bold flex items-center justify-between hover:border-purple-500/30 transition-all text-sm"
+                    >
+                      <div className="flex items-center gap-3">
+                        {form.item && itemDetails[form.item]?.sprite && (
+                          <img src={itemDetails[form.item].sprite} className="w-6 h-6 object-contain" alt="" />
+                        )}
+                        <span>{form.item || 'Sem item'}</span>
+                      </div>
+                      <ChevronDown size={16} className={`transition-transform ${showItemDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showItemDropdown && (
+                      <div className="absolute top-full left-0 w-full mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden z-[100] shadow-2xl max-h-80 overflow-y-auto custom-scrollbar animate-fade-in">
+                        <button 
+                          type="button"
+                          onClick={() => { setForm(prev => ({...prev, item: ''})); setShowItemDropdown(false); }}
+                          className="w-full px-4 py-3 text-left hover:bg-white/5 border-b border-white/5 text-gray-500 text-xs font-bold uppercase"
+                        >
+                          Sem item
+                        </button>
+                        {COMPETITIVE_ITEMS.map(it => {
+                          const det = itemDetails[it];
+                          return (
+                            <button 
+                              key={it}
+                              type="button"
+                              onClick={() => { setForm(prev => ({...prev, item: it})); setShowItemDropdown(false); }}
+                              className="w-full px-4 py-4 text-left hover:bg-purple-500/10 border-b border-white/5 last:border-0 flex items-start gap-4 group transition-colors"
+                            >
+                              <div className="w-10 h-10 shrink-0 bg-white/5 rounded-lg flex items-center justify-center group-hover:bg-purple-500/20 transition-all">
+                                {det?.sprite ? <img src={det.sprite} className="w-8 h-8 object-contain" alt="" /> : <Package size={16} />}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-black text-white text-sm uppercase">{it}</span>
+                                  <span className="text-[10px] text-primary font-black">+20k</span>
+                                </div>
+                                <p className="text-[9px] text-gray-500 font-medium leading-relaxed">
+                                  {det?.effect || 'Carregando descrição...'}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Moveset */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block">Moveset (até 4 golpes)</label>
+                    <span className="text-[10px] font-black text-primary uppercase">VALOR TOTAL: +{(form.moves.filter(m => m && m.trim() !== '').length * 10000) / 1000}k</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {form.moves.map((mv, idx) => {
+                      const filtered = availableMoves
+                        .filter(m => !form.moves.includes(m))
+                        .filter(m => m.toLowerCase().includes((moveSearches[idx] || '').toLowerCase()))
+                        .slice(0, 12);
+                      return (
+                        <div key={idx} className="relative">
+                          <div className="flex items-center gap-2 bg-black/60 border-2 border-white/5 rounded-xl px-4 py-3 focus-within:border-purple-500 transition-all">
+                            <span className="text-[9px] font-black text-purple-400/60 uppercase w-4">{idx + 1}</span>
+                            <input
+                              type="text"
+                              value={mv || moveSearches[idx]}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setMoveSearches(prev => { const n = [...prev]; n[idx] = val; return n; });
+                                setForm(prev => { const m = [...prev.moves]; m[idx] = ''; return { ...prev, moves: m }; });
+                                setMoveDropdownOpen(idx);
+                              }}
+                              onFocus={() => setMoveDropdownOpen(idx)}
+                              placeholder={`Escolher golpe ${idx + 1}...`}
+                              className="flex-1 bg-transparent text-white font-bold text-sm outline-none placeholder:text-gray-600"
+                            />
+                            {mv && <button onClick={() => {
+                              setForm(prev => { const m = [...prev.moves]; m[idx] = ''; return { ...prev, moves: m }; });
+                              setMoveSearches(prev => { const n = [...prev]; n[idx] = ''; return n; });
+                            }} className="text-gray-600 hover:text-red-400 transition-colors"><X size={12} /></button>}
+                          </div>
+                          {moveDropdownOpen === idx && filtered.length > 0 && !mv && (
+                            <div className="absolute top-full left-0 w-full mt-2 bg-[#0a0a0a] border border-purple-500/30 rounded-2xl overflow-hidden z-[100] shadow-2xl max-h-64 overflow-y-auto custom-scrollbar animate-fade-in">
+                              {filtered.map(m => {
+                                const det = moveDetails[m];
+                                return (
+                                  <button 
+                                    key={m} 
+                                    type="button"
+                                    className="w-full px-4 py-3 text-left hover:bg-purple-500/10 border-b border-white/5 last:border-0 flex flex-col gap-1 transition-all group"
+                                    onClick={() => {
+                                      setForm(prev => { const moves = [...prev.moves]; moves[idx] = m; return { ...prev, moves }; });
+                                      setMoveSearches(prev => { const n = [...prev]; n[idx] = ''; return n; });
+                                      setMoveDropdownOpen(null);
+                                    }}
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm font-black text-white uppercase group-hover:text-purple-400 transition-colors">{m}</span>
+                                      <div className="flex gap-2">
+                                         {det?.category && (
+                                           <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                             det.category === 'physical' ? 'bg-red-500/20 text-red-400' :
+                                             det.category === 'special' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                                           }`}>
+                                             {det.category}
+                                           </span>
+                                         )}
+                                         <span className="text-[8px] font-black text-purple-400 uppercase bg-purple-500/10 px-1.5 py-0.5 rounded">{det?.type}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-3 text-[9px] font-bold text-gray-500 items-center">
+                                       {det?.power && <span className="flex items-center gap-1"><Zap size={10} className="text-yellow-500" /> {det.power}</span>}
+                                       {det?.accuracy && <span className="flex items-center gap-1"><Target size={10} className="text-blue-400" /> {det.accuracy}%</span>}
+                                    </div>
+                                    <p className="text-[8px] text-gray-600 line-clamp-1 italic">{det?.effect || 'Sem descrição disponível'}</p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* PP Max */}
+                <button
+                  onClick={() => setForm(prev => ({ ...prev, ppMax: !prev.ppMax }))}
+                  className={`w-full p-5 rounded-2xl border-2 flex items-center justify-between transition-all ${
+                    form.ppMax ? 'border-purple-500 bg-purple-500/10' : 'border-white/5 hover:border-white/20'
+                  }`}
+                >
+                  <div className="text-left">
+                    <p className={`font-black text-sm uppercase tracking-wide ${form.ppMax ? 'text-purple-300' : 'text-white'}`}>Maximizar PP (PP Max)</p>
+                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">Aplica PP Max nos 4 golpes do moveset</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-black text-lg ${form.ppMax ? 'text-purple-400' : 'text-gray-600'}`}>+5k</p>
+                    <p className="text-[9px] font-bold text-gray-600 uppercase">{form.ppMax ? 'Ativado' : 'Opcional'}</p>
+                  </div>
+                </button>
+
+                {/* Summary + Submit */}
+                <div className="bg-purple-500/5 border-2 border-purple-500/20 rounded-[2rem] p-8 space-y-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                    <div>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Base</p>
+                      <p className="text-lg font-black text-white">{formatPrice(calculateItemPrice(form))}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">EVs</p>
+                      <p className="text-lg font-black text-orange-400">+{Math.ceil(vitaminCost / 1000)}k</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Build+Item</p>
+                      <p className="text-lg font-black text-purple-400">+{((form.level === '100' ? 80000 : 40000) + (form.item ? ITEM_PRICE : 0) + (form.ppMax ? PP_MAX_PRICE : 0) + (form.moves.filter(m => m.trim() !== '').length * 10000)) / 1000}k</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Total</p>
+                      <p className="text-2xl font-black text-white">{formatPrice(Math.ceil(totalPrice / 1000) * 1000)}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row w-full gap-4 z-10">
+                    <div className="flex flex-col flex-1 gap-2">
+                      <button 
+                        disabled={isSubmitting || cooldown > 0}
+                        onClick={handleBuyNow} 
+                        className={`btn-manda w-full !p-4 !bg-transparent border-2 border-purple-500/20 hover:border-purple-500 text-purple-400 transition-all flex flex-col items-center justify-center gap-1 ${(isSubmitting || cooldown > 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span className="font-extrabold uppercase text-sm">
+                          {isSubmitting ? 'Enviando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : 'Comprar Agora'}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                          {cooldown > 0 ? 'Anti-Spam' : 'Apenas 1'}
+                        </span>
+                      </button>
+                    </div>
+                    <button 
+                      disabled={isSubmitting}
+                      onClick={handleAddToCart} 
+                      className="btn-manda flex-[2] !px-8 !py-5 text-lg !bg-purple-600 !shadow-[0_0_30px_rgba(168,85,247,0.4)] flex flex-col sm:flex-row items-center justify-center gap-3"
+                    >
+                      <span className="font-extrabold">Ao Carrinho</span> <ShoppingBag size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <button onClick={() => setStep(3)} className="text-gray-500 font-black uppercase text-[10px] hover:text-white transition-all underline underline-offset-4 decoration-purple-500">Voltar para IVs</button>
+                </div>
+              </motion.div>
+            );
+          })()}
 
           {step === 4 && (
             <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="py-16 text-center space-y-8">

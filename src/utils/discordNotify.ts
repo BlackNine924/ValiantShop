@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { POKEMON_DATA } from '../data/pokemonData';
-import { EGG_GROUPS_MAP } from '../data/eggGroups';
 
 // ─────────────────────────────────────────────────────────────
 // CONFIG
@@ -22,7 +21,6 @@ const STATUS_CONFIG: Record<string, { color: number; label: string }> = {
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
-const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const workerRequest = async (data: any, retries = 3): Promise<any> => {
@@ -64,36 +62,57 @@ const buildEmbed = (order: any, status: string = 'Pendente') => {
   const ivFormatted = formatIVs(order.ivs || '', order.ignoredIvs || []);
   const isHA = order.hasHA || (pokemonInfo?.hiddenAbility === order.ability && order.ability);
   const abilityDisplay = isHA ? `${order.ability} (HA)` : (order.ability || 'N/A');
-  const eggGroupsData = EGG_GROUPS_MAP[normalizeName(order.pokemon || '')];
-  const eggGroupDisplay = eggGroupsData ? eggGroupsData.join(', ') : 'N/A';
   const priceFormatted = `${(order.totalPrice || 0) / 1000}k`;
   const cinematicBanner = 'https://wallpapers-clan.com/wp-content/uploads/2024/08/ash-pikachu-adventure-pokemon-desktop-wallpaper-cover.jpg';
   const thumbUrl = pokeId > 0 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokeId}.png` : '';
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG['Pendente'];
 
-  return {
-    title: '✨ ENCOMENDA VALIANTSHOP ✨',
-    color: statusCfg.color,
-    description: `👋 <@${USER_ID}>, um novo pedido foi registrado no sistema.\n\n**Status:** ${statusCfg.label}`,
+  const fields = [
+    { name: '👤 Treinador',   value: `\`${order.playerNick || 'Desconhecido'}\``, inline: true },
+    { name: '👾 Pokémon',     value: `\`${order.pokemon || 'N/A'}\``,             inline: true },
+    { name: '📊 IVs',         value: `\`${ivFormatted}\``,                         inline: true },
+    { name: '🧪 Ability',     value: `\`${abilityDisplay}\``,                      inline: true },
+    { name: '🧬 Gênero',      value: `\`${order.gender || 'N/A'}\``,               inline: true },
+    { name: '💬 Discord',     value: `\`${order.discordNick || 'Não informado'}\``, inline: true },
+    { name: '📝 Observações', value: `\`${order.observations || 'Nenhum'}\``,       inline: true },
+    { name: '🥚 Egg Group',   value: `\`${order.eggGroup || 'N/A'}\``,              inline: true },
+    { name: '💰 Valor Total', value: `**${priceFormatted}**`,                       inline: true },
+  ];
+
+  if (order.isCompetitive && order.build) {
+    const b = order.build;
+    const evStr = Object.entries(b.evs || {})
+      .filter(([_, v]) => (v as number) > 0)
+      .map(([s, v]) => `${s}: ${v}`)
+      .join(' | ');
+
+    fields.push(
+      { name: '⚔️ Build Competitiva', value: '\u200b', inline: false },
+      { name: '📈 EVs', value: `\`${evStr || 'Nenhum'}\``, inline: true },
+      { name: '🎖️ Level', value: `\`${b.level || '?'}\``, inline: true },
+      { name: '🎒 Item', value: `\`${b.item || 'Nenhum'}\``, inline: true },
+      { name: '⚡ PP Max', value: `\`${b.ppMax ? 'Sim' : 'Não'}\``, inline: true },
+      { name: '🌀 Moveset', value: `\`${(b.moves || []).filter(Boolean).join(' / ') || 'N/A'}\``, inline: false }
+    );
+  }
+
+  const embed: any = {
+    title: order.isCompetitive ? '⚔️ NOVA ENCOMENDA COMPETITIVA ⚔️' : '✨ ENCOMENDA VALIANTSHOP ✨',
+    color: order.isCompetitive ? 0xA855F7 : statusCfg.color,
+    description: order.isCompetitive 
+      ? `👋 <@${USER_ID}>, um novo pedido competitivo foi registrado.\n\n**Status:** ${statusCfg.label}`
+      : `👋 <@${USER_ID}>, um novo pedido foi registrado no sistema.\n\n**Status:** ${statusCfg.label}`,
     thumbnail: thumbUrl ? { url: thumbUrl } : undefined,
     image: { url: cinematicBanner },
-    fields: [
-      { name: '👤 Treinador',   value: `\`${order.playerNick || 'Desconhecido'}\``, inline: true },
-      { name: '👾 Pokémon',     value: `\`${order.pokemon || 'N/A'}\``,             inline: true },
-      { name: '📊 IVs',         value: `\`${ivFormatted}\``,                         inline: true },
-      { name: '🧪 Ability',     value: `\`${abilityDisplay}\``,                      inline: true },
-      { name: '🧬 Gênero',      value: `\`${order.gender || 'N/A'}\``,               inline: true },
-      { name: '💬 Discord',     value: `\`${order.discordNick || 'Não informado'}\``, inline: true },
-      { name: '📝 Observações', value: `\`${order.observations || 'Nenhum'}\``,       inline: true },
-      { name: '🥚 Egg Group',   value: `\`${eggGroupDisplay}\``,                      inline: true },
-      { name: '💰 Valor Total', value: `**${priceFormatted}**`,                       inline: true },
-    ],
+    fields,
     timestamp: new Date().toISOString(),
     footer: {
-      text: '🏢 ValiantShop | Logística de Encomendas',
+      text: order.isCompetitive ? '🏢 ValiantShop | Logística Competitiva' : '🏢 ValiantShop | Logística de Encomendas',
       icon_url: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
     },
   };
+
+  return embed;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -123,7 +142,8 @@ export const notifyNewOrder = async (order: any, orderId?: string): Promise<stri
       action: 'send',
       orderId,
       order: enrichedOrder,
-      content: `🔔 **Aviso de Venda** | <@${USER_ID}>`,
+      channelId: enrichedOrder.isCompetitive ? '1501747572463894538' : '1496973570168066148',
+      content: enrichedOrder.isCompetitive ? `⚔️ **Novo Pedido Competitivo** | <@${USER_ID}>` : `🔔 **Aviso de Venda** | <@${USER_ID}>`,
       embeds: [embed]
     });
     

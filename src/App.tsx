@@ -11,6 +11,7 @@ import { PokedexPage } from './pages/PokedexPage';
 import { PokeQuizPage } from './pages/PokeQuizPage';
 import { ConsultoriaSystem } from './pages/ConsultoriaSystem';
 import { BreederDashboard } from './pages/BreederDashboard';
+import { BuilderDashboard } from './pages/BuilderDashboard';
 import { CommunityFeed } from './pages/CommunityFeed';
 import { TrainerProfile } from './pages/TrainerProfile';
 import { PixelHunt } from './components/PixelHunt';
@@ -115,6 +116,7 @@ const HubPage = ({ setShowRankingModal, setShowReviewsModal }: any) => {
       color: 'primary',
       items: [
         { to: '/order', label: 'ENCOMENDAS', desc: 'Breeding personalizado e pronta entrega.', icon: <ShoppingBag size={24} /> },
+        { to: '/competitive-order', label: 'ENCOMENDAS COMPETITIVAS', desc: 'Build competitiva completa e treinada.', icon: <Swords size={24} /> },
         { to: '/prices', label: 'TABELA DE PREÇOS', desc: 'Valores, taxas e prazos de entrega.', icon: <Table size={24} /> },
         ...(user ? [{ to: '/status', label: 'STATUS DOS PEDIDOS', desc: 'Acompanhe suas encomendas ao vivo.', icon: <History size={24} /> }] : [])
       ]
@@ -658,9 +660,10 @@ const Navbar = ({ isLoginOpen, setIsLoginOpen, notifications, setNotifications, 
                 <div className="flex items-center gap-x-6 justify-end min-w-[140px]">
                    <NavDropdown 
                      title="Loja" 
-                     isActive={['/order', '/prices', '/status', '/hub/loja'].includes(location.pathname)}
+                     isActive={['/order', '/competitive-order', '/prices', '/status', '/hub/loja'].includes(location.pathname)}
                      items={[
                        { to: '/order', label: 'Encomendas', icon: <ShoppingBag size={18} /> },
+                       { to: '/competitive-order', label: 'Encomendas Competitivas', icon: <Swords size={18} /> },
                        { to: '/prices', label: 'Tabela de Preços', icon: <Table size={18} /> },
                        ...(user ? [{ to: '/status', label: 'Status dos Pedidos', icon: <History size={18} /> }] : [])
                      ]}
@@ -998,10 +1001,19 @@ function App() {
                   </ProtectedOrderRoute>
                 } 
               />
+              <Route 
+                path="/competitive-order" 
+                element={
+                  <ProtectedOrderRoute setIsLoginOpen={setIsLoginOpen}>
+                    <OrderForm isCompetitive={true} />
+                  </ProtectedOrderRoute>
+                } 
+              />
               <Route path="/prices" element={<Prices />} />
               <Route path="/status" element={<Status />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/breeder" element={<BreederDashboard />} />
+              <Route path="/builder" element={<BuilderDashboard />} />
               <Route 
                 path="/pokegrid" 
                 element={
@@ -1262,18 +1274,25 @@ function App() {
                   <FileText size={18} />
                 </button>
                 <button 
+                  onClick={() => navigate('/breeder')}
+                  className="w-12 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.4)] group"
+                  title="Painel Breeder"
+                >
+                  <Egg size={20} className="group-hover:scale-110 transition-transform" />
+                </button>
+                <button 
                   onClick={() => navigate('/admin')}
-                  className="w-12 h-12 bg-primary/10 hover:bg-primary/20 text-primary hover:text-white rounded-xl flex items-center justify-center transition-all border border-primary/20 shadow-[0_0_15px_var(--primary-glow)] group"
+                  className="w-12 h-12 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.4)] group"
                   title="Painel Admin"
                 >
                   <Shield size={20} className="group-hover:scale-110 transition-transform" />
                 </button>
                 <button 
-                  onClick={() => navigate('/breeder')}
-                  className="w-12 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.3)] group"
-                  title="Painel Breeder"
+                  onClick={() => navigate('/builder')}
+                  className="w-12 h-12 bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-white rounded-xl flex items-center justify-center transition-all border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.4)] group"
+                  title="Painel Builder"
                 >
-                  <Egg size={20} className="group-hover:scale-110 transition-transform" />
+                  <Swords size={20} className="group-hover:rotate-12 transition-transform" />
                 </button>
                 <button 
                   onClick={() => navigate('/status?chat=support')}
