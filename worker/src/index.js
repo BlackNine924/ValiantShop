@@ -1269,16 +1269,24 @@ export default {
             await updateFirestore(env, 'bot_config', 'embeds', fields, idToken);
             
             // Sync live bot message
-            const embed = buildEmbedFromConfig(cfg, mockOrder);
-            const res = await fetch(`https://discord.com/api/v10/channels/${cfg.channel || DEFAULT_EMBEDS[type].channel}/messages?limit=10`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
-            if (res.ok) {
-              const msgs = await res.json();
-              const target = msgs.find(m => m.author.id === interaction.application_id);
-              if (target) {
-                await fetch(`https://discord.com/api/v10/channels/${target.channel_id}/messages/${target.id}`, {
-                  method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
-                  body: JSON.stringify({ content: cfg.content, embeds: [embed], components: buildMainMenuComponents('PREVIEW', cfg.components, cfg.selects) })
-                });
+            if (type !== 'notificacao' && type !== 'cancelamento') {
+              const targetChannel = cfg.channel || DEFAULT_EMBEDS[type]?.channel || interaction.channel_id;
+              const res = await fetch(`https://discord.com/api/v10/channels/${targetChannel}/messages?limit=25`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } });
+              if (res.ok) {
+                const msgs = await res.json();
+                // Procura a última mensagem do bot
+                const target = msgs.find(m => m.author.id === interaction.application_id && m.embeds && m.embeds.length > 0);
+                if (target) {
+                  const payload = { components: buildFinalComponents(cfg) };
+                  if (type === 'help' || type === 'tabela' || type === 'server' || type === 'config_bot') {
+                    payload.embeds = [buildEmbedFromConfig(cfg, {})];
+                    payload.content = cfg.content || '';
+                  }
+                  await fetch(`https://discord.com/api/v10/channels/${target.channel_id}/messages/${target.id}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
+                    body: JSON.stringify(payload)
+                  });
+                }
               }
             }
             
